@@ -1,0 +1,48 @@
+# sample_config.yaml
+# Example Autonima pipeline specification
+# Defines a systematic review according to PRISMA steps
+
+objective: "Identify fMRI studies of working memory in schizophrenia"
+
+search:
+  database: "pubmed"
+  query: "schizophrenia AND working memory AND fMRI"
+  max_results: 1000
+  filters:
+    - humans
+    - english
+    - peer_reviewed
+
+inclusion_criteria:
+  - Human participants
+  - fMRI neuroimaging
+  - Case-control or experimental design
+  - Task-based working memory paradigm
+
+exclusion_criteria:
+  - Animal studies
+  - Review articles, meta-analyses, or theoretical papers
+  - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
+  - Studies without a control or comparison group
+
+retrieval:
+  sources:
+    - pubget
+    - ace
+  fallback: manual # user-assisted download if not accessible
+
+screening:
+  abstract:
+    model: "gpt-4"   # LLM for abstract screening
+    threshold: 0.75  # probability cutoff for inclusion
+  fulltext:
+    model: "gpt-4"
+    adjudicate: true # human-in-the-loop option
+
+output:
+  directory: "results/schizophrenia_wm"
+  prisma_diagram: true
+  formats:
+    - csv
+    - json
+    - pdf
