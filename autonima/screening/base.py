@@ -1,7 +1,7 @@
 """Base interface for screening engines."""
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 
 
@@ -67,10 +67,40 @@ class ScreeningEngine(ABC):
         Returns:
             Formatted prompt string
         """
-        content = study.abstract if screening_type == "abstract" else f"[Full text would be here for {study.pmid}]"
+        # Use abstract content for abstract screening, placeholder for full-text
+        if screening_type == "abstract":
+            content = study.abstract or "No abstract available"
+        else:
+            content = f"[Full text content would be loaded from {study.full_text_path}]" if study.full_text_path else "No full text available"
+
+        # Select appropriate instructions based on screening type
+        if screening_type == "abstract":
+            instructions = """
+INSTRUCTIONS:
+1. Carefully evaluate the abstract against each criterion
+2. If ANY exclusion criterion is clearly met, EXCLUDE the study
+3. If the abstract provides INSUFFICIENT information to determine inclusion, INCLUDE for full-text review
+4. Only EXCLUDE if you are highly confident based on the abstract alone
+5. Provide a confidence score (0.0-1.0) reflecting how certain you are about the decision
+6. Give a brief reason (max 100 words) explaining your decision
+"""
+        else:
+            instructions = """
+INSTRUCTIONS:
+1. Carefully evaluate the full text against each inclusion criterion
+2. Verify that ALL inclusion criteria are met
+3. Check that NO exclusion criteria are violated
+4. Pay special attention to study design, methods, participants, and outcomes
+5. If the study meets all criteria, INCLUDE it
+6. If ANY criterion is not met, EXCLUDE it
+7. Provide a confidence score (0.0-1.0) reflecting your certainty
+8. Give a detailed reason (max 200 words) explaining your decision
+"""
 
         prompt = f"""
-You are a systematic review screening assistant. Your task is to evaluate whether a study should be INCLUDED or EXCLUDED based on the provided criteria.
+You are a systematic review {screening_type} screener. Your task is to evaluate whether a study should be INCLUDED or EXCLUDED in a systematic review based on its {screening_type} and the provided criteria.
+
+**IMPORTANT**: This is {screening_type.upper()} screening only.
 
 STUDY INFORMATION:
 Title: {study.title}
@@ -86,19 +116,12 @@ INCLUSION CRITERIA:
 EXCLUSION CRITERIA:
 {chr(10).join(f"- {criterion}" for criterion in exclusion_criteria)}
 
-INSTRUCTIONS:
-1. Carefully analyze the study against each inclusion and exclusion criterion
-2. If ANY exclusion criterion applies, EXCLUDE the study
-3. If ALL inclusion criteria are met AND no exclusion criteria apply, INCLUDE the study
-4. Provide a confidence score between 0.0 and 1.0
-5. Give a brief reason for your decision (max 100 words)
+{instructions}
 
 RESPONSE FORMAT:
 DECISION: [INCLUDED/EXCLUDED]
 CONFIDENCE: [0.0-1.0]
 REASON: [Brief explanation]
-
-Please provide your response in the exact format specified above.
 """
 
         return prompt.strip()
