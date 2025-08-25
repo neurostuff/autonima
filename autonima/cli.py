@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 # Note: This would be installed as a dependency
-# import click
+import click
 
 from .config import ConfigManager, ConfigurationError
 from .pipeline import run_pipeline_from_config
@@ -18,33 +18,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-# Mock click functionality for now (would use actual click in real implementation)
-class MockClick:
-    """Mock click functionality for development."""
-
-    @staticmethod
-    def command():
-        def decorator(func):
-            return func
-        return decorator
-
-    @staticmethod
-    def option(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
-
-    @staticmethod
-    def argument(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
-
-
-# Use mock click for now
-click = MockClick()
 
 
 @click.command()
@@ -211,84 +184,20 @@ def create_sample_config():
 
 
 # CLI group would be used with actual click
-# @click.group()
-# def cli():
-#     """Autonima: Automated Neuroimaging Meta-Analysis"""
-#     pass
+@click.group()
+def cli():
+    """Autonima: Automated Neuroimaging Meta-Analysis"""
+    pass
 
 
-# cli.add_command(run)
-# cli.add_command(validate)
-# cli.add_command(create_sample_config)
+cli.add_command(run)
+cli.add_command(validate)
+cli.add_command(create_sample_config)
 
 
 def main():
     """Main CLI entry point."""
-    if len(sys.argv) < 2:
-        print("Autonima: Automated Neuroimaging Meta-Analysis")
-        print()
-        print("Usage:")
-        print("  python -m autonima run --config <config_file>")
-        print("  python -m autonima validate --config <config_file>")
-        print("  python -m autonima create-sample-config")
-        print()
-        print("For help: python -m autonima <command> --help")
-        sys.exit(1)
-
-    command = sys.argv[1]
-
-    if command == "run":
-        # Simple argument parsing for run command
-        config_path = None
-        verbose = False
-        dry_run = False
-
-        i = 2
-        while i < len(sys.argv):
-            if sys.argv[i] == "--config" and i + 1 < len(sys.argv):
-                config_path = sys.argv[i + 1]
-                i += 2
-            elif sys.argv[i] == "--verbose":
-                verbose = True
-                i += 1
-            elif sys.argv[i] == "--dry-run":
-                dry_run = True
-                i += 1
-            else:
-                i += 1
-
-        if not config_path:
-            print("Error: --config is required")
-            sys.exit(1)
-
-        # Call the run function
-        run(config_path, None, verbose, dry_run)
-
-    elif command == "validate":
-        # Simple argument parsing for validate command
-        config_path = None
-
-        i = 2
-        while i < len(sys.argv):
-            if sys.argv[i] == "--config" and i + 1 < len(sys.argv):
-                config_path = sys.argv[i + 1]
-                i += 2
-            else:
-                i += 1
-
-        if not config_path:
-            print("Error: --config is required")
-            sys.exit(1)
-
-        validate(config_path)
-
-    elif command == "create-sample-config":
-        create_sample_config()
-
-    else:
-        print(f"Unknown command: {command}")
-        print("Available commands: run, validate, create-sample-config")
-        sys.exit(1)
+    cli()
 
 
 if __name__ == "__main__":

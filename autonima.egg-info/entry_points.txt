@@ -1,0 +1,2 @@
+[console_scripts]
+autonima = autonima.cli:main
