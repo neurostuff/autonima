@@ -1,6 +1,7 @@
 """Pytest tests for the simplified screening module."""
 
 import asyncio
+from unittest.mock import patch, MagicMock
 from autonima.models.types import Study, StudyStatus, ScreeningConfig
 from autonima.screening import LLMScreener
 
@@ -49,26 +50,39 @@ def test_unified_screener_abstract_screening():
     config.inclusion_criteria = ["fMRI neuroimaging", "Human participants"]
     config.exclusion_criteria = ["Animal studies", "Review articles"]
 
-    # Create unified screener
-    screener = LLMScreener(
-        config,
-        inclusion_criteria=config.inclusion_criteria,
-        exclusion_criteria=config.exclusion_criteria
-    )
+    # Mock the LLM client
+    with patch('autonima.screening.screener.GenericLLMClient') as \
+         mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        
+        # Mock the screen_abstract method to return a predefined response
+        mock_response = MagicMock()
+        mock_response.decision = "INCLUDED"
+        mock_response.confidence = 0.95
+        mock_response.reason = "Meets all inclusion criteria"
+        mock_client.screen_abstract.return_value = mock_response
 
-    # Test abstract screening
-    studies_list = [study]
-    abstract_results = asyncio.run(screener.screen_abstracts(studies_list))
-    
-    assert isinstance(abstract_results, list)
-    # We should get exactly one result
-    assert len(abstract_results) == 1
-    
-    result = abstract_results[0]
-    assert result.study_id == "TEST001"
-    assert hasattr(result, 'decision')
-    assert hasattr(result, 'confidence')
-    assert hasattr(result, 'reason')
+        # Create unified screener
+        screener = LLMScreener(
+            config,
+            inclusion_criteria=config.inclusion_criteria,
+            exclusion_criteria=config.exclusion_criteria
+        )
+
+        # Test abstract screening
+        studies_list = [study]
+        abstract_results = asyncio.run(screener.screen_abstracts(studies_list))
+        
+        assert isinstance(abstract_results, list)
+        # We should get exactly one result
+        assert len(abstract_results) == 1
+        
+        result = abstract_results[0]
+        assert result.study_id == "TEST001"
+        assert hasattr(result, 'decision')
+        assert hasattr(result, 'confidence')
+        assert hasattr(result, 'reason')
 
 
 def test_unified_screener_get_info():

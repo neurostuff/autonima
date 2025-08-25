@@ -20,9 +20,11 @@ autonima/
 │   └── base.py            # Abstract search interface
 ├── screening/
 │   ├── __init__.py
-│   ├── llm_screener.py    # LLM-based screening logic
-│   ├── abstract_screen.py # Abstract screening implementation
-│   └── fulltext_screen.py # Full-text screening implementation
+│   ├── base.py            # Abstract screening interface
+│   ├── screener.py        # LLM-based screening logic
+│   ├── prompts.py         # Prompt library for screening
+│   ├── schema.py          # Pydantic models for screening output
+│   └── openai_client.py   # Generic LLM API integration
 ├── retrieval/
 │   ├── __init__.py
 │   ├── pubget.py          # PubGet integration
@@ -79,6 +81,9 @@ autonima/
   - Full-text screening with human-in-the-loop options
   - Multi-model support (GPT-4, Claude, etc.)
   - Screening result caching and reproducibility
+  - Prompt library for consistent screening
+  - Pydantic schemas for structured output
+  - Generic LLM API integration with function calling
 
 #### 5. Retrieval Module (`retrieval/`)
 
@@ -166,10 +171,11 @@ class PipelineConfig:
 4. Build output formatting system
 
 ### Phase 3: LLM Integration
-1. Implement LLM screening with OpenAI API
+1. Implement LLM screening with generic API client
 2. Add support for multiple LLM providers
 3. Implement screening result caching
 4. Add confidence scoring and thresholds
+5. Implement prompt library and Pydantic schemas
 
 ### Phase 4: Advanced Features
 1. Integrate with PubGet and ACE
@@ -230,4 +236,4 @@ autonima validate --config config.yaml
 
 This architecture provides a solid foundation for implementing Autonima while maintaining modularity, extensibility, and adherence to the PRISMA framework.
 
-NOTE: As a first step, the platform can be built ONLY using pubget for full text retrieval. In this case, any papers that are not in the OA subset of PubMedCentral can be rejected. When evaluating the performance, this should be taken into account, as to not penalize for article for which the full text was not available. 
+NOTE: As a first step, the platform can be built ONLY using pubget for full text retrieval. In this case, any papers that are not in the OA subset of PubMedCentral can be rejected. When evaluating the performance, this should be taken into account, as to not penalize for article for which the full text was not available.

@@ -21,6 +21,7 @@ Autonima enables end-to-end automation of systematic review steps:
 
    * Applies inclusion/exclusion criteria to abstracts using LLM-based screening.
    * Benchmarked against human/manual performance.
+   * Uses function calling with Pydantic schemas for structured output.
 
 3. **Full-Text Retrieval**
 
@@ -30,6 +31,7 @@ Autonima enables end-to-end automation of systematic review steps:
 
    * Applies full-text screening with LLMs.
    * Produces a final set of included studies for meta-analysis.
+   * Uses function calling with Pydantic schemas for structured output.
 
 ---
 

@@ -1,8 +1,8 @@
 """Base interface for screening engines."""
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Tuple
-from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
+from typing import List, Dict, Any
+from ..models.types import Study, ScreeningConfig, ScreeningResult
 
 
 class ScreeningEngine(ABC):
@@ -13,7 +13,10 @@ class ScreeningEngine(ABC):
         self.config = config
 
     @abstractmethod
-    async def screen_abstracts(self, studies: List[Study]) -> List[ScreeningResult]:
+    async def screen_abstracts(
+        self, 
+        studies: List[Study]
+    ) -> List[ScreeningResult]:
         """
         Screen study abstracts for inclusion/exclusion.
 
@@ -26,7 +29,10 @@ class ScreeningEngine(ABC):
         pass
 
     @abstractmethod
-    async def screen_fulltexts(self, studies: List[Study]) -> List[ScreeningResult]:
+    async def screen_fulltexts(
+        self, 
+        studies: List[Study]
+    ) -> List[ScreeningResult]:
         """
         Screen full-text articles for inclusion/exclusion.
 
@@ -47,115 +53,3 @@ class ScreeningEngine(ABC):
             Dictionary with screening engine metadata
         """
         pass
-
-    def build_screening_prompt(
-        self,
-        study: Study,
-        inclusion_criteria: List[str],
-        exclusion_criteria: List[str],
-        screening_type: str = "abstract"
-    ) -> str:
-        """
-        Build a screening prompt for the LLM.
-
-        Args:
-            study: Study to screen
-            inclusion_criteria: List of inclusion criteria
-            exclusion_criteria: List of exclusion criteria
-            screening_type: Type of screening ("abstract" or "fulltext")
-
-        Returns:
-            Formatted prompt string
-        """
-        # Use abstract content for abstract screening, placeholder for full-text
-        if screening_type == "abstract":
-            content = study.abstract or "No abstract available"
-        else:
-            content = f"[Full text content would be loaded from {study.full_text_path}]" if study.full_text_path else "No full text available"
-
-        # Select appropriate instructions based on screening type
-        if screening_type == "abstract":
-            instructions = """
-INSTRUCTIONS:
-1. Carefully evaluate the abstract against each criterion
-2. If ANY exclusion criterion is clearly met, EXCLUDE the study
-3. If the abstract provides INSUFFICIENT information to determine inclusion, INCLUDE for full-text review
-4. Only EXCLUDE if you are highly confident based on the abstract alone
-5. Provide a confidence score (0.0-1.0) reflecting how certain you are about the decision
-6. Give a brief reason (max 100 words) explaining your decision
-"""
-        else:
-            instructions = """
-INSTRUCTIONS:
-1. Carefully evaluate the full text against each inclusion criterion
-2. Verify that ALL inclusion criteria are met
-3. Check that NO exclusion criteria are violated
-4. Pay special attention to study design, methods, participants, and outcomes
-5. If the study meets all criteria, INCLUDE it
-6. If ANY criterion is not met, EXCLUDE it
-7. Provide a confidence score (0.0-1.0) reflecting your certainty
-8. Give a detailed reason (max 200 words) explaining your decision
-"""
-
-        prompt = f"""
-You are a systematic review {screening_type} screener. Your task is to evaluate whether a study should be INCLUDED or EXCLUDED in a systematic review based on its {screening_type} and the provided criteria.
-
-**IMPORTANT**: This is {screening_type.upper()} screening only.
-
-STUDY INFORMATION:
-Title: {study.title}
-Abstract: {content}
-Authors: {', '.join(study.authors)}
-Journal: {study.journal}
-Publication Date: {study.publication_date}
-DOI: {study.doi or 'Not available'}
-
-INCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in inclusion_criteria)}
-
-EXCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in exclusion_criteria)}
-
-{instructions}
-
-RESPONSE FORMAT:
-DECISION: [INCLUDED/EXCLUDED]
-CONFIDENCE: [0.0-1.0]
-REASON: [Brief explanation]
-"""
-
-        return prompt.strip()
-
-    def parse_screening_response(self, response: str) -> Tuple[StudyStatus, float, str]:
-        """
-        Parse LLM response into structured result.
-
-        Args:
-            response: Raw LLM response string
-
-        Returns:
-            Tuple of (decision, confidence, reason)
-        """
-        lines = response.strip().split('\n')
-        decision = StudyStatus.EXCLUDED
-        confidence = 0.5
-        reason = "Unable to parse response"
-
-        for line in lines:
-            line = line.strip()
-            if line.startswith('DECISION:'):
-                decision_text = line.replace('DECISION:', '').strip().upper()
-                if 'INCLUDE' in decision_text:
-                    decision = StudyStatus.INCLUDED
-                else:
-                    decision = StudyStatus.EXCLUDED
-            elif line.startswith('CONFIDENCE:'):
-                try:
-                    confidence = float(line.replace('CONFIDENCE:', '').strip())
-                    confidence = max(0.0, min(1.0, confidence))  # Clamp to [0,1]
-                except ValueError:
-                    confidence = 0.5
-            elif line.startswith('REASON:'):
-                reason = line.replace('REASON:', '').strip()
-
-        return decision, confidence, reason
