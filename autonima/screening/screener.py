@@ -17,13 +17,15 @@ logger = logging.getLogger(__name__)
 class LLMScreener(ScreeningEngine):
     """Unified LLM-powered screening engine for both abstract and full-text screening."""
 
-    def __init__(self, config: ScreeningConfig):
+    def __init__(self, config: ScreeningConfig, inclusion_criteria: List[str] = None, exclusion_criteria: List[str] = None):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
         self._client = None
         self._cache_file = Path("cache/screening_cache.json")
         self._cache_file.parent.mkdir(exist_ok=True)
         self._cache = self._load_cache()
+        self.inclusion_criteria = inclusion_criteria or []
+        self.exclusion_criteria = exclusion_criteria or []
 
     async def screen_abstracts(self, studies: List[Study]) -> List[ScreeningResult]:
         """
@@ -67,8 +69,8 @@ class LLMScreener(ScreeningEngine):
             # Build prompt with inclusion/exclusion criteria from config
             prompt = self.build_screening_prompt(
                 study=study,
-                inclusion_criteria=self.config.inclusion_criteria,
-                exclusion_criteria=self.config.exclusion_criteria,
+                inclusion_criteria=self.inclusion_criteria,
+                exclusion_criteria=self.exclusion_criteria,
                 screening_type="abstract"
             )
 
@@ -171,8 +173,8 @@ class LLMScreener(ScreeningEngine):
             # Build prompt with inclusion/exclusion criteria from config
             prompt = self.build_screening_prompt(
                 study=study,
-                inclusion_criteria=self.config.inclusion_criteria,
-                exclusion_criteria=self.config.exclusion_criteria,
+                inclusion_criteria=self.inclusion_criteria,
+                exclusion_criteria=self.exclusion_criteria,
                 screening_type="fulltext"
             )
 

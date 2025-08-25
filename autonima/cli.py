@@ -21,15 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 @click.command()
-@click.option('--config', '-c', required=True,
-              help='Path to YAML configuration file')
-@click.option('--output', '-o', default=None,
-              help='Output directory (overrides config)')
+@click.argument('config', type=click.Path(exists=True))
+@click.argument('output_folder', type=click.Path())
 @click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose logging')
 @click.option('--dry-run', is_flag=True,
               help='Validate configuration without running pipeline')
-def run(config: str, output: Optional[str], verbose: bool, dry_run: bool):
+def run(config: str, output_folder: str, verbose: bool, dry_run: bool):
     """
     Run the Autonima systematic review pipeline.
 
@@ -40,10 +38,18 @@ def run(config: str, output: Optional[str], verbose: bool, dry_run: bool):
     4. Full-text screening
     5. Output generation with PRISMA compliance
 
-    Example:
-        autonima run --config config.yaml
-        autonima run --config config.yaml --verbose
-        autonima run --config config.yaml --dry-run
+    Arguments:
+        CONFIG          Path to YAML configuration file
+        OUTPUT_FOLDER   Output folder for all results and intermediary files
+
+    Options:
+        -v, --verbose   Enable verbose logging
+        --dry-run       Validate configuration without running pipeline
+
+    Examples:
+        autonima run config.yaml results
+        autonima run config.yaml results --verbose
+        autonima run config.yaml results --dry-run
     """
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -60,8 +66,8 @@ def run(config: str, output: Optional[str], verbose: bool, dry_run: bool):
         config_manager = ConfigManager()
         pipeline_config = config_manager.load_from_file(str(config_path))
 
-        if output:
-            pipeline_config.output.directory = output
+        # Set output directory to the specified output folder
+        pipeline_config.output.directory = output_folder
 
         logger.info(f"Pipeline objective: {pipeline_config.objective}")
         logger.info(f"Search database: {pipeline_config.search.database}")
@@ -76,7 +82,7 @@ def run(config: str, output: Optional[str], verbose: bool, dry_run: bool):
         logger.info("Starting pipeline execution...")
 
         async def execute_pipeline():
-            results = await run_pipeline_from_config(str(config_path))
+            results = await run_pipeline_from_config(config=pipeline_config)
 
             # Print summary
             stats = results.execution_stats
@@ -110,17 +116,21 @@ def run(config: str, output: Optional[str], verbose: bool, dry_run: bool):
 
 
 @click.command()
-@click.option('--config', '-c', required=True,
-              help='Path to YAML configuration file')
-def validate(config: str):
+@click.argument('config', type=click.Path(exists=True))
+@click.argument('output_folder', type=click.Path())
+def validate(config: str, output_folder: str):
     """
     Validate a configuration file without running the pipeline.
 
     This command checks if the configuration file is valid and
     all required parameters are present.
 
-    Example:
-        autonima validate --config config.yaml
+    Arguments:
+        CONFIG          Path to YAML configuration file
+        OUTPUT_FOLDER   Output folder for all results and intermediary files
+
+    Examples:
+        autonima validate config.yaml results
     """
     config_path = Path(config)
     if not config_path.exists():
@@ -130,6 +140,9 @@ def validate(config: str):
     try:
         config_manager = ConfigManager()
         pipeline_config = config_manager.load_from_file(str(config_path))
+        
+        # Set output directory to the specified output folder
+        pipeline_config.output.directory = output_folder
 
         print(f"✓ Configuration file is valid: {config_path}")
         print(f"✓ Objective: {pipeline_config.objective}")

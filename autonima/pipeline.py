@@ -48,6 +48,10 @@ class AutonimaPipeline:
         self._abstract_screener = None
         self._fulltext_screener = None
 
+        # Ensure output directory exists
+        output_dir = Path(self.config.output.directory)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         # Initialize components
         self._setup_components()
 
@@ -60,7 +64,11 @@ class AutonimaPipeline:
             raise ValueError(f"Unsupported database: {self.config.search.database}")
 
         # Initialize screening engine
-        self._screener = LLMScreener(self.config.screening)
+        self._screener = LLMScreener(
+            self.config.screening,
+            inclusion_criteria=self.config.inclusion_criteria,
+            exclusion_criteria=self.config.exclusion_criteria
+        )
 
     async def run(self) -> PipelineResult:
         """
@@ -120,7 +128,19 @@ class AutonimaPipeline:
             "search_query": self.config.search.query
         })
 
+        # Save intermediary results
+        output_dir = Path(self.config.output.directory)
+        search_results_file = output_dir / "search_results.json"
+        search_data = {
+            "studies": [study.to_dict() for study in studies],
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(search_results_file, 'w') as f:
+            import json
+            json.dump(search_data, f, indent=2)
+
         logger.info(f"Search completed: found {len(studies)} studies")
+        logger.info(f"Search results saved to {search_results_file}")
 
     async def _execute_abstract_screening(self):
         """Execute abstract screening phase."""
@@ -151,8 +171,20 @@ class AutonimaPipeline:
         # Add screening results to pipeline results
         self.results.screening_results.extend(screening_results)
 
+        # Save intermediary results
+        output_dir = Path(self.config.output.directory)
+        screening_results_file = output_dir / "abstract_screening_results.json"
+        screening_data = {
+            "screening_results": [result.to_dict() for result in screening_results],
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(screening_results_file, 'w') as f:
+            import json
+            json.dump(screening_data, f, indent=2)
+
         screened_count = len([s for s in self.results.studies if s.status != StudyStatus.PENDING])
         logger.info(f"Abstract screening completed: {screened_count} studies screened")
+        logger.info(f"Abstract screening results saved to {screening_results_file}")
 
     async def _mock_abstract_screening(self, studies: List[Study]):
         """Mock abstract screening for development purposes."""
@@ -203,8 +235,28 @@ class AutonimaPipeline:
         # For now, mock retrieval
         await self._mock_fulltext_retrieval(included_studies)
 
+        # Save intermediary results
+        output_dir = Path(self.config.output.directory)
+        retrieval_results_file = output_dir / "fulltext_retrieval_results.json"
+        retrieval_data = {
+            "studies_with_fulltext": [
+                {
+                    "pmid": study.pmid,
+                    "title": study.title,
+                    "full_text_path": study.full_text_path,
+                    "retrieved_at": study.retrieved_at.isoformat() if study.retrieved_at else None
+                }
+                for study in self.results.studies if study.full_text_path
+            ],
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(retrieval_results_file, 'w') as f:
+            import json
+            json.dump(retrieval_data, f, indent=2)
+
         retrieved_count = len([s for s in self.results.studies if s.full_text_path])
         logger.info(f"Full-text retrieval completed: {retrieved_count} texts retrieved")
+        logger.info(f"Full-text retrieval results saved to {retrieval_results_file}")
 
     async def _mock_fulltext_retrieval(self, studies: List[Study]):
         """Mock full-text retrieval for development purposes."""
@@ -245,11 +297,23 @@ class AutonimaPipeline:
         # Add screening results to pipeline results
         self.results.screening_results.extend(screening_results)
 
+        # Save intermediary results
+        output_dir = Path(self.config.output.directory)
+        fulltext_screening_results_file = output_dir / "fulltext_screening_results.json"
+        fulltext_screening_data = {
+            "screening_results": [result.to_dict() for result in screening_results],
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(fulltext_screening_results_file, 'w') as f:
+            import json
+            json.dump(fulltext_screening_data, f, indent=2)
+
         final_count = len([
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED
         ])
         logger.info(f"Full-text screening completed: {final_count} studies included")
+        logger.info(f"Full-text screening results saved to {fulltext_screening_results_file}")
 
     async def _mock_fulltext_screening(self, studies: List[Study]):
         """Mock full-text screening for development purposes."""
@@ -302,6 +366,15 @@ class AutonimaPipeline:
             "final_included_count": len(included_studies)
         })
 
+        # Save final results
+        output_dir = Path(self.config.output.directory)
+        final_results_file = output_dir / "final_results.json"
+        with open(final_results_file, 'w') as f:
+            import json
+            json.dump(self.results.to_dict(), f, indent=2)
+
+        logger.info(f"Final results saved to {final_results_file}")
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""
         return {
@@ -335,18 +408,22 @@ class AutonimaPipeline:
 
 
 # Convenience function for running pipeline from config file
-async def run_pipeline_from_config(config_path: str) -> PipelineResult:
+async def run_pipeline_from_config(config_path: str = None, config: PipelineConfig = None) -> PipelineResult:
     """
-    Run pipeline from configuration file.
+    Run pipeline from configuration file or config object.
 
     Args:
         config_path: Path to YAML configuration file
+        config: Pipeline configuration object
 
     Returns:
         Pipeline results
     """
-    config_manager = ConfigManager()
-    config = config_manager.load_from_file(config_path)
+    if config is None:
+        if config_path is None:
+            raise ValueError("Either config_path or config must be provided")
+        config_manager = ConfigManager()
+        config = config_manager.load_from_file(config_path)
 
     pipeline = AutonimaPipeline(config)
     return await pipeline.run()
