@@ -1,12 +1,12 @@
-"""LLM-based screening engine using OpenAI API."""
+"""Unified LLM-based screening engine for systematic reviews."""
 
 import asyncio
 import logging
 import hashlib
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional
 from pathlib import Path
+from typing import List, Dict, Any
 
 from .base import ScreeningEngine
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class LLMScreener(ScreeningEngine):
-    """LLM-powered screening engine using OpenAI API."""
+    """Unified LLM-powered screening engine for both abstract and full-text screening."""
 
     def __init__(self, config: ScreeningConfig):
-        """Initialize the LLM screener with configuration."""
+        """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
         self._client = None
         self._cache_file = Path("cache/screening_cache.json")
@@ -27,7 +27,7 @@ class LLMScreener(ScreeningEngine):
 
     async def screen_abstracts(self, studies: List[Study]) -> List[ScreeningResult]:
         """
-        Screen study abstracts using LLM.
+        Screen study abstracts for inclusion/exclusion.
 
         Args:
             studies: List of studies to screen
@@ -35,10 +35,20 @@ class LLMScreener(ScreeningEngine):
         Returns:
             List of screening results
         """
+        logger.info(f"Starting abstract screening for {len(studies)} studies")
+
+        # Filter to only studies that have abstracts
+        screenable_studies = [s for s in studies if s.abstract and s.abstract.strip()]
+
+        if len(screenable_studies) < len(studies):
+            logger.warning(
+                f"Skipping {len(studies) - len(screenable_studies)} studies without abstracts"
+            )
+
         results = []
         abstract_config = self.config.abstract
 
-        for study in studies:
+        for study in screenable_studies:
             # Check cache first
             cache_key = self._get_cache_key(study, "abstract")
             if cache_key in self._cache:
@@ -54,11 +64,11 @@ class LLMScreener(ScreeningEngine):
                 ))
                 continue
 
-            # Build prompt and call LLM
+            # Build prompt with inclusion/exclusion criteria from config
             prompt = self.build_screening_prompt(
                 study=study,
-                inclusion_criteria=[],  # Will be passed from pipeline
-                exclusion_criteria=[],  # Will be passed from pipeline
+                inclusion_criteria=self.config.inclusion_criteria,
+                exclusion_criteria=self.config.exclusion_criteria,
                 screening_type="abstract"
             )
 
@@ -118,7 +128,7 @@ class LLMScreener(ScreeningEngine):
 
     async def screen_fulltexts(self, studies: List[Study]) -> List[ScreeningResult]:
         """
-        Screen full-text articles using LLM.
+        Screen full-text articles for inclusion/exclusion.
 
         Args:
             studies: List of studies with full text to screen
@@ -126,10 +136,23 @@ class LLMScreener(ScreeningEngine):
         Returns:
             List of screening results
         """
+        logger.info(f"Starting full-text screening for {len(studies)} studies")
+
+        # Filter to only studies that have full text
+        screenable_studies = [
+            s for s in studies
+            if s.full_text_path and Path(s.full_text_path).exists()
+        ]
+
+        if len(screenable_studies) < len(studies):
+            logger.warning(
+                f"Skipping {len(studies) - len(screenable_studies)} studies without full text"
+            )
+
         results = []
         fulltext_config = self.config.fulltext
 
-        for study in studies:
+        for study in screenable_studies:
             # Check cache first
             cache_key = self._get_cache_key(study, "fulltext")
             if cache_key in self._cache:
@@ -145,43 +168,62 @@ class LLMScreener(ScreeningEngine):
                 ))
                 continue
 
-            # For now, mock full text screening since we don't have actual full texts
-            # In a real implementation, you would load the full text from study.full_text_path
-
-            mock_response = f"""
-DECISION: INCLUDED
-CONFIDENCE: 0.85
-REASON: This study meets all inclusion criteria for neuroimaging research and shows no exclusion factors.
-"""
-
-            decision, confidence, reason = self.parse_screening_response(mock_response)
-
-            # Apply threshold
-            threshold = fulltext_config.get("threshold", 0.8)
-            if confidence < threshold:
-                decision = StudyStatus.EXCLUDED
-                reason = f"Confidence {confidence:.2f} below threshold {threshold}. {reason}"
-
-            result = ScreeningResult(
-                study_id=study.pmid,
-                decision=decision,
-                reason=reason,
-                confidence=confidence,
-                model_used=fulltext_config.get("model", "gpt-4"),
+            # Build prompt with inclusion/exclusion criteria from config
+            prompt = self.build_screening_prompt(
+                study=study,
+                inclusion_criteria=self.config.inclusion_criteria,
+                exclusion_criteria=self.config.exclusion_criteria,
                 screening_type="fulltext"
             )
 
-            results.append(result)
+            try:
+                response = await self._call_llm(
+                    prompt=prompt,
+                    model=fulltext_config.get("model", "gpt-4"),
+                    temperature=fulltext_config.get("temperature", 0.1),
+                    max_tokens=fulltext_config.get("max_tokens", 2000)
+                )
 
-            # Cache the result
-            self._cache[cache_key] = {
-                "decision": decision.value,
-                "reason": reason,
-                "confidence": confidence,
-                "model_used": fulltext_config.get("model", "gpt-4"),
-                "timestamp": datetime.now().isoformat()
-            }
-            self._save_cache()
+                decision, confidence, reason = self.parse_screening_response(response)
+
+                # Apply threshold
+                threshold = fulltext_config.get("threshold", 0.8)
+                if confidence < threshold:
+                    decision = StudyStatus.EXCLUDED
+                    reason = f"Confidence {confidence:.2f} below threshold {threshold}. {reason}"
+
+                result = ScreeningResult(
+                    study_id=study.pmid,
+                    decision=decision,
+                    reason=reason,
+                    confidence=confidence,
+                    model_used=fulltext_config.get("model", "gpt-4"),
+                    screening_type="fulltext"
+                )
+
+                results.append(result)
+
+                # Cache the result
+                self._cache[cache_key] = {
+                    "decision": decision.value,
+                    "reason": reason,
+                    "confidence": confidence,
+                    "model_used": fulltext_config.get("model", "gpt-4"),
+                    "timestamp": datetime.now().isoformat()
+                }
+                self._save_cache()
+
+            except Exception as e:
+                logger.error(f"Error screening fulltext for {study.pmid}: {e}")
+                # Return failed screening result
+                results.append(ScreeningResult(
+                    study_id=study.pmid,
+                    decision=StudyStatus.SCREENING_FAILED,
+                    reason=f"Screening failed: {str(e)}",
+                    confidence=0.0,
+                    model_used=fulltext_config.get("model", "gpt-4"),
+                    screening_type="fulltext"
+                ))
 
         return results
 

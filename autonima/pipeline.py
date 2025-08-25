@@ -15,7 +15,7 @@ from .models.types import (
     ScreeningResult
 )
 from .search import PubMedSearch
-from .screening import AbstractScreener, FullTextScreener
+from .screening import LLMScreener
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,8 @@ class AutonimaPipeline:
         else:
             raise ValueError(f"Unsupported database: {self.config.search.database}")
 
-        # Initialize screening engines
-        self._abstract_screener = AbstractScreener(self.config.screening)
-        self._fulltext_screener = FullTextScreener(self.config.screening)
+        # Initialize screening engine
+        self._screener = LLMScreener(self.config.screening)
 
     async def run(self) -> PipelineResult:
         """
@@ -134,11 +133,11 @@ class AutonimaPipeline:
             logger.info("No studies require abstract screening")
             return
 
-        if not self._abstract_screener:
-            raise RuntimeError("Abstract screener not initialized")
+        if not self._screener:
+            raise RuntimeError("Screener not initialized")
 
         # Use LLM-based screening
-        screening_results = await self._abstract_screener.screen_abstracts(pending_studies)
+        screening_results = await self._screener.screen_abstracts(pending_studies)
 
         # Apply screening results to studies
         for result in screening_results:
@@ -228,11 +227,11 @@ class AutonimaPipeline:
             logger.info("No studies require full-text screening")
             return
 
-        if not self._fulltext_screener:
-            raise RuntimeError("Full-text screener not initialized")
+        if not self._screener:
+            raise RuntimeError("Screener not initialized")
 
         # Use LLM-based full-text screening
-        screening_results = await self._fulltext_screener.screen_fulltexts(screenable_studies)
+        screening_results = await self._screener.screen_fulltexts(screenable_studies)
 
         # Apply screening results to studies
         for result in screening_results:
