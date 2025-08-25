@@ -1,9 +1,0 @@
-{
-  "66ec425c1034072603543ef50c1471b9": {
-    "decision": "included",
-    "reason": "This study investigates fMRI correlates of working memory in schizophrenia patients, meeting all inclusion criteria for neuroimaging research in psychiatric populations.",
-    "confidence": 0.92,
-    "model_used": "gpt-4",
-    "timestamp": "2025-08-22T14:38:51.155795"
-  }
-}
