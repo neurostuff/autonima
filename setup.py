@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Read the contents of README file
 this_directory = Path(__file__).parent
-long_description = (this_directory / "READMEmd").read_text()
+long_description = (this_directory / "README.md").read_text()
 
 # Read version from package
 def get_version():
