@@ -50,6 +50,9 @@ setup(
         "pathlib",
         "typing",
         "datetime",
+        "biopython>=1.81",
+        "pandas>=2.0",
+        "matplotlib>=3.5"
     ],
     extras_require={
         "dev": [
@@ -61,27 +64,7 @@ setup(
             "pre-commit>=3.0",
         ],
         "llm": [
-            "openai>=1.0",
-            "anthropic>=0.5",
-            "tiktoken>=0.5",
-        ],
-        "pubmed": [
-            "biopython>=1.81",
-        ],
-        "output": [
-            "pandas>=2.0",
-            "matplotlib>=3.5",
-            "reportlab>=4.0",
-            "PyPDF2>=3.0",
-        ],
-        "full": [
-            "openai>=1.0",
-            "anthropic>=0.5",
-            "biopython>=1.81",
-            "pandas>=2.0",
-            "matplotlib>=3.5",
-            "reportlab>=4.0",
-            "PyPDF2>=3.0",
+            "openai>=1.0"
         ]
     },
     entry_points={
