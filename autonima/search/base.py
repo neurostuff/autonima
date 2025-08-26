@@ -48,8 +48,8 @@ class SearchEngine(ABC):
         Returns:
             Complete query string
         """
-        query_parts = [base_query]]
-        
+        query_parts = [base_query]
+
         # Add date filters if specified
         if self.config.date_from:
             date_from = self.config.date_from
