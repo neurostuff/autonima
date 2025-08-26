@@ -99,9 +99,8 @@ class LLMScreener(ScreeningEngine):
                     None,
                     self._llm_client.screen_abstract,
                     prompt,
-                    abstract_config.get("model", "gpt-4"),
-                    abstract_config.get("temperature", 0.1),
-                    abstract_config.get("max_tokens", 1000)
+                    abstract_config.get("model", "gpt-4o-mini"),
+                    abstract_config.get("temperature", 0.1)
                 )
 
                 # Apply threshold
@@ -111,7 +110,7 @@ class LLMScreener(ScreeningEngine):
                     reason = (f"Confidence {response.confidence:.2f} below "
                               f"threshold {threshold}. {response.reason}")
                 else:
-                    decision = (StudyStatus.INCLUDED if response.decision == 
+                    decision = (StudyStatus.INCLUDED if response.decision ==
                                 "INCLUDED" else StudyStatus.EXCLUDED)
                     reason = response.reason
 
@@ -120,7 +119,7 @@ class LLMScreener(ScreeningEngine):
                     decision=decision,
                     reason=reason,
                     confidence=response.confidence,
-                    model_used=abstract_config.get("model", "gpt-4"),
+                    model_used=abstract_config.get("model", "gpt-4o-mini"),
                     screening_type="abstract"
                 )
 

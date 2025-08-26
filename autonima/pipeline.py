@@ -1,18 +1,16 @@
 """Main pipeline orchestrator for Autonima."""
 
-import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from .config import ConfigManager
 from .models.types import (
     PipelineConfig,
     PipelineResult,
     Study,
-    StudyStatus,
-    ScreeningResult
+    StudyStatus
 )
 from .search import PubMedSearch
 from .screening import LLMScreener
@@ -61,7 +59,8 @@ class AutonimaPipeline:
         if self.config.search.database.lower() == "pubmed":
             self._search_engine = PubMedSearch(self.config.search)
         else:
-            raise ValueError(f"Unsupported database: {self.config.search.database}")
+            raise ValueError(
+                f"Unsupported database: {self.config.search.database}")
 
         # Initialize screening engine
         self._screener = LLMScreener(
@@ -147,7 +146,8 @@ class AutonimaPipeline:
         logger.info("Starting abstract screening phase")
 
         # Get studies that need screening
-        pending_studies = [s for s in self.results.studies if s.status == StudyStatus.PENDING]
+        pending_studies = [
+            s for s in self.results.studies if s.status == StudyStatus.PENDING]
 
         if not pending_studies:
             logger.info("No studies require abstract screening")
@@ -157,11 +157,15 @@ class AutonimaPipeline:
             raise RuntimeError("Screener not initialized")
 
         # Use LLM-based screening
-        screening_results = await self._screener.screen_abstracts(pending_studies)
+        screening_results = await self._screener.screen_abstracts(
+            pending_studies)
 
         # Apply screening results to studies
         for result in screening_results:
-            study = next((s for s in self.results.studies if s.pmid == result.study_id), None)
+            study = next(
+                (s for s in self.results.studies if s.pmid == result.study_id),
+                None
+                )
             if study:
                 study.status = result.decision
                 study.screening_reason = result.reason

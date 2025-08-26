@@ -4,9 +4,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
-# Note: This would be installed as a dependency
 import click
 
 from .config import ConfigManager, ConfigurationError
@@ -27,7 +25,15 @@ logger = logging.getLogger(__name__)
               help='Enable verbose logging')
 @click.option('--dry-run', is_flag=True,
               help='Validate configuration without running pipeline')
-def run(config: str, output_folder: str, verbose: bool, dry_run: bool):
+@click.option('--debug', is_flag=True,
+              help='Enable debug mode with post-mortem debugging on errors')
+def run(
+    config: str,
+    output_folder: str,
+    verbose: bool,
+    dry_run: bool,
+    debug: bool
+):
     """
     Run the Autonima systematic review pipeline.
 
@@ -75,7 +81,8 @@ def run(config: str, output_folder: str, verbose: bool, dry_run: bool):
         logger.info(f"Output directory: {pipeline_config.output.directory}")
 
         if dry_run:
-            logger.info("Dry run completed successfully - configuration is valid")
+            logger.info("Dry run completed successfully")
+            logger.info("Configuration is valid")
             return
 
         # Run the pipeline
@@ -92,7 +99,8 @@ def run(config: str, output_folder: str, verbose: bool, dry_run: bool):
             print("AUTONIMA PIPELINE COMPLETED")
             print("="*60)
             print(f"Objective: {pipeline_config.objective}")
-            print(f"Total studies identified: {prisma_stats.get('total_identified', 0)}")
+            identified = prisma_stats.get('total_identified', 0)
+            print(f"Total studies identified: {identified}")
             print(f"Studies included: {prisma_stats.get('final_included', 0)}")
             print(f"Output directory: {pipeline_config.output.directory}")
 
@@ -105,20 +113,28 @@ def run(config: str, output_folder: str, verbose: bool, dry_run: bool):
             return results
 
         # Run the async pipeline
-        results = asyncio.run(execute_pipeline())
+        asyncio.run(execute_pipeline())
 
     except ConfigurationError as e:
         logger.error(f"Configuration error: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
         sys.exit(1)
     except Exception as e:
         logger.error(f"Pipeline execution failed: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
         sys.exit(1)
 
 
 @click.command()
 @click.argument('config', type=click.Path(exists=True))
 @click.argument('output_folder', type=click.Path())
-def validate(config: str, output_folder: str):
+@click.option('--debug', is_flag=True,
+              help='Enable debug mode with post-mortem debugging on errors')
+def validate(config: str, output_folder: str, debug: bool):
     """
     Validate a configuration file without running the pipeline.
 
@@ -148,15 +164,23 @@ def validate(config: str, output_folder: str):
         print(f"✓ Objective: {pipeline_config.objective}")
         print(f"✓ Search database: {pipeline_config.search.database}")
         print(f"✓ Search query: {pipeline_config.search.query}")
-        print(f"✓ Inclusion criteria: {len(pipeline_config.inclusion_criteria)}")
-        print(f"✓ Exclusion criteria: {len(pipeline_config.exclusion_criteria)}")
+        incl_count = len(pipeline_config.inclusion_criteria)
+        excl_count = len(pipeline_config.exclusion_criteria)
+        print(f"✓ Inclusion criteria: {incl_count}")
+        print(f"✓ Exclusion criteria: {excl_count}")
         print(f"✓ Output directory: {pipeline_config.output.directory}")
 
     except ConfigurationError as e:
         logger.error(f"Configuration validation failed: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error during validation: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
         sys.exit(1)
 
 
@@ -193,7 +217,6 @@ def create_sample_config():
 
     except Exception as e:
         logger.error(f"Failed to create sample config: {e}")
-        sys.exit(1)
 
 
 # CLI group would be used with actual click

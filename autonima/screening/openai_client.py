@@ -13,7 +13,7 @@ class GenericLLMClient:
     def __init__(
         self, 
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None
+        base_url: Optional[str] = None,
     ):
         """Initialize the generic LLM client.
         
@@ -23,7 +23,7 @@ class GenericLLMClient:
             base_url: Base URL for the API. If not provided, defaults to 
                       OpenAI's API.
         """
-        self.base_url = base_url or "https://api.openai.com/v1"
+        self.base_url = base_url or None
         
         # Determine the appropriate API key based on the base URL
         if api_key:
