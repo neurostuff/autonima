@@ -185,8 +185,7 @@ class ConfigManager:
             search=SearchConfig(
                 database="pubmed",
                 query="schizophrenia AND working memory AND fMRI",
-                max_results=1000,
-                filters=["humans", "english", "peer_reviewed"]
+                max_results=1000
             ),
             inclusion_criteria=[
                 "Human participants",

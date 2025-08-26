@@ -49,7 +49,7 @@ class PubMedSearch(SearchEngine):
             logger.info(f"Searching PubMed with query: {query}")
 
             # Build complete query
-            full_query = self.build_query(query, self.config.filters)
+            full_query = self.build_query(query)
             logger.info(f"Full query: {full_query}")
 
             # Execute search
@@ -316,7 +316,6 @@ class PubMedSearch(SearchEngine):
             "engine": "pubmed",
             "api_url": self.base_url,
             "max_results": self.config.max_results,
-            "filters": self.config.filters,
             "date_from": self.config.date_from,
             "date_to": self.config.date_to,
             "email": self.config.email

@@ -28,7 +28,7 @@ class GenericLLMClient:
         # Determine the appropriate API key based on the base URL
         if api_key:
             self.api_key = api_key
-        elif "openrouter" in self.base_url:
+        elif self.base_url and "openrouter" in self.base_url:
             self.api_key = os.getenv("OPENROUTER_API_KEY")
         else:
             self.api_key = os.getenv("OPENAI_API_KEY")

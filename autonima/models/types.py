@@ -67,7 +67,6 @@ class SearchConfig:
     database: str = "pubmed"
     query: str = ""
     max_results: int = 1000
-    filters: List[str] = field(default_factory=list)
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     email: Optional[str] = None  # Required for NCBI API
@@ -130,7 +129,6 @@ class PipelineConfig:
                 "database": self.search.database,
                 "query": self.search.query,
                 "max_results": self.search.max_results,
-                "filters": self.search.filters,
                 "date_from": self.search.date_from,
                 "date_to": self.search.date_to,
                 "email": self.search.email,

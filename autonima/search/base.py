@@ -38,23 +38,18 @@ class SearchEngine(ABC):
     def build_query(
         self,
         base_query: str,
-        filters: Optional[List[str]] = None
     ) -> str:
         """
-        Build a complete query string from base query and filters.
+        Build a complete query string from base query.
 
         Args:
             base_query: Base search query
-            filters: List of additional filters to apply
 
         Returns:
             Complete query string
         """
-        query_parts = [base_query]
-
-        if filters:
-            query_parts.extend(filters)
-
+        query_parts = [base_query]]
+        
         # Add date filters if specified
         if self.config.date_from:
             date_from = self.config.date_from
