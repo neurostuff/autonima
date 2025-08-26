@@ -27,6 +27,7 @@ retrieval:
     - pubget
     - ace
   fallback: manual # user-assisted download if not accessible
+  n_jobs: 1 # number of parallel jobs for processing
 
 screening:
   abstract:

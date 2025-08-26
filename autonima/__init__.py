@@ -24,4 +24,13 @@ __description__ = "LLM-powered automated systematic review and meta-analysis"
 from .pipeline import AutonimaPipeline
 from .config import PipelineConfig
 
-__all__ = ["AutonimaPipeline", "PipelineConfig"]
+# Import retrieval module components
+from .retrieval import BaseRetriever, PubGetRetriever, ACERetriever
+
+__all__ = [
+    "AutonimaPipeline",
+    "PipelineConfig",
+    "BaseRetriever",
+    "PubGetRetriever",
+    "ACERetriever"
+]

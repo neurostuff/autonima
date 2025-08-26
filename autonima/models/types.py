@@ -13,6 +13,8 @@ class StudyStatus(Enum):
     EXCLUDED = "excluded"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
+    FULLTEXT_RETRIEVED = "fulltext_retrieved"
+    FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
 
 
 @dataclass
@@ -98,6 +100,7 @@ class RetrievalConfig:
     timeout: int = 30
     max_retries: int = 3
     download_directory: str = "downloads"
+    n_jobs: int = 1
 
 
 @dataclass
@@ -145,6 +148,7 @@ class PipelineConfig:
                 "timeout": self.retrieval.timeout,
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
+                "n_jobs": self.retrieval.n_jobs,
             },
             "output": {
                 "directory": self.output.directory,

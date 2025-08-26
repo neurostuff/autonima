@@ -14,6 +14,7 @@ from .models.types import (
 )
 from .search import PubMedSearch
 from .screening import LLMScreener
+from .retrieval import PubGetRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class AutonimaPipeline:
         self._search_engine = None
         self._abstract_screener = None
         self._fulltext_screener = None
+        self._retriever = None
 
         # Ensure output directory exists
         output_dir = Path(self.config.output.directory)
@@ -68,6 +70,10 @@ class AutonimaPipeline:
             inclusion_criteria=self.config.inclusion_criteria,
             exclusion_criteria=self.config.exclusion_criteria
         )
+        
+        # Initialize retrieval engine
+        n_jobs = getattr(self.config.retrieval, 'n_jobs', 1)
+        self._retriever = PubGetRetriever(n_jobs=n_jobs)
 
     async def run(self) -> PipelineResult:
         """
@@ -179,22 +185,37 @@ class AutonimaPipeline:
         output_dir = Path(self.config.output.directory)
         screening_results_file = output_dir / "abstract_screening_results.json"
         screening_data = {
-            "screening_results": [result.to_dict() for result in screening_results],
+            "screening_results": [
+                result.to_dict() for result in screening_results
+            ],
             "timestamp": datetime.now().isoformat()
         }
         with open(screening_results_file, 'w') as f:
             import json
             json.dump(screening_data, f, indent=2)
 
-        screened_count = len([s for s in self.results.studies if s.status != StudyStatus.PENDING])
-        logger.info(f"Abstract screening completed: {screened_count} studies screened")
-        logger.info(f"Abstract screening results saved to {screening_results_file}")
+        screened_count = len([
+            s for s in self.results.studies
+            if s.status != StudyStatus.PENDING
+        ])
+        logger.info(
+            f"Abstract screening completed: {screened_count} studies "
+            "screened"
+        )
+        logger.info(
+            f"Abstract screening results saved to {screening_results_file}"
+        )
 
     async def _mock_abstract_screening(self, studies: List[Study]):
         """Mock abstract screening for development purposes."""
         # Simple keyword-based screening
-        inclusion_keywords = ["fMRI", "functional magnetic resonance", "neuroimaging", "brain"]
-        exclusion_keywords = ["animal", "mice", "rats", "review", "meta-analysis"]
+        inclusion_keywords = [
+            "fMRI", "functional magnetic resonance",
+            "neuroimaging", "brain"
+        ]
+        exclusion_keywords = [
+            "animal", "mice", "rats", "review", "meta-analysis"
+        ]
 
         for study in studies:
             # Check for inclusion criteria
@@ -205,7 +226,9 @@ class AutonimaPipeline:
 
             # Check for exclusion criteria
             excludes_study = any(
-                keyword.lower() in (study.title + " " + (study.abstract or "")).lower()
+                keyword.lower() in (
+                    study.title + " " + (study.abstract or "")
+                ).lower()
                 for keyword in exclusion_keywords
             )
 
@@ -235,22 +258,66 @@ class AutonimaPipeline:
             logger.info("No studies require full-text retrieval")
             return
 
-        # TODO: Implement actual full-text retrieval (PubGet, ACE)
-        # For now, mock retrieval
-        await self._mock_fulltext_retrieval(included_studies)
+        if not self._retriever:
+            raise RuntimeError("Retriever not initialized")
+
+        # Use PubGet for actual retrieval
+        output_dir = Path(self.config.output.directory)
+        retrieval_dir = output_dir / "retrieval"
+        
+        # Retrieve full-text articles
+        try:
+            api_key = getattr(self.config.retrieval, 'api_key', None)
+            n_docs = getattr(self.config.retrieval, 'max_docs', None)
+            
+            retrieved_studies = self._retriever.retrieve(
+                studies=included_studies,
+                output_dir=retrieval_dir,
+                api_key=api_key,
+                n_docs=n_docs
+            )
+            
+            # Update studies in results with retrieved information
+            for retrieved_study in retrieved_studies:
+                # Find matching study in results
+                study = next(
+                    (s for s in self.results.studies
+                     if s.pmid == retrieved_study.pmid),
+                    None
+                )
+                if study and retrieved_study.full_text_path:
+                    study.full_text_path = retrieved_study.full_text_path
+                    study.retrieved_at = datetime.now()
+        except Exception as e:
+            logger.error(f"Full-text retrieval failed: {e}")
+            # Fall back to mock retrieval for development
+            logger.info("Falling back to mock retrieval for development")
+            await self._mock_fulltext_retrieval(included_studies)
+
+        # Validate retrieval
+        self._retriever.validate_retrieval(included_studies, retrieval_dir)
 
         # Save intermediary results
-        output_dir = Path(self.config.output.directory)
         retrieval_results_file = output_dir / "fulltext_retrieval_results.json"
         retrieval_data = {
             "studies_with_fulltext": [
                 {
                     "pmid": study.pmid,
+                    "pmcid": study.pmcid,
                     "title": study.title,
                     "full_text_path": study.full_text_path,
-                    "retrieved_at": study.retrieved_at.isoformat() if study.retrieved_at else None
+                    "retrieved_at": (
+                        study.retrieved_at.isoformat()
+                        if study.retrieved_at else None
+                    ),
+                    "status": study.status.value
                 }
-                for study in self.results.studies if study.full_text_path
+                for study in self.results.studies
+                if (study.full_text_path or
+                    study.status in [
+                        StudyStatus.FULLTEXT_RETRIEVED,
+                        StudyStatus.FULLTEXT_UNAVAILABLE
+                    ])
             ],
             "timestamp": datetime.now().isoformat()
         }
@@ -258,9 +325,20 @@ class AutonimaPipeline:
             import json
             json.dump(retrieval_data, f, indent=2)
 
-        retrieved_count = len([s for s in self.results.studies if s.full_text_path])
-        logger.info(f"Full-text retrieval completed: {retrieved_count} texts retrieved")
-        logger.info(f"Full-text retrieval results saved to {retrieval_results_file}")
+        retrieved_count = len([
+            s for s in self.results.studies if s.full_text_path
+        ])
+        unavailable_count = len([
+            s for s in self.results.studies
+            if s.status == StudyStatus.FULLTEXT_UNAVAILABLE
+        ])
+        logger.info(
+            f"Full-text retrieval completed: {retrieved_count} texts "
+            f"retrieved, {unavailable_count} unavailable"
+        )
+        logger.info(
+            f"Full-text retrieval results saved to {retrieval_results_file}"
+        )
 
     async def _mock_fulltext_retrieval(self, studies: List[Study]):
         """Mock full-text retrieval for development purposes."""
@@ -268,6 +346,7 @@ class AutonimaPipeline:
             # Simulate successful retrieval for most studies
             study.full_text_path = f"downloads/{study.pmid}.pdf"
             study.retrieved_at = datetime.now()
+            study.status = StudyStatus.FULLTEXT_RETRIEVED
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""
@@ -287,11 +366,16 @@ class AutonimaPipeline:
             raise RuntimeError("Screener not initialized")
 
         # Use LLM-based full-text screening
-        screening_results = await self._screener.screen_fulltexts(screenable_studies)
+        screening_results = await self._screener.screen_fulltexts(
+            screenable_studies
+        )
 
         # Apply screening results to studies
         for result in screening_results:
-            study = next((s for s in self.results.studies if s.pmid == result.study_id), None)
+            study = next(
+                (s for s in self.results.studies if s.pmid == result.study_id),
+                None
+            )
             if study:
                 study.status = result.decision
                 study.screening_reason = result.reason
@@ -303,9 +387,13 @@ class AutonimaPipeline:
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
-        fulltext_screening_results_file = output_dir / "fulltext_screening_results.json"
+        fulltext_screening_results_file = (
+            output_dir / "fulltext_screening_results.json"
+        )
         fulltext_screening_data = {
-            "screening_results": [result.to_dict() for result in screening_results],
+            "screening_results": [
+                result.to_dict() for result in screening_results
+            ],
             "timestamp": datetime.now().isoformat()
         }
         with open(fulltext_screening_results_file, 'w') as f:
@@ -316,8 +404,13 @@ class AutonimaPipeline:
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED
         ])
-        logger.info(f"Full-text screening completed: {final_count} studies included")
-        logger.info(f"Full-text screening results saved to {fulltext_screening_results_file}")
+        logger.info(
+            f"Full-text screening completed: {final_count} studies included"
+        )
+        logger.info(
+            f"Full-text screening results saved to "
+            f"{fulltext_screening_results_file}"
+        )
 
     async def _mock_fulltext_screening(self, studies: List[Study]):
         """Mock full-text screening for development purposes."""
@@ -326,7 +419,9 @@ class AutonimaPipeline:
             # Mock confidence score
             confidence = 0.7 + (hash(study.pmid) % 100) / 100 * 0.3
 
-            if confidence >= self.config.screening.fulltext.get('threshold', 0.8):
+            if confidence >= self.config.screening.fulltext.get(
+                'threshold', 0.8
+            ):
                 study.status = StudyStatus.INCLUDED
                 study.screening_reason = "Passed full-text screening"
                 study.fulltext_screening_score = confidence
@@ -349,8 +444,14 @@ class AutonimaPipeline:
         """Generate basic outputs and statistics."""
         # Calculate PRISMA statistics
         total_studies = len(self.results.studies)
-        included_studies = [s for s in self.results.studies if s.status == StudyStatus.INCLUDED]
-        excluded_studies = [s for s in self.results.studies if s.status == StudyStatus.EXCLUDED]
+        included_studies = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED
+        ]
+        excluded_studies = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.EXCLUDED
+        ]
 
         prisma_stats = {
             "total_identified": total_studies,
@@ -402,7 +503,10 @@ class AutonimaPipeline:
             },
             "execution": {
                 "started_at": self.results.started_at.isoformat(),
-                "completed_at": self.results.completed_at.isoformat() if self.results.completed_at else None,
+                "completed_at": (
+                    self.results.completed_at.isoformat()
+                    if self.results.completed_at else None
+                ),
                 "duration_seconds": (
                     self.results.completed_at - self.results.started_at
                 ).total_seconds() if self.results.completed_at else None,
@@ -412,7 +516,10 @@ class AutonimaPipeline:
 
 
 # Convenience function for running pipeline from config file
-async def run_pipeline_from_config(config_path: str = None, config: PipelineConfig = None) -> PipelineResult:
+async def run_pipeline_from_config(
+    config_path: str = None,
+    config: PipelineConfig = None
+) -> PipelineResult:
     """
     Run pipeline from configuration file or config object.
 
