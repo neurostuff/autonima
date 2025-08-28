@@ -98,7 +98,7 @@ class PubGetRetriever(BaseRetriever):
                 # Extract articles from bulk download
                 logger.info("Extracting articles...")
                 articles_dir, extract_exit_code = extract_articles(
-                    articlesets_dir=download_dir / "articlesets",
+                    articlesets_dir=download_dir,
                     output_dir=str(temp_path / "articles"),
                     n_jobs=self.n_jobs
                 )
