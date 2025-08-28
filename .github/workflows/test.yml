@@ -27,6 +27,7 @@ jobs:
         pip install -e .
         pip install -e .[dev]
         pip install -e .[llm]
+        pip install -e git+https://github.com/neuroquery/pubget.git#egg=pubget
 
     - name: Run tests
       run: |
