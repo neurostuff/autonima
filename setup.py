@@ -52,7 +52,8 @@ setup(
         "datetime",
         "biopython>=1.81",
         "pandas>=2.0",
-        "matplotlib>=3.5"
+        "matplotlib>=3.5",
+        "pubget>=0.0.9"
     ],
     extras_require={
         "dev": [
