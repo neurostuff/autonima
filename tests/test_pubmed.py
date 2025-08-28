@@ -71,22 +71,8 @@ def test_pubmed_search_get_info(pubmed_search):
     expected_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
     assert info['api_url'] == expected_url
     assert 'max_results' in info
-    assert 'filters' in info
     assert 'email' in info
 
-
-def test_pubmed_search_with_filters(search_config):
-    """Test PubMed search with additional filters."""
-    # Add a filter to the configuration
-    search_config.filters = ['humans', 'english']
-    search_engine = PubMedSearch(search_config)
-    
-    # Execute the search
-    studies = asyncio.run(search_engine.search(search_config.query))
-    
-    # Verify results
-    assert isinstance(studies, list)
-    assert len(studies) <= search_config.max_results
 
 
 def test_pubmed_search_empty_query(search_config):

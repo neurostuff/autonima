@@ -9,6 +9,7 @@ import click
 
 from .config import ConfigManager, ConfigurationError
 from .pipeline import run_pipeline_from_config
+from .utils import set_debug_mode, log_error_with_debug
 
 # Set up logging
 logging.basicConfig(
@@ -60,10 +61,15 @@ def run(
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.info("Verbose logging enabled")
+    
+    # Set debug mode globally
+    set_debug_mode(debug)
 
     config_path = Path(config)
     if not config_path.exists():
-        logger.error(f"Configuration file not found: {config_path}")
+        log_error_with_debug(
+            logger, f"Configuration file not found: {config_path}"
+        )
         sys.exit(1)
 
     try:
@@ -116,13 +122,13 @@ def run(
         asyncio.run(execute_pipeline())
 
     except ConfigurationError as e:
-        logger.error(f"Configuration error: {e}")
+        log_error_with_debug(logger, f"Configuration error: {e}")
         if debug:
             import pdb
             pdb.post_mortem()
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Pipeline execution failed: {e}")
+        log_error_with_debug(logger, f"Pipeline execution failed: {e}")
         if debug:
             import pdb
             pdb.post_mortem()
@@ -150,7 +156,9 @@ def validate(config: str, output_folder: str, debug: bool):
     """
     config_path = Path(config)
     if not config_path.exists():
-        logger.error(f"Configuration file not found: {config_path}")
+        log_error_with_debug(
+            logger, f"Configuration file not found: {config_path}"
+        )
         sys.exit(1)
 
     try:
@@ -171,13 +179,15 @@ def validate(config: str, output_folder: str, debug: bool):
         print(f"✓ Output directory: {pipeline_config.output.directory}")
 
     except ConfigurationError as e:
-        logger.error(f"Configuration validation failed: {e}")
+        log_error_with_debug(logger, f"Configuration validation failed: {e}")
         if debug:
             import pdb
             pdb.post_mortem()
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Unexpected error during validation: {e}")
+        log_error_with_debug(
+            logger, f"Unexpected error during validation: {e}"
+        )
         if debug:
             import pdb
             pdb.post_mortem()
@@ -216,7 +226,7 @@ def create_sample_config():
         temp_path.unlink()
 
     except Exception as e:
-        logger.error(f"Failed to create sample config: {e}")
+        log_error_with_debug(logger, f"Failed to create sample config: {e}")
 
 
 # CLI group would be used with actual click

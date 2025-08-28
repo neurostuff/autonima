@@ -89,10 +89,11 @@ autonima/
 
 - **Purpose**: Download full-text articles
 - **Features**:
-  - PubGet integration for open-access papers
-  - ACE (Academic Citation Engine) integration
+  - PubGet integration for open-access papers from PubMed Central
+  - ACE (Academic Citation Engine) integration (stub implementation)
   - Fallback mechanisms for paywalled content
   - PDF/text extraction and parsing
+  - Support for parallel processing with configurable number of jobs
 
 #### 6. Output Module (`output/`)
 
@@ -178,7 +179,7 @@ class PipelineConfig:
 5. Implement prompt library and Pydantic schemas
 
 ### Phase 4: Advanced Features
-1. Integrate with PubGet and ACE
+1. Integrate with PubGet and ACE (PubGet implemented, ACE stubbed)
 2. Implement PRISMA diagram generation
 3. Add PDF processing capabilities
 4. Implement benchmarking framework
@@ -206,6 +207,7 @@ class PipelineConfig:
 - `reportlab` - PDF generation
 - `PyPDF2` - PDF text extraction
 - `pytest` - Testing framework
+- `pubget` - Full-text article retrieval from PubMed Central (Open Access subset)
 
 ## CLI Design
 

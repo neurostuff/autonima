@@ -13,6 +13,8 @@ class StudyStatus(Enum):
     EXCLUDED = "excluded"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
+    FULLTEXT_RETRIEVED = "fulltext_retrieved"
+    FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
 
 
 @dataclass
@@ -34,11 +36,13 @@ class Study:
     fulltext_screening_score: Optional[float] = None
     retrieved_at: Optional[datetime] = None
     screened_at: Optional[datetime] = None
+    pmcid: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
         return {
             "pmid": self.pmid,
+            "pmcid": self.pmcid,
             "title": self.title,
             "abstract": self.abstract,
             "authors": self.authors,
@@ -67,7 +71,6 @@ class SearchConfig:
     database: str = "pubmed"
     query: str = ""
     max_results: int = 1000
-    filters: List[str] = field(default_factory=list)
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     email: Optional[str] = None  # Required for NCBI API
@@ -99,6 +102,7 @@ class RetrievalConfig:
     timeout: int = 30
     max_retries: int = 3
     download_directory: str = "downloads"
+    n_jobs: int = 1
 
 
 @dataclass
@@ -130,7 +134,6 @@ class PipelineConfig:
                 "database": self.search.database,
                 "query": self.search.query,
                 "max_results": self.search.max_results,
-                "filters": self.search.filters,
                 "date_from": self.search.date_from,
                 "date_to": self.search.date_to,
                 "email": self.search.email,
@@ -147,6 +150,7 @@ class PipelineConfig:
                 "timeout": self.retrieval.timeout,
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
+                "n_jobs": self.retrieval.n_jobs,
             },
             "output": {
                 "directory": self.output.directory,

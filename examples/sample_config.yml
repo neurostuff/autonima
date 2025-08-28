@@ -9,10 +9,6 @@ search:
   query: "schizophrenia AND working memory AND fMRI"
   max_results: 100
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
-  filters:
-    - humans
-    - english
-    - peer_reviewed
 
 inclusion_criteria:
   - Human participants
@@ -31,17 +27,17 @@ retrieval:
     - pubget
     - ace
   fallback: manual # user-assisted download if not accessible
+  n_jobs: 1 # number of parallel jobs for processing
 
 screening:
   abstract:
-    model: "gpt-4"   # LLM for abstract screening
+    model: "gpt-5-mini-2025-08-07"   # LLM for abstract screening
     threshold: 0.75  # probability cutoff for inclusion
   fulltext:
-    model: "gpt-4"
+    model: "gpt-5-mini-2025-08-07"
     adjudicate: true # human-in-the-loop option
 
 output:
-  directory: "results/schizophrenia_wm"
   prisma_diagram: true
   formats:
     - csv
