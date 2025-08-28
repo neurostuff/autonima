@@ -26,7 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install -e .[dev]
+        pip install -e .[llm]
 
     - name: Run tests
       run: |
         pytest tests/ -v
+      env:
+        OPENAI_API_KEY: "fake-api-key-for-testing"
+        OPENROUTER_API_KEY: "fake-api-key-for-testing"
