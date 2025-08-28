@@ -15,6 +15,7 @@ from .models.types import (
 from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
+from .utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ class AutonimaPipeline:
             return self.results
 
         except Exception as e:
-            logger.error(f"Pipeline failed: {e}")
+            log_error_with_debug(logger, f"Pipeline failed: {e}")
             self.results.errors.append(str(e))
             raise
 
@@ -206,44 +207,6 @@ class AutonimaPipeline:
             f"Abstract screening results saved to {screening_results_file}"
         )
 
-    async def _mock_abstract_screening(self, studies: List[Study]):
-        """Mock abstract screening for development purposes."""
-        # Simple keyword-based screening
-        inclusion_keywords = [
-            "fMRI", "functional magnetic resonance",
-            "neuroimaging", "brain"
-        ]
-        exclusion_keywords = [
-            "animal", "mice", "rats", "review", "meta-analysis"
-        ]
-
-        for study in studies:
-            # Check for inclusion criteria
-            includes_study = any(
-                keyword.lower() in (study.abstract or "").lower()
-                for keyword in inclusion_keywords
-            )
-
-            # Check for exclusion criteria
-            excludes_study = any(
-                keyword.lower() in (
-                    study.title + " " + (study.abstract or "")
-                ).lower()
-                for keyword in exclusion_keywords
-            )
-
-            if excludes_study:
-                study.status = StudyStatus.EXCLUDED
-                study.screening_reason = "Contains exclusion keywords"
-            elif includes_study:
-                study.status = StudyStatus.INCLUDED
-                study.screening_reason = "Contains inclusion keywords"
-            else:
-                study.status = StudyStatus.EXCLUDED
-                study.screening_reason = "Does not meet inclusion criteria"
-
-            study.screened_at = datetime.now()
-
     async def _execute_retrieval_phase(self):
         """Execute full-text retrieval phase."""
         logger.info("Starting full-text retrieval phase")
@@ -260,6 +223,30 @@ class AutonimaPipeline:
 
         if not self._retriever:
             raise RuntimeError("Retriever not initialized")
+
+        # Fetch PMCIDs for included studies that don't have them
+        studies_needing_pmcid = [
+            s for s in included_studies if not s.pmcid
+        ]
+        
+        if studies_needing_pmcid:
+            logger.info(
+                f"Fetching PMCIDs for {len(studies_needing_pmcid)} studies"
+            )
+            pmids = [s.pmid for s in studies_needing_pmcid]
+            pmid_to_pmcid = await self._search_engine.fetch_pmcids(pmids)
+            
+            # Update studies with their PMCIDs
+            for study in studies_needing_pmcid:
+                if study.pmid in pmid_to_pmcid and pmid_to_pmcid[study.pmid]:
+                    study.pmcid = pmid_to_pmcid[study.pmid]
+                    logger.debug(
+                        f"Updated study {study.pmid} with PMCID {study.pmcid}"
+                    )
+                else:
+                    logger.warning(
+                        f"Could not find PMCID for study {study.pmid}"
+                    )
 
         # Use PubGet for actual retrieval
         output_dir = Path(self.config.output.directory)
@@ -289,10 +276,7 @@ class AutonimaPipeline:
                     study.full_text_path = retrieved_study.full_text_path
                     study.retrieved_at = datetime.now()
         except Exception as e:
-            logger.error(f"Full-text retrieval failed: {e}")
-            # Fall back to mock retrieval for development
-            logger.info("Falling back to mock retrieval for development")
-            await self._mock_fulltext_retrieval(included_studies)
+            log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
 
         # Validate retrieval
         self._retriever.validate_retrieval(included_studies, retrieval_dir)
@@ -339,14 +323,6 @@ class AutonimaPipeline:
         logger.info(
             f"Full-text retrieval results saved to {retrieval_results_file}"
         )
-
-    async def _mock_fulltext_retrieval(self, studies: List[Study]):
-        """Mock full-text retrieval for development purposes."""
-        for study in studies:
-            # Simulate successful retrieval for most studies
-            study.full_text_path = f"downloads/{study.pmid}.pdf"
-            study.retrieved_at = datetime.now()
-            study.status = StudyStatus.FULLTEXT_RETRIEVED
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""

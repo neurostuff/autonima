@@ -12,6 +12,7 @@ from .base import ScreeningEngine
 from .prompts import PromptLibrary
 from .openai_client import GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
+from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class LLMScreener(ScreeningEngine):
                 await asyncio.sleep(0.1)
 
             except Exception as e:
-                logger.error(f"Error screening abstract for {study.pmid}: {e}")
+                log_error_with_debug(logger, f"Error screening abstract for {study.pmid}: {e}")
                 # Return failed screening result
                 results.append(ScreeningResult(
                     study_id=study.pmid,
@@ -253,7 +254,9 @@ class LLMScreener(ScreeningEngine):
                 self._save_cache()
 
             except Exception as e:
-                logger.error(f"Error screening fulltext for {study.pmid}: {e}")
+                log_error_with_debug(
+                    logger, f"Error screening fulltext for {study.pmid}: {e}"
+                )
                 # Return failed screening result
                 results.append(ScreeningResult(
                     study_id=study.pmid,
@@ -300,7 +303,7 @@ class LLMScreener(ScreeningEngine):
             with open(self._cache_file, 'w') as f:
                 json.dump(self._cache, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to save cache: {e}")
+            log_error_with_debug(logger, f"Failed to save cache: {e}")
 
     def clear_cache(self):
         """Clear the screening cache."""

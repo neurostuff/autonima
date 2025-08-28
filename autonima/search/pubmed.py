@@ -11,6 +11,7 @@ import requests
 
 from .base import SearchEngine
 from ..models.types import Study, StudyStatus, SearchConfig
+from ..utils import log_error_with_debug
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class PubMedSearch(SearchEngine):
             return studies
 
         except Exception as e:
-            logger.error(f"Error during PubMed search: {e}")
+            log_error_with_debug(logger, f"Error during PubMed search: {e}")
             raise
 
     async def _execute_search(self, query: str) -> List[str]:
@@ -98,7 +99,7 @@ class PubMedSearch(SearchEngine):
             return pmids
             
         except Exception as e:
-            logger.error(f"Error executing PubMed search: {e}")
+            log_error_with_debug(logger, f"Error executing PubMed search: {e}")
             raise
 
     async def _fetch_study_details(self, pmids: List[str]) -> List[Study]:
@@ -159,7 +160,7 @@ class PubMedSearch(SearchEngine):
             return studies
             
         except Exception as e:
-            logger.error(f"Error fetching study batch: {e}")
+            log_error_with_debug(logger, f"Error fetching study batch: {e}")
             raise
 
     def _parse_pubmed_xml(self, xml_data: str) -> List[Study]:
@@ -186,7 +187,7 @@ class PubMedSearch(SearchEngine):
                     continue
                     
         except Exception as e:
-            logger.error(f"Error parsing PubMed XML: {e}")
+            log_error_with_debug(logger, f"Error parsing PubMed XML: {e}")
             raise
             
         return studies
@@ -307,7 +308,9 @@ class PubMedSearch(SearchEngine):
             return studies[0] if studies else None
             
         except Exception as e:
-            logger.error(f"Error fetching details for {pmid}: {e}")
+            log_error_with_debug(
+                logger, f"Error fetching details for {pmid}: {e}"
+            )
             return None
 
     def get_search_info(self) -> Dict[str, Any]:
@@ -346,7 +349,7 @@ class PubMedSearch(SearchEngine):
                 if attempt == self.max_retries - 1:
                     msg = (f"Failed to fetch {url} after "
                            f"{self.max_retries} attempts: {e}")
-                    logger.error(msg)
+                    log_error_with_debug(logger, msg)
                     raise
 
                 msg = f"Attempt {attempt + 1} failed, retrying: {e}"
@@ -354,3 +357,60 @@ class PubMedSearch(SearchEngine):
                 # Exponential backoff
                 delay = self.retry_delay * (2 ** attempt)
                 await asyncio.sleep(delay)
+
+    async def fetch_pmcids(self, pmids: List[str]) -> Dict[str, str]:
+        """
+        Fetch PMCIDs for a list of PMIDs using the PubMed API.
+        
+        Args:
+            pmids: List of PubMed IDs
+            
+        Returns:
+            Dictionary mapping PMIDs to PMCIDs (empty string if not found)
+        """
+        if not pmids:
+            return {}
+        
+        pmid_to_pmcid = {pmid: "" for pmid in pmids}
+        
+        try:
+            # Use Entrez.elink to convert PMIDs to PMCIDs
+            handle = Entrez.elink(
+                dbfrom="pubmed",
+                db="pmc",
+                id=pmids,
+                retmode="xml"
+            )
+            link_results = Entrez.read(handle)
+            handle.close()
+            
+            # Parse the results to extract PMCIDs
+            for linkset in link_results:
+                if "LinkSetDb" not in linkset:
+                    continue
+                    
+                # Find the PMID for this linkset
+                pmid = linkset.get("IdList", [""])[0]
+                if not pmid:
+                    continue
+                
+                # Look for PMC links
+                for link_db in linkset["LinkSetDb"]:
+                    if link_db["DbTo"] == "pmc":
+                        if link_db["Link"]:
+                            # PMCIDs are stored as numeric IDs,
+                            # need to prefix with "PMC"
+                            pmcid = "PMC" + link_db["Link"][0]["Id"]
+                            pmid_to_pmcid[pmid] = pmcid
+                            break
+            
+            successful_count = len([v for v in pmid_to_pmcid.values() if v])
+            logger.info(
+                f"Successfully fetched PMCIDs for {successful_count} "
+                f"out of {len(pmids)} PMIDs"
+            )
+            return pmid_to_pmcid
+            
+        except Exception as e:
+            log_error_with_debug(logger, f"Error fetching PMCIDs: {e}")
+            return pmid_to_pmcid

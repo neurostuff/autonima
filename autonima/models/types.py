@@ -36,11 +36,13 @@ class Study:
     fulltext_screening_score: Optional[float] = None
     retrieved_at: Optional[datetime] = None
     screened_at: Optional[datetime] = None
+    pmcid: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
         return {
             "pmid": self.pmid,
+            "pmcid": self.pmcid,
             "title": self.title,
             "abstract": self.abstract,
             "authors": self.authors,

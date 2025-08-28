@@ -7,6 +7,7 @@ from typing import List
 
 from ..models.types import Study, StudyStatus
 from .base import BaseRetriever
+from ..utils import log_error_with_debug
 
 try:
     from pubget import download_pmcids, extract_articles, extract_data_to_csv
@@ -133,7 +134,7 @@ class PubGetRetriever(BaseRetriever):
                 )
                 
             except Exception as e:
-                logger.error(f"Error during retrieval: {e}")
+                log_error_with_debug(logger, f"Error during retrieval: {e}")
                 raise
         
         return studies
@@ -156,7 +157,7 @@ class PubGetRetriever(BaseRetriever):
         try:
             _ = pd.read_csv(metadata_file)
         except Exception as e:
-            logger.error(f"Error reading metadata: {e}")
+            log_error_with_debug(logger, f"Error reading metadata: {e}")
             return
         
         # Create mapping from PMCID to article directory
