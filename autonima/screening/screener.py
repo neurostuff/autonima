@@ -140,7 +140,10 @@ class LLMScreener(ScreeningEngine):
                 await asyncio.sleep(0.1)
 
             except Exception as e:
-                log_error_with_debug(logger, f"Error screening abstract for {study.pmid}: {e}")
+                log_error_with_debug(
+                    logger,
+                    f"Error screening abstract for {study.pmid}: {e}"
+                )
                 # Return failed screening result
                 results.append(ScreeningResult(
                     study_id=study.pmid,
@@ -173,9 +176,11 @@ class LLMScreener(ScreeningEngine):
             self._llm_client = GenericLLMClient()
 
         # Filter to only studies that have full text
+        # Check if the study has a pmcid and the standard text file exists
+        text_file_path = Path("test_output/retrieval/pubget_data/text.csv")
         screenable_studies = [
             s for s in studies
-            if s.full_text_path and Path(s.full_text_path).exists()
+            if s.pmcid and text_file_path.exists()
         ]
 
         if len(screenable_studies) < len(studies):

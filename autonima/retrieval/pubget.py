@@ -2,6 +2,8 @@
 
 import logging
 import tempfile
+import pandas as pd
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
@@ -73,6 +75,11 @@ class PubGetRetriever(BaseRetriever):
         
         # Extract PMCIDs
         pmcids = [study.pmcid for study in studies_with_pmcid if study.pmcid]
+        # Add PMCID prefix if missing
+        pmcids = [
+            pmcid if pmcid.startswith("PMC") else f"PMC{pmcid}"
+            for pmcid in pmcids
+        ]
         
         # Create output directory
         output_dir = Path(output_dir)
@@ -125,9 +132,6 @@ class PubGetRetriever(BaseRetriever):
                         data_dir, final_data_dir, dirs_exist_ok=True
                     )
                 
-                # Update studies with full-text paths
-                self._update_study_paths(studies_with_pmcid, final_data_dir)
-                
                 logger.info(
                     f"Successfully retrieved {len(studies_with_pmcid)} "
                     "articles"
@@ -139,51 +143,6 @@ class PubGetRetriever(BaseRetriever):
         
         return studies
 
-    def _update_study_paths(self, studies: List[Study], data_dir: Path):
-        """
-        Update studies with paths to their full-text files.
-        
-        Args:
-            studies: List of studies to update
-            data_dir: Directory containing extracted data
-        """
-        # Read metadata to map PMCID to file paths
-        metadata_file = data_dir / "metadata.csv"
-        if not metadata_file.exists():
-            logger.warning("Metadata file not found")
-            return
-        
-        import pandas as pd
-        try:
-            _ = pd.read_csv(metadata_file)
-        except Exception as e:
-            log_error_with_debug(logger, f"Error reading metadata: {e}")
-            return
-        
-        # Create mapping from PMCID to article directory
-        pmcid_to_path = {}
-        articles_dir = data_dir.parent / "articles"
-        
-        if articles_dir.exists():
-            for subdir in articles_dir.iterdir():
-                if subdir.is_dir():
-                    for article_dir in subdir.iterdir():
-                        if (article_dir.is_dir() and
-                                article_dir.name.startswith("pmcid_")):
-                            pmcid = article_dir.name.replace("pmcid_", "")
-                            pmcid_to_path[pmcid] = article_dir
-        
-        # Update studies with full-text paths
-        for study in studies:
-            pmcid = study.metadata.get('pmcid')
-            if pmcid and pmcid in pmcid_to_path:
-                article_dir = pmcid_to_path[pmcid]
-                xml_file = article_dir / "article.xml"
-                if xml_file.exists():
-                    study.full_text_path = str(xml_file)
-                    logger.debug(
-                        f"Updated full-text path for study {pmcid}"
-                    )
 
     def validate_retrieval(
         self,
@@ -205,10 +164,20 @@ class PubGetRetriever(BaseRetriever):
             logger.warning("PubGet data directory not found")
             return studies
         
+        all_texts = data_dir / "text.csv"
+        if not all_texts.exists():
+            logger.warning("Extracted text file not found")
+            return studies
+        
+        # Load first column 
+        df = pd.read_csv(all_texts)
+        retrieved_pmcid = set(df['pmcid'].dropna().astype(str).tolist())
+        
         # Check which studies have full-text files
         for study in studies:
-            if study.full_text_path and Path(study.full_text_path).exists():
+            if study.pmcid in retrieved_pmcid:
                 study.status = StudyStatus.FULLTEXT_RETRIEVED
+                study.retrieved_at = datetime.now()
             else:
                 study.status = StudyStatus.FULLTEXT_UNAVAILABLE
         

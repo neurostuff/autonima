@@ -400,7 +400,7 @@ class PubMedSearch(SearchEngine):
                         if link_db["Link"]:
                             # PMCIDs are stored as numeric IDs,
                             # need to prefix with "PMC"
-                            pmcid = "PMC" + link_db["Link"][0]["Id"]
+                            pmcid = link_db["Link"][0]["Id"]
                             pmid_to_pmcid[pmid] = pmcid
                             break
             

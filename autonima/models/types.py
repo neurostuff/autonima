@@ -30,7 +30,6 @@ class Study:
     keywords: List[str] = field(default_factory=list)
     status: StudyStatus = StudyStatus.PENDING
     screening_reason: Optional[str] = None
-    full_text_path: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     abstract_screening_score: Optional[float] = None
     fulltext_screening_score: Optional[float] = None
@@ -52,7 +51,6 @@ class Study:
             "keywords": self.keywords,
             "status": self.status.value,
             "screening_reason": self.screening_reason,
-            "full_text_path": self.full_text_path,
             "metadata": self.metadata,
             "abstract_screening_score": self.abstract_screening_score,
             "fulltext_screening_score": self.fulltext_screening_score,
@@ -63,6 +61,19 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
         }
+    
+    def load_full_text(self) -> str:
+        """Load the full text content for this study.
+        
+        Returns:
+            The full text content as a string, or None if not found
+        """
+        # Import here to avoid circular imports
+        from ..retrieval.utils import _load_full_text
+        
+        # Use the _load_full_text function with the standard path
+        text_path = "test_output/retrieval/pubget_data/text.csv"
+        return _load_full_text(self, text_path)
 
 
 @dataclass

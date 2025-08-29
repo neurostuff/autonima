@@ -1,7 +1,7 @@
 """Prompt library for LLM-powered systematic review screening."""
 
 from typing import List
-from ..models.types import Study
+from ..models.types import Study, StudyStatus
 
 
 class PromptLibrary:
@@ -76,11 +76,14 @@ EXCLUSION CRITERIA:
         """Get the prompt for full-text screening."""
         base_prompt = PromptLibrary.get_base_prompt()
         
-        # For full-text screening, we would load the full text content
-        # For now, we'll use a placeholder
-        if study.full_text_path:
-            content = "[Full text content would be loaded from " + \
-                      f"{study.full_text_path}]"
+        # For full-text screening, we load the full text content
+        if study.status == StudyStatus.FULLTEXT_RETRIEVED:
+            try:
+                full_text = study.load_full_text()
+                content = (full_text if full_text is not None
+                          else "No full text available")
+            except Exception:
+                content = "Error loading full text"
         else:
             content = "No full text available"
         

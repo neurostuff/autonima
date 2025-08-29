@@ -214,7 +214,7 @@ class AutonimaPipeline:
         # Get included studies that need full-text retrieval
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and not s.full_text_path
+            if s.status == StudyStatus.INCLUDED and s.status != StudyStatus.FULLTEXT_RETRIEVED
         ]
 
         if not included_studies:
@@ -251,30 +251,19 @@ class AutonimaPipeline:
         # Use PubGet for actual retrieval
         output_dir = Path(self.config.output.directory)
         retrieval_dir = output_dir / "retrieval"
-        
+
         # Retrieve full-text articles
         try:
             api_key = getattr(self.config.retrieval, 'api_key', None)
             n_docs = getattr(self.config.retrieval, 'max_docs', None)
-            
-            retrieved_studies = self._retriever.retrieve(
+
+            _ = self._retriever.retrieve(
                 studies=included_studies,
                 output_dir=retrieval_dir,
                 api_key=api_key,
                 n_docs=n_docs
             )
-            
-            # Update studies in results with retrieved information
-            for retrieved_study in retrieved_studies:
-                # Find matching study in results
-                study = next(
-                    (s for s in self.results.studies
-                     if s.pmid == retrieved_study.pmid),
-                    None
-                )
-                if study and retrieved_study.full_text_path:
-                    study.full_text_path = retrieved_study.full_text_path
-                    study.retrieved_at = datetime.now()
+                   
         except Exception as e:
             log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
 
@@ -289,7 +278,6 @@ class AutonimaPipeline:
                     "pmid": study.pmid,
                     "pmcid": study.pmcid,
                     "title": study.title,
-                    "full_text_path": study.full_text_path,
                     "retrieved_at": (
                         study.retrieved_at.isoformat()
                         if study.retrieved_at else None
@@ -297,8 +285,7 @@ class AutonimaPipeline:
                     "status": study.status.value
                 }
                 for study in self.results.studies
-                if (study.full_text_path or
-                    study.status in [
+                if (study.status in [
                         StudyStatus.FULLTEXT_RETRIEVED,
                         StudyStatus.FULLTEXT_UNAVAILABLE
                     ])
@@ -310,7 +297,8 @@ class AutonimaPipeline:
             json.dump(retrieval_data, f, indent=2)
 
         retrieved_count = len([
-            s for s in self.results.studies if s.full_text_path
+            s for s in self.results.studies
+            if s.status == StudyStatus.FULLTEXT_RETRIEVED
         ])
         unavailable_count = len([
             s for s in self.results.studies
@@ -331,7 +319,7 @@ class AutonimaPipeline:
         # Get studies with full text that need screening
         screenable_studies = [
             s for s in self.results.studies
-            if s.full_text_path and s.status == StudyStatus.INCLUDED
+            if s.status == StudyStatus.FULLTEXT_RETRIEVED and s.status == StudyStatus.INCLUDED
         ]
 
         if not screenable_studies:
