@@ -1,0 +1,37 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", 3.11, 3.12]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -e .[dev]
+        pip install -e .[llm]
+        pip install -e git+https://github.com/neuroquery/pubget.git#egg=pubget
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v
+      env:
+        OPENAI_API_KEY: "fake-api-key-for-testing"
+        OPENROUTER_API_KEY: "fake-api-key-for-testing"
