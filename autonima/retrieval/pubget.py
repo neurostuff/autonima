@@ -95,9 +95,19 @@ class PubGetRetriever(BaseRetriever):
         # Filter studies to only download missing PMCIDs
         studies_to_download = [
             study for study in studies_with_pmcid
-            if study.pmcid and (study.pmcid not in existing_pmcids) and
-            (f"PMC{study.pmcid}" not in existing_pmcids)
+            if study.pmcid and
+            (study.pmcid.replace('PMC', '') not in existing_pmcids)
         ]
+        
+        # Set status to FULLTEXT_CACHED for studies that are already downloaded
+        cached_studies = [
+            study for study in studies_with_pmcid
+            if study.pmcid and
+            (study.pmcid.replace('PMC', '') in existing_pmcids)
+        ]
+        
+        for study in cached_studies:
+            study.status = StudyStatus.FULLTEXT_CACHED
         
         if not studies_to_download:
             logger.info("All PMCIDs already downloaded, skipping retrieval")
@@ -105,8 +115,7 @@ class PubGetRetriever(BaseRetriever):
         
         logger.info(
             f"Retrieving full-text for {len(studies_to_download)} studies "
-            f"(skipping {len(studies_with_pmcid) - len(studies_to_download)} "
-            "already downloaded)"
+            f"(skipping {len(cached_studies)} already downloaded)"
         )
         
         # Extract PMCIDs for studies that need to be downloaded
@@ -130,10 +139,20 @@ class PubGetRetriever(BaseRetriever):
                     n_docs=kwargs.get('n_docs'),
                     api_key=kwargs.get('api_key')
                 )
-                
+
                 if download_exit_code != 0:
                     logger.warning("Article download was incomplete")
-                
+
+                # Check to see how many articles were downloaded
+                # If no articles were downloaded, skip the rest of the steps
+                if not download_dir or not Path(download_dir).exists():
+                    logger.warning("No articles were downloaded.")
+                    return studies
+                downloaded_files = list(Path(download_dir).rglob('*'))
+                if len(downloaded_files) <= 1:
+                    logger.warning("No articles were downloaded.")
+                    return studies
+                                
                 # Extract articles from bulk download
                 logger.info("Extracting articles...")
                 articles_dir, extract_exit_code = extract_articles(
@@ -280,7 +299,9 @@ class PubGetRetriever(BaseRetriever):
         
         # Check which studies have full-text files
         for study in studies:
-            if study.pmcid in retrieved_pmcid:
+            if study.status == StudyStatus.FULLTEXT_CACHED:
+                continue
+            elif study.pmcid in retrieved_pmcid:
                 study.status = StudyStatus.FULLTEXT_RETRIEVED
                 study.retrieved_at = datetime.now()
             else:

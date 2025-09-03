@@ -214,7 +214,8 @@ class AutonimaPipeline:
         included_studies = [
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED and
-            s.status != StudyStatus.FULLTEXT_RETRIEVED
+            s.status not in [StudyStatus.FULLTEXT_RETRIEVED,
+                             StudyStatus.FULLTEXT_CACHED]
         ]
 
         if not included_studies:
@@ -237,16 +238,18 @@ class AutonimaPipeline:
             pmid_to_pmcid = await self._search_engine.fetch_pmcids(pmids)
             
             # Update studies with their PMCIDs
+            not_found = []
             for study in studies_needing_pmcid:
                 if study.pmid in pmid_to_pmcid and pmid_to_pmcid[study.pmid]:
                     study.pmcid = pmid_to_pmcid[study.pmid]
-                    logger.debug(
-                        f"Updated study {study.pmid} with PMCID {study.pmcid}"
-                    )
                 else:
-                    logger.warning(
-                        f"Could not find PMCID for study {study.pmid}"
-                    )
+                    not_found.append(study.pmid)
+
+            if not_found:
+                logger.warning(
+                    f"PMCIDs not found for {len(not_found)} studies: "
+                    f"{', '.join(not_found)}"
+                )
 
         # Use PubGet for actual retrieval
         output_dir = Path(self.config.output.directory)
@@ -287,7 +290,8 @@ class AutonimaPipeline:
                 for study in self.results.studies
                 if (study.status in [
                         StudyStatus.FULLTEXT_RETRIEVED,
-                        StudyStatus.FULLTEXT_UNAVAILABLE
+                        StudyStatus.FULLTEXT_UNAVAILABLE,
+                        StudyStatus.FULLTEXT_CACHED
                     ])
             ],
             "timestamp": datetime.now().isoformat()
@@ -298,7 +302,8 @@ class AutonimaPipeline:
 
         retrieved_count = len([
             s for s in self.results.studies
-            if s.status == StudyStatus.FULLTEXT_RETRIEVED
+            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
+                            StudyStatus.FULLTEXT_CACHED]
         ])
         unavailable_count = len([
             s for s in self.results.studies
@@ -319,7 +324,8 @@ class AutonimaPipeline:
         # Get studies with full text that need screening
         screenable_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.FULLTEXT_RETRIEVED
+            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
+                            StudyStatus.FULLTEXT_CACHED]
         ]
 
         if not screenable_studies:

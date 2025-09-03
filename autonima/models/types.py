@@ -15,6 +15,7 @@ class StudyStatus(Enum):
     SCREENING_FAILED = "screening_failed"
     FULLTEXT_RETRIEVED = "fulltext_retrieved"
     FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
+    FULLTEXT_CACHED = "fulltext_cached"
 
 
 @dataclass
