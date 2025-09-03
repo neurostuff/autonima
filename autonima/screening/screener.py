@@ -100,8 +100,7 @@ class LLMScreener(ScreeningEngine):
                     None,
                     self._llm_client.screen_abstract,
                     prompt,
-                    abstract_config.get("model", "gpt-4o-mini"),
-                    abstract_config.get("temperature", 0.1)
+                    abstract_config.get("model", "gpt-4o-mini")
                 )
 
                 # Apply threshold
@@ -221,9 +220,7 @@ class LLMScreener(ScreeningEngine):
                     None,
                     self._llm_client.screen_fulltext,
                     prompt,
-                    fulltext_config.get("model", "gpt-4"),
-                    fulltext_config.get("temperature", 0.1),
-                    fulltext_config.get("max_tokens", 2000)
+                    fulltext_config.get("model", "gpt-4")
                 )
 
                 # Apply threshold

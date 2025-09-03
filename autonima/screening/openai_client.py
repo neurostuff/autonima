@@ -102,17 +102,13 @@ class GenericLLMClient:
     def screen_abstract(
         self,
         prompt: str,
-        model: str = "gpt-4",
-        temperature: float = 0.1,
-        max_tokens: int = 1000
+        model: str = "gpt-4"
     ) -> AbstractScreeningOutput:
         """Screen an abstract using LLM API with function calling.
         
         Args:
             prompt: The prompt to send to the LLM
             model: The model to use
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
             
         Returns:
             AbstractScreeningOutput: The screening result
@@ -141,9 +137,7 @@ class GenericLLMClient:
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name},
-            temperature=temperature,
-            max_tokens=max_tokens
+            function_call={"name": func_name}
         )
         
         # Extract the function call result
@@ -159,17 +153,13 @@ class GenericLLMClient:
     def screen_fulltext(
         self,
         prompt: str,
-        model: str = "gpt-4",
-        temperature: float = 0.1,
-        max_tokens: int = 2000
+        model: str = "gpt-4"
     ) -> FullTextScreeningOutput:
         """Screen a full-text using LLM API with function calling.
         
         Args:
             prompt: The prompt to send to the LLM
             model: The model to use
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
             
         Returns:
             FullTextScreeningOutput: The screening result
@@ -198,9 +188,7 @@ class GenericLLMClient:
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name},
-            temperature=temperature,
-            max_tokens=max_tokens
+            function_call={"name": func_name}
         )
         
         # Extract the function call result

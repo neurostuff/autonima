@@ -93,14 +93,10 @@ class ScreeningConfig:
     abstract: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
         "threshold": 0.75,
-        "temperature": 0.1,
-        "max_tokens": 1000
     })
     fulltext: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
         "threshold": 0.8,
-        "temperature": 0.1,
-        "max_tokens": 2000,
         "adjudicate": True
     })
 
@@ -202,7 +198,10 @@ class PipelineResult:
     """Results from running the complete pipeline."""
     config: PipelineConfig
     studies: List[Study] = field(default_factory=list)
-    screening_results: List[ScreeningResult] = field(default_factory=list)
+    abstract_screening_results: List[ScreeningResult] = field(
+        default_factory=list)
+    fulltext_screening_results: List[ScreeningResult] = field(
+        default_factory=list)
     execution_stats: Dict[str, Any] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     started_at: datetime = field(default_factory=datetime.now)
@@ -213,8 +212,11 @@ class PipelineResult:
         return {
             "config": self.config.to_dict(),
             "studies": [study.to_dict() for study in self.studies],
-            "screening_results": [
-                result.to_dict() for result in self.screening_results
+            "abstract_screening_results": [
+                result.to_dict() for result in self.abstract_screening_results
+            ],
+            "fulltext_screening_results": [
+                result.to_dict() for result in self.fulltext_screening_results
             ],
             "execution_stats": self.execution_stats,
             "errors": self.errors,

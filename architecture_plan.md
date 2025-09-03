@@ -140,7 +140,6 @@ class Study:
     keywords: List[str]
     status: StudyStatus  # INCLUDED, EXCLUDED, PENDING
     screening_reason: Optional[str]
-    full_text_path: Optional[str]
     metadata: Dict[str, Any]
 ```
 

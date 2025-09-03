@@ -3,13 +3,12 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from .config import ConfigManager
 from .models.types import (
     PipelineConfig,
     PipelineResult,
-    Study,
     StudyStatus
 )
 from .search import PubMedSearch
@@ -180,7 +179,7 @@ class AutonimaPipeline:
                 study.screened_at = datetime.now()
 
         # Add screening results to pipeline results
-        self.results.screening_results.extend(screening_results)
+        self.results.abstract_screening_results.extend(screening_results)
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
@@ -214,7 +213,8 @@ class AutonimaPipeline:
         # Get included studies that need full-text retrieval
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and s.status != StudyStatus.FULLTEXT_RETRIEVED
+            if s.status == StudyStatus.INCLUDED and
+            s.status != StudyStatus.FULLTEXT_RETRIEVED
         ]
 
         if not included_studies:
@@ -319,7 +319,7 @@ class AutonimaPipeline:
         # Get studies with full text that need screening
         screenable_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.FULLTEXT_RETRIEVED and s.status == StudyStatus.INCLUDED
+            if s.status == StudyStatus.FULLTEXT_RETRIEVED
         ]
 
         if not screenable_studies:
@@ -347,7 +347,7 @@ class AutonimaPipeline:
                 study.screened_at = datetime.now()
 
         # Add screening results to pipeline results
-        self.results.screening_results.extend(screening_results)
+        self.results.fulltext_screening_results.extend(screening_results)
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
@@ -375,24 +375,6 @@ class AutonimaPipeline:
             f"Full-text screening results saved to "
             f"{fulltext_screening_results_file}"
         )
-
-    async def _mock_fulltext_screening(self, studies: List[Study]):
-        """Mock full-text screening for development purposes."""
-        # Simulate more strict screening for full text
-        for study in studies:
-            # Mock confidence score
-            confidence = 0.7 + (hash(study.pmid) % 100) / 100 * 0.3
-
-            if confidence >= self.config.screening.fulltext.get(
-                'threshold', 0.8
-            ):
-                study.status = StudyStatus.INCLUDED
-                study.screening_reason = "Passed full-text screening"
-                study.fulltext_screening_score = confidence
-            else:
-                study.status = StudyStatus.EXCLUDED
-                study.screening_reason = "Failed full-text screening"
-                study.fulltext_screening_score = confidence
 
     async def _execute_output_phase(self):
         """Execute output generation phase."""
@@ -463,7 +445,14 @@ class AutonimaPipeline:
                     s for s in self.results.studies
                     if s.status == StudyStatus.EXCLUDED
                 ]),
-                "screening_results": len(self.results.screening_results)
+                "abstract_screening_results": len(
+                    self.results.abstract_screening_results),
+                "fulltext_screening_results": len(
+                    self.results.fulltext_screening_results),
+                "total_screening_results": (
+                    len(self.results.abstract_screening_results) +
+                    len(self.results.fulltext_screening_results)
+                )
             },
             "execution": {
                 "started_at": self.results.started_at.isoformat(),
