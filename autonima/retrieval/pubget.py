@@ -60,12 +60,12 @@ class PubGetRetriever(BaseRetriever):
             List of studies with updated full_text_path attributes
         """
         # Filter studies that have PMCID (needed for PubGet)
-        studies_with_pmcid = [
-            study for study in studies
+        study_pmcids = [
+            study.pmcid for study in studies
             if study.pmcid and study.status == StudyStatus.INCLUDED
         ]
         
-        if not studies_with_pmcid:
+        if not study_pmcids:
             logger.info("No studies with PMCID found for retrieval")
             return studies
         
@@ -92,22 +92,14 @@ class PubGetRetriever(BaseRetriever):
             except Exception as e:
                 logger.warning(f"Could not read existing metadata: {e}")
         
-        # Filter studies to only download missing PMCIDs
-        studies_to_download = [
-            study for study in studies_with_pmcid
-            if study.pmcid and
-            (study.pmcid.replace('PMC', '') not in existing_pmcids)
-        ]
-        
-        # Set status to FULLTEXT_CACHED for studies that are already downloaded
-        cached_studies = [
-            study for study in studies_with_pmcid
-            if study.pmcid and
-            (study.pmcid.replace('PMC', '') in existing_pmcids)
-        ]
-        
+        cached_studies = existing_pmcids.intersection(set(study_pmcids))
+
         for study in cached_studies:
             study.status = StudyStatus.FULLTEXT_CACHED
+
+        studies_to_download = list(
+            set(study_pmcids) - existing_pmcids
+        )
         
         if not studies_to_download:
             logger.info("All PMCIDs already downloaded, skipping retrieval")
@@ -118,12 +110,10 @@ class PubGetRetriever(BaseRetriever):
             f"(skipping {len(cached_studies)} already downloaded)"
         )
         
-        # Extract PMCIDs for studies that need to be downloaded
-        pmcids = [study.pmcid for study in studies_to_download if study.pmcid]
         # Add PMCID prefix if missing
         pmcids = [
             pmcid if pmcid.startswith("PMC") else f"PMC{pmcid}"
-            for pmcid in pmcids
+            for pmcid in studies_to_download
         ]
         
         # Use temporary directory for pubget processing

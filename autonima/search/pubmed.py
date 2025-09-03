@@ -431,4 +431,10 @@ class PubMedSearch(SearchEngine):
             f"Successfully fetched PMCIDs for {successful_count} "
             f"out of {len(pmids)} PMIDs using PMC ID Converter API"
         )
+
+        # Remove prefix "PMC" from PMCIDs
+        pmid_to_pmcid = {
+            pmid: (pmcid[3:] if pmcid.startswith("PMC") else pmcid)
+            for pmid, pmcid in pmid_to_pmcid.items()
+        }
         return pmid_to_pmcid
