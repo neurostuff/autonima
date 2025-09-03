@@ -406,7 +406,7 @@ class AutonimaPipeline:
             "fulltext_assessed": len(included_studies),
             "fulltext_excluded": len(excluded_studies) - len([
                 s for s in excluded_studies
-                if "full-text" in (s.screening_reason or "")
+                if "full-text" in (s.fulltext_screening_reason or "")
             ]),
             "final_included": len(included_studies)
         }
