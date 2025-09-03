@@ -60,12 +60,12 @@ class PubGetRetriever(BaseRetriever):
             List of studies with updated full_text_path attributes
         """
         # Filter studies that have PMCID (needed for PubGet)
-        study_pmcids = [
-            study.pmcid for study in studies
+        studies_with_pmcid = [
+            study for study in studies
             if study.pmcid and study.status == StudyStatus.INCLUDED
         ]
         
-        if not study_pmcids:
+        if not studies_with_pmcid:
             logger.info("No studies with PMCID found for retrieval")
             return studies
         
@@ -92,15 +92,16 @@ class PubGetRetriever(BaseRetriever):
             except Exception as e:
                 logger.warning(f"Could not read existing metadata: {e}")
         
-        cached_studies = existing_pmcids.intersection(set(study_pmcids))
+        cached_studies = []
+        studies_to_download = []
 
-        for study in cached_studies:
-            study.status = StudyStatus.FULLTEXT_CACHED
-
-        studies_to_download = list(
-            set(study_pmcids) - existing_pmcids
-        )
-        
+        for study in studies_with_pmcid:
+            if study.pmcid and study.pmcid in existing_pmcids:
+                cached_studies.append(study)
+                study.status = StudyStatus.FULLTEXT_CACHED
+            else:
+                studies_to_download.append(study)
+                
         if not studies_to_download:
             logger.info("All PMCIDs already downloaded, skipping retrieval")
             return studies
@@ -110,10 +111,12 @@ class PubGetRetriever(BaseRetriever):
             f"(skipping {len(cached_studies)} already downloaded)"
         )
         
+        # Extract PMCIDs for studies that need to be downloaded
+        pmcids = [study.pmcid for study in studies_to_download if study.pmcid]
         # Add PMCID prefix if missing
         pmcids = [
             pmcid if pmcid.startswith("PMC") else f"PMC{pmcid}"
-            for pmcid in studies_to_download
+            for pmcid in pmcids
         ]
         
         # Use temporary directory for pubget processing
