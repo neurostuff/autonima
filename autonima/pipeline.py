@@ -174,7 +174,7 @@ class AutonimaPipeline:
                 )
             if study:
                 study.status = result.decision
-                study.screening_reason = result.reason
+                study.abstract_screening_reason = result.reason
                 study.abstract_screening_score = result.confidence
                 study.screened_at = datetime.now()
 
@@ -342,7 +342,7 @@ class AutonimaPipeline:
             )
             if study:
                 study.status = result.decision
-                study.screening_reason = result.reason
+                study.fulltext_screening_reason = result.reason
                 study.fulltext_screening_score = result.confidence
                 study.screened_at = datetime.now()
 

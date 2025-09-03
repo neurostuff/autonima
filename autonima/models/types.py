@@ -29,7 +29,8 @@ class Study:
     doi: Optional[str] = None
     keywords: List[str] = field(default_factory=list)
     status: StudyStatus = StudyStatus.PENDING
-    screening_reason: Optional[str] = None
+    abstract_screening_reason: Optional[str] = None
+    fulltext_screening_reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     abstract_screening_score: Optional[float] = None
     fulltext_screening_score: Optional[float] = None
@@ -50,7 +51,8 @@ class Study:
             "doi": self.doi,
             "keywords": self.keywords,
             "status": self.status.value,
-            "screening_reason": self.screening_reason,
+            "abstract_screening_reason": self.abstract_screening_reason,
+            "fulltext_screening_reason": self.fulltext_screening_reason,
             "metadata": self.metadata,
             "abstract_screening_score": self.abstract_screening_score,
             "fulltext_screening_score": self.fulltext_screening_score,
