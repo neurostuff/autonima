@@ -289,9 +289,6 @@ class LLMScreener(ScreeningEngine):
         for study in screenable_studies:
             cache_key = self._get_cache_key(study, screening_type)
             if cache_key in self._cache:
-                logger.info(
-                    f"Using cached result for {study.pmid} {screening_type}"
-                )
                 cached_result = self._cache[cache_key]
                 cached_results.append(self._create_screening_result(
                     study,
