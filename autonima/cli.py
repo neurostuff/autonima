@@ -16,6 +16,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Silence verbose HTTP request logs from httpx (used by OpenAI client)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,7 +102,9 @@ def run(
         logger.info("Starting pipeline execution...")
 
         async def execute_pipeline():
-            results = await run_pipeline_from_config(config=pipeline_config, num_workers=num_workers)
+            results = await run_pipeline_from_config(
+                config=pipeline_config, num_workers=num_workers
+            )
 
             # Print summary
             stats = results.execution_stats
