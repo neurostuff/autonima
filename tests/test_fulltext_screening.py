@@ -57,9 +57,6 @@ def test_fulltext_screening():
 
             # Create unified screener
             screener = LLMScreener(config, output_dir="test_output")
-            
-            # Clear cache to ensure we're testing the actual screening
-            screener.clear_cache()
 
             # Test screening
             studies_list = [study]
@@ -108,9 +105,6 @@ def test_fulltext_screening_with_missing_pmcid():
         
         # Create unified screener
         screener = LLMScreener(config, output_dir="test_output")
-        
-        # Clear cache to ensure we're testing the actual screening
-        screener.clear_cache()
 
         # Test screening - should skip studies with missing pmcid
         studies_list = [study]

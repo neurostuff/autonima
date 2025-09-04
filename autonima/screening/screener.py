@@ -1,14 +1,13 @@
 """Unified LLM-based screening engine for systematic reviews."""
 
 import logging
-import hashlib
 import json
 import concurrent.futures
 import tqdm
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from threading import Lock
 
 from .base import ScreeningEngine
 from .prompts import PromptLibrary
@@ -17,6 +16,122 @@ from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
+
+
+def load_screening_results_with_lock(
+    file_path: Path,
+    lock_suffix: str = "_lock"
+) -> List[Dict[str, Any]]:
+    """
+    Load screening results from a JSON file with file locking to prevent
+    concurrent modifications.
+    
+    Args:
+        file_path: Path to the JSON file containing screening results
+        lock_suffix: Suffix for the lock file
+        
+    Returns:
+        List of screening results, or empty list if file doesn't exist
+        or can't be loaded
+    """
+    lock_file = file_path.with_suffix(file_path.suffix + lock_suffix)
+    
+    # Wait for lock to be released
+    while lock_file.exists():
+        time.sleep(0.1)
+    
+    # Create lock file
+    try:
+        lock_file.touch()
+        
+        # Load results if file exists
+        if file_path.exists():
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    return data.get("screening_results", [])
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load screening results from {file_path}: {e}"
+                )
+                return []
+        return []
+    finally:
+        # Remove lock file
+        if lock_file.exists():
+            lock_file.unlink()
+
+
+def save_screening_result_with_lock(
+    file_path: Path,
+    new_result: Dict[str, Any],
+    lock_suffix: str = "_lock"
+) -> bool:
+    """
+    Save a screening result to a JSON file with file locking to prevent
+    concurrent modifications.
+    
+    Args:
+        file_path: Path to the JSON file containing screening results
+        new_result: The new screening result to add
+        lock_suffix: Suffix for the lock file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    lock_file = file_path.with_suffix(file_path.suffix + lock_suffix)
+    
+    # Wait for lock to be released
+    while lock_file.exists():
+        time.sleep(0.1)
+    
+    # Create lock file
+    try:
+        lock_file.touch()
+        
+        # Load existing results
+        if file_path.exists():
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load existing screening results: {e}"
+                )
+                data = {"screening_results": []}
+        else:
+            data = {
+                "screening_results": [],
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Add new result or update existing one
+        existing_results = data.get("screening_results", [])
+        updated = False
+        for i, result in enumerate(existing_results):
+            if result.get("study_id") == new_result.get("study_id"):
+                existing_results[i] = new_result
+                updated = True
+                break
+        
+        if not updated:
+            existing_results.append(new_result)
+        
+        data["screening_results"] = existing_results
+        data["timestamp"] = datetime.now().isoformat()
+        
+        # Save results
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save screening result to {file_path}: {e}")
+        return False
+    finally:
+        # Remove lock file
+        if lock_file.exists():
+            lock_file.unlink()
 
 
 def parallelize_screening(func):
@@ -64,15 +179,44 @@ class LLMScreener(ScreeningEngine):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
         self._client = None
-        self._cache_file = Path("cache/screening_cache.json")
-        self._cache_file.parent.mkdir(exist_ok=True)
-        self._cache = self._load_cache()
         self.inclusion_criteria = inclusion_criteria or []
         self.exclusion_criteria = exclusion_criteria or []
         self._llm_client: Optional[GenericLLMClient] = None
-        self.output_dir = output_dir
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.num_workers = num_workers
-        self._cache_lock = Lock()
+        # Load existing results
+        self._existing_abstract_results = self._load_existing_results(
+            "abstract"
+        )
+        self._existing_fulltext_results = self._load_existing_results(
+            "fulltext"
+        )
+
+    def _load_existing_results(self, screening_type: str) -> Dict[str, Dict]:
+        """
+        Load existing screening results from the output directory.
+        
+        Args:
+            screening_type: Either "abstract" or "fulltext"
+            
+        Returns:
+            Dictionary mapping study IDs to their screening results
+        """
+        filename = f"{screening_type}_screening_results.json"
+        results_file = self.output_dir / filename
+        if not results_file.exists():
+            return {}
+            
+        try:
+            results = load_screening_results_with_lock(results_file)
+            # Convert list to dictionary for faster lookup
+            return {result["study_id"]: result for result in results}
+        except Exception as e:
+            logger.warning(
+                f"Failed to load existing {screening_type} results: {e}"
+            )
+            return {}
 
     def _initialize_llm_client(self) -> GenericLLMClient:
         """Initialize the LLM client if not already done."""
@@ -157,8 +301,6 @@ class LLMScreener(ScreeningEngine):
     ) -> ScreeningResult:
         """Screen a single study (synchronous for parallel execution)."""
         try:
-            # Check cache first (although main screening function handles this)
-            cache_key = self._get_cache_key(study, screening_type)
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
@@ -169,7 +311,7 @@ class LLMScreener(ScreeningEngine):
                 inclusion_criteria=self.inclusion_criteria,
                 exclusion_criteria=self.exclusion_criteria,
                 **(
-                    dict(output_dir=self.output_dir)
+                    dict(output_dir=str(self.output_dir))
                     if screening_type == "fulltext"
                     else {}
                 )
@@ -198,18 +340,12 @@ class LLMScreener(ScreeningEngine):
                 screening_type
             )
                 
-            # Cache the result
-            self._cache[cache_key] = {
-                "decision": decision.value,
-                "reason": reason,
-                "confidence": response.confidence,
-                "model_used": model,
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            # Save cache after each screening operation
-            # for more frequent saving
-            self._save_cache()
+            # Save result to file after each screening operation
+            result_dict = result.to_dict()
+            results_file = (
+                self.output_dir / f"{screening_type}_screening_results.json"
+            )
+            save_screening_result_with_lock(results_file, result_dict)
                 
             return result
                 
@@ -223,7 +359,7 @@ class LLMScreener(ScreeningEngine):
                 "model",
                 "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"
             )
-            return self._create_screening_result(
+            result = self._create_screening_result(
                 study,
                 StudyStatus.SCREENING_FAILED,
                 f"Screening failed: {str(e)}",
@@ -231,6 +367,15 @@ class LLMScreener(ScreeningEngine):
                 model,
                 screening_type
             )
+            
+            # Save failed result to file
+            result_dict = result.to_dict()
+            results_file = (
+                self.output_dir / f"{screening_type}_screening_results.json"
+            )
+            save_screening_result_with_lock(results_file, result_dict)
+            
+            return result
 
     @parallelize_screening
     def _screen_single_study_wrapper(
@@ -282,27 +427,33 @@ class LLMScreener(ScreeningEngine):
             
         config = self._get_screening_config(screening_type)
         
-        # Separate cached results from studies that need screening
-        cached_results = []
+        # Separate existing results from studies that need screening
+        existing_results = []
         studies_to_screen = []
         
+        # Get the appropriate existing results dictionary
+        existing_results_dict = (
+            self._existing_abstract_results
+            if screening_type == "abstract"
+            else self._existing_fulltext_results
+        )
+        
         for study in screenable_studies:
-            cache_key = self._get_cache_key(study, screening_type)
-            if cache_key in self._cache:
-                cached_result = self._cache[cache_key]
-                cached_results.append(self._create_screening_result(
+            if study.pmid in existing_results_dict:
+                existing_result = existing_results_dict[study.pmid]
+                existing_results.append(self._create_screening_result(
                     study,
-                    StudyStatus(cached_result["decision"]),
-                    cached_result["reason"],
-                    cached_result["confidence"],
-                    cached_result["model_used"],
+                    StudyStatus(existing_result["decision"]),
+                    existing_result["reason"],
+                    existing_result["confidence"],
+                    existing_result["model_used"],
                     screening_type
                 ))
             else:
                 studies_to_screen.append(study)
         
         logger.info(
-            f"Found {len(cached_results)} cached results, "
+            f"Found {len(existing_results)} existing results, "
             f"{len(studies_to_screen)} studies to screen"
         )
         
@@ -318,8 +469,8 @@ class LLMScreener(ScreeningEngine):
                 num_workers=num_workers
             )
         
-        # Combine cached and new results
-        results = cached_results + new_results
+        # Combine existing and new results
+        results = existing_results + new_results
         
         return results
     
@@ -365,42 +516,5 @@ class LLMScreener(ScreeningEngine):
             "abstract_threshold": self.config.abstract.get("threshold", 0.75),
             "fulltext_model": self.config.fulltext.get("model", "gpt-4"),
             "fulltext_threshold": self.config.fulltext.get("threshold", 0.8),
-            "cache_enabled": True,
-            "cache_size": len(self._cache)
+            "cache_enabled": False
         }
-
-    def _get_cache_key(self, study: Study, screening_type: str) -> str:
-        """Generate a cache key for a study and screening type."""
-        content = (f"{study.pmid}_{study.title}_{study.abstract}_"
-                   f"{screening_type}")
-        return hashlib.md5(content.encode()).hexdigest()
-
-    def _load_cache(self) -> Dict[str, Any]:
-        """Load screening cache from file."""
-        if self._cache_file.exists():
-            try:
-                with open(self._cache_file, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load cache: {e}")
-        return {}
-
-    def _save_cache(self):
-        """Save screening cache to file."""
-        try:
-            with self._cache_lock:
-                # Create a copy of the cache to avoid "dictionary changed size
-                # during iteration" errors when the cache is modified by other
-                # threads during JSON serialization
-                cache_copy = self._cache.copy()
-                with open(self._cache_file, 'w') as f:
-                    json.dump(cache_copy, f, indent=2)
-        except Exception as e:
-            log_error_with_debug(logger, f"Failed to save cache: {e}")
-
-    def clear_cache(self):
-        """Clear the screening cache."""
-        self._cache = {}
-        if self._cache_file.exists():
-            self._cache_file.unlink()
-        logger.info("Screening cache cleared")
