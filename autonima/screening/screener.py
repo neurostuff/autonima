@@ -50,10 +50,9 @@ class LLMScreener(ScreeningEngine):
         if screening_type == "abstract":
             return [s for s in studies if s.abstract and s.abstract.strip()]
         else:  # fulltext
-            text_file_path = Path(self.output_dir) / "retrieval" / "pubget_data" / "text.csv"
             return [
                 s for s in studies
-                if s.pmcid and text_file_path.exists() and
+                if s.pmcid and
                 s.status in [StudyStatus.FULLTEXT_RETRIEVED, StudyStatus.FULLTEXT_CACHED]
             ]
 
@@ -147,6 +146,8 @@ class LLMScreener(ScreeningEngine):
                 exclusion_criteria=self.exclusion_criteria,
                 **(dict(output_dir=self.output_dir) if screening_type == "fulltext" else {})
             )
+
+            model = config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
             
             try:
                 # Call LLM API
@@ -158,14 +159,14 @@ class LLMScreener(ScreeningEngine):
                     None,
                     screen_method,
                     prompt,
-                    config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
+                    model
                 )
                 
                 # Process response
                 decision, reason = self._process_screening_response(response, config, screening_type)
                 result = self._create_screening_result(
                     study, decision, reason, response.confidence,
-                    config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"),
+                    model,
                     screening_type
                 )
                 
@@ -176,7 +177,7 @@ class LLMScreener(ScreeningEngine):
                     "decision": decision.value,
                     "reason": reason,
                     "confidence": response.confidence,
-                    "model_used": config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"),
+                    "model_used": model,
                     "timestamp": datetime.now().isoformat()
                 }
                 self._save_cache()
@@ -194,7 +195,7 @@ class LLMScreener(ScreeningEngine):
                     StudyStatus.SCREENING_FAILED,
                     f"Screening failed: {str(e)}",
                     0.0,
-                    config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"),
+                    model,
                     screening_type
                 ))
                 
