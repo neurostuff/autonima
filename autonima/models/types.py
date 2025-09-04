@@ -105,8 +105,7 @@ class ScreeningConfig:
     })
     fulltext: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
-        "threshold": 0.8,
-        "adjudicate": True
+        "threshold": 0.8
     })
 
 

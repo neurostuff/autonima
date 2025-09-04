@@ -83,7 +83,7 @@ class PubGetRetriever(BaseRetriever):
                 existing_df = pd.read_csv(metadata_file)
                 if 'pmcid' in existing_df.columns:
                     existing_pmcids = set(
-                        existing_df['pmcid'].dropna().astype(str).tolist()
+                        existing_df['pmcid'].dropna().astype(int).tolist()
                     )
                     logger.info(
                         f"Found {len(existing_pmcids)} already downloaded "
@@ -114,10 +114,7 @@ class PubGetRetriever(BaseRetriever):
         # Extract PMCIDs for studies that need to be downloaded
         pmcids = [study.pmcid for study in studies_to_download if study.pmcid]
         # Add PMCID prefix if missing
-        pmcids = [
-            pmcid if pmcid.startswith("PMC") else f"PMC{pmcid}"
-            for pmcid in pmcids
-        ]
+        pmcids = [f"PMC{pmcid}" for pmcid in pmcids]
         
         # Use temporary directory for pubget processing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -288,7 +285,7 @@ class PubGetRetriever(BaseRetriever):
         
         # Load first column 
         df = pd.read_csv(all_texts)
-        retrieved_pmcid = set(df['pmcid'].dropna().astype(str).tolist())
+        retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
         
         # Check which studies have full-text files
         for study in studies:

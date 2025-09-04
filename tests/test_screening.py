@@ -43,7 +43,7 @@ def test_abstract_screening():
         mock_client.screen_abstract.return_value = mock_response
 
         # Create unified screener
-        screener = LLMScreener(config)
+        screener = LLMScreener(config, output_dir="test_output")
 
         # Test screening
         studies_list = [study]
@@ -66,7 +66,7 @@ def test_screener_initialization():
     config = ScreeningConfig()
 
     # Create unified screener
-    screener = LLMScreener(config)
+    screener = LLMScreener(config, output_dir="test_output")
     
     assert screener.config == config
 
@@ -77,7 +77,7 @@ def test_screener_get_info():
     config = ScreeningConfig()
 
     # Create unified screener
-    screener = LLMScreener(config)
+    screener = LLMScreener(config, output_dir="test_output")
 
     # Test screening info
     info = screener.get_screening_info()

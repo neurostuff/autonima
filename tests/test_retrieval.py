@@ -28,7 +28,7 @@ class TestRetrieval(unittest.TestCase):
                 keywords=["fMRI", "neuroimaging"],
                 status=StudyStatus.INCLUDED,
                 metadata={
-                    "pmcid": "PMC1234567"  # PMC ID is required for PubGet
+                    "pmcid": "1234567"  # PMC ID is required for PubGet
                 }
             ),
             Study(
@@ -43,7 +43,7 @@ class TestRetrieval(unittest.TestCase):
                 doi="10.1002/hbm.26123",
                 keywords=["fMRI", "working memory"],
                 status=StudyStatus.INCLUDED,
-                metadata={"pmcid": "PMC7654321"}
+                metadata={"pmcid": "7654321"}
             )
         ]
 

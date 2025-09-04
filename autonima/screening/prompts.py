@@ -83,12 +83,12 @@ EXCLUSION CRITERIA:
         ):
             try:
                 
-                full_text = study.load_full_text(output_dir=output_dir)
-                content = (full_text if full_text is not None
-                           else "No full text available")
-                
+                content = study.load_full_text(output_dir=output_dir)
+
             except Exception:
-                content = "Error loading full text"
+                raise RuntimeError(
+                    f"Failed to load full text for study {study.pmid}"
+                )
         else:
             content = "No full text available"
         
