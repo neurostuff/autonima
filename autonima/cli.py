@@ -16,6 +16,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Silence verbose HTTP request logs from httpx (used by OpenAI client)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,12 +32,15 @@ logger = logging.getLogger(__name__)
               help='Validate configuration without running pipeline')
 @click.option('--debug', is_flag=True,
               help='Enable debug mode with post-mortem debugging on errors')
+@click.option('--num-workers', '-j', type=int, default=1,
+              help='Number of parallel workers for screening (default: 1)')
 def run(
     config: str,
     output_folder: str,
     verbose: bool,
     dry_run: bool,
-    debug: bool
+    debug: bool,
+    num_workers: int
 ):
     """
     Run the Autonima systematic review pipeline.
@@ -95,7 +102,9 @@ def run(
         logger.info("Starting pipeline execution...")
 
         async def execute_pipeline():
-            results = await run_pipeline_from_config(config=pipeline_config)
+            results = await run_pipeline_from_config(
+                config=pipeline_config, num_workers=num_workers
+            )
 
             # Print summary
             stats = results.execution_stats
