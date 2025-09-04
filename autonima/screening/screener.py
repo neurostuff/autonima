@@ -9,6 +9,7 @@ import tqdm
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from threading import Lock
 
 from .base import ScreeningEngine
 from .prompts import PromptLibrary
@@ -72,6 +73,7 @@ class LLMScreener(ScreeningEngine):
         self._llm_client: Optional[GenericLLMClient] = None
         self.output_dir = output_dir
         self.num_workers = num_workers
+        self._cache_lock = Lock()
 
     def _initialize_llm_client(self) -> GenericLLMClient:
         """Initialize the LLM client if not already done."""
@@ -205,6 +207,10 @@ class LLMScreener(ScreeningEngine):
                 "model_used": model,
                 "timestamp": datetime.now().isoformat()
             }
+            
+            # Save cache after each screening operation
+            # for more frequent saving
+            self._save_cache()
                 
             return result
                 
@@ -264,9 +270,12 @@ class LLMScreener(ScreeningEngine):
             studies, screening_type
         )
         if len(screenable_studies) < len(studies):
+            text_type = (
+                'abstracts' if screening_type == 'abstract' else 'full text'
+            )
             logger.warning(
-                f"Skipping {len(studies) - len(screenable_studies)} studies "
-                f"without {'abstracts' if screening_type == 'abstract' else 'full text'}"
+                f"Skipping {len(studies) - len(screenable_studies)} "
+                f"studies without {text_type}"
             )
             
         if not screenable_studies:
@@ -281,7 +290,9 @@ class LLMScreener(ScreeningEngine):
         for study in screenable_studies:
             cache_key = self._get_cache_key(study, screening_type)
             if cache_key in self._cache:
-                logger.info(f"Using cached result for {study.pmid} {screening_type}")
+                logger.info(
+                    f"Using cached result for {study.pmid} {screening_type}"
+                )
                 cached_result = self._cache[cache_key]
                 cached_results.append(self._create_screening_result(
                     study,
@@ -294,22 +305,22 @@ class LLMScreener(ScreeningEngine):
             else:
                 studies_to_screen.append(study)
         
-        logger.info(f"Found {len(cached_results)} cached results, {len(studies_to_screen)} studies to screen")
+        logger.info(
+            f"Found {len(cached_results)} cached results, "
+            f"{len(studies_to_screen)} studies to screen"
+        )
         
         # Process studies that need screening
         new_results = []
         if studies_to_screen:
             # Use parallel processing if num_workers > 1
             logger.info(f"Using {num_workers} workers for parallel screening")
-            # For parallel processing, we need to save cache after all results are collected
             new_results = self._screen_single_study_wrapper(
                 studies_to_screen,
                 screening_type,
                 config,
                 num_workers=num_workers
             )
-            # Save cache after parallel processing
-            self._save_cache()
         
         # Combine cached and new results
         results = cached_results + new_results
@@ -381,8 +392,9 @@ class LLMScreener(ScreeningEngine):
     def _save_cache(self):
         """Save screening cache to file."""
         try:
-            with open(self._cache_file, 'w') as f:
-                json.dump(self._cache, f, indent=2)
+            with self._cache_lock:
+                with open(self._cache_file, 'w') as f:
+                    json.dump(self._cache, f, indent=2)
         except Exception as e:
             log_error_with_debug(logger, f"Failed to save cache: {e}")
 
