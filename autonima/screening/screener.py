@@ -22,10 +22,11 @@ class LLMScreener(ScreeningEngine):
     screening."""
 
     def __init__(
-        self, 
-        config: ScreeningConfig, 
-        inclusion_criteria: List[str] = None, 
-        exclusion_criteria: List[str] = None
+        self,
+        config: ScreeningConfig,
+        inclusion_criteria: List[str] = None,
+        exclusion_criteria: List[str] = None,
+        output_dir: str = "test_output"
     ):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
@@ -36,6 +37,7 @@ class LLMScreener(ScreeningEngine):
         self.inclusion_criteria = inclusion_criteria or []
         self.exclusion_criteria = exclusion_criteria or []
         self._llm_client: Optional[GenericLLMClient] = None
+        self.output_dir = output_dir
 
     async def screen_abstracts(
         self, 
@@ -174,12 +176,17 @@ class LLMScreener(ScreeningEngine):
         if self._llm_client is None:
             self._llm_client = GenericLLMClient()
 
-        # Filter to only studies that have full text
+        # Filter to only studies that have full text and correct status
         # Check if the study has a pmcid and the standard text file exists
-        text_file_path = Path("test_output/retrieval/pubget_data/text.csv")
+        # Also check that the study status is appropriate for screening
+        text_file_path = (
+            Path(self.output_dir) / "retrieval" / "pubget_data" / "text.csv"
+        )
         screenable_studies = [
             s for s in studies
-            if s.pmcid and text_file_path.exists()
+            if s.pmcid and text_file_path.exists() and
+            s.status in [StudyStatus.FULLTEXT_RETRIEVED,
+                         StudyStatus.FULLTEXT_CACHED]
         ]
 
         if len(screenable_studies) < len(studies):
@@ -211,7 +218,8 @@ class LLMScreener(ScreeningEngine):
             prompt = PromptLibrary.get_fulltext_screening_prompt(
                 study=study,
                 inclusion_criteria=self.inclusion_criteria,
-                exclusion_criteria=self.exclusion_criteria
+                exclusion_criteria=self.exclusion_criteria,
+                output_dir=self.output_dir
             )
 
             try:

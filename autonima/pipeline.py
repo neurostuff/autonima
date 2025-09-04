@@ -68,7 +68,8 @@ class AutonimaPipeline:
         self._screener = LLMScreener(
             self.config.screening,
             inclusion_criteria=self.config.inclusion_criteria,
-            exclusion_criteria=self.config.exclusion_criteria
+            exclusion_criteria=self.config.exclusion_criteria,
+            output_dir=self.config.output.directory
         )
         
         # Initialize retrieval engine
@@ -247,8 +248,7 @@ class AutonimaPipeline:
 
             if not_found:
                 logger.warning(
-                    f"PMCIDs not found for {len(not_found)} studies: "
-                    f"{', '.join(not_found)}"
+                    f"PMCIDs not found for {len(not_found)} studies."
                 )
 
         # Use PubGet for actual retrieval

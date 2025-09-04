@@ -38,7 +38,7 @@ def test_load_full_text():
         )
         
         # Test loading full text
-        result = _load_full_text(study, str(test_file))
+        result = _load_full_text(study, text_path=str(test_file))
         
         # Verify the result
         expected = 'This is the full text for study 1.'
@@ -55,7 +55,7 @@ def test_load_full_text():
             pmcid="PMC999999"  # This PMCID doesn't exist in the CSV
         )
         
-        result2 = _load_full_text(study2, str(test_file))
+        result2 = _load_full_text(study2, text_path=str(test_file))
         assert result2 is None, f"Expected None, got {result2}"
         
         print("All tests passed!")
@@ -97,7 +97,7 @@ def test_study_load_full_text():
         )
         
         # Test loading full text through the Study method
-        result = study.load_full_text()
+        result = study.load_full_text(output_dir="test_output")
         
         # Verify the result
         expected = 'This is the full text for study 1.'

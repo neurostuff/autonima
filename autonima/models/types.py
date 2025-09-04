@@ -65,18 +65,24 @@ class Study:
             ),
         }
     
-    def load_full_text(self) -> str:
+    def load_full_text(self, output_dir: str = "test_output") -> str:
         """Load the full text content for this study.
         
+        Args:
+            output_dir: Output directory where pubget data is stored
+            
         Returns:
             The full text content as a string, or None if not found
+            
+        Raises:
+            ValueError: If output_dir is not provided
+            FileNotFoundError: If the text file doesn't exist at the expected location
         """
         # Import here to avoid circular imports
         from ..retrieval.utils import _load_full_text
         
-        # Use the _load_full_text function with the standard path
-        text_path = "test_output/retrieval/pubget_data/text.csv"
-        return _load_full_text(self, text_path)
+        # Use the _load_full_text function with the output directory
+        return _load_full_text(self, output_dir=output_dir)
 
 
 @dataclass

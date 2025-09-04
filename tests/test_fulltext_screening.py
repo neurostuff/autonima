@@ -56,7 +56,7 @@ def test_fulltext_screening():
             mock_client.screen_fulltext.return_value = mock_response
 
             # Create unified screener
-            screener = LLMScreener(config)
+            screener = LLMScreener(config, output_dir="test_output")
             
             # Clear cache to ensure we're testing the actual screening
             screener.clear_cache()
@@ -107,7 +107,7 @@ def test_fulltext_screening_with_missing_pmcid():
         mock_client_class.return_value = mock_client
         
         # Create unified screener
-        screener = LLMScreener(config)
+        screener = LLMScreener(config, output_dir="test_output")
         
         # Clear cache to ensure we're testing the actual screening
         screener.clear_cache()

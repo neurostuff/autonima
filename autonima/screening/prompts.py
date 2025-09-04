@@ -71,17 +71,22 @@ EXCLUSION CRITERIA:
     def get_fulltext_screening_prompt(
         study: Study,
         inclusion_criteria: List[str],
-        exclusion_criteria: List[str]
+        exclusion_criteria: List[str],
+        output_dir: str = "test_output"
     ) -> str:
         """Get the prompt for full-text screening."""
         base_prompt = PromptLibrary.get_base_prompt()
         
         # For full-text screening, we load the full text content
-        if study.status == StudyStatus.FULLTEXT_RETRIEVED:
+        if study.status in (
+            [StudyStatus.FULLTEXT_RETRIEVED, StudyStatus.FULLTEXT_CACHED]
+        ):
             try:
-                full_text = study.load_full_text()
+                
+                full_text = study.load_full_text(output_dir=output_dir)
                 content = (full_text if full_text is not None
-                          else "No full text available")
+                           else "No full text available")
+                
             except Exception:
                 content = "Error loading full text"
         else:
