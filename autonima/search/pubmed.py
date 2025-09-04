@@ -325,33 +325,39 @@ class PubMedSearch(SearchEngine):
         }
 
     async def _make_request_with_retry(
-        self, 
-        url: str, 
-        params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self,
+        url: str,
+        params: Dict[str, Any],
+        response_type: str = "json"
+    ):
         """
         Make HTTP request with retry logic.
-
+        
         Args:
             url: Request URL
             params: Request parameters
-
+            response_type: Type of response expected ("json" or "xml")
+            
         Returns:
-            Response data as dictionary
+            Response data as dictionary or text
         """
         for attempt in range(self.max_retries):
             try:
                 response = requests.get(url, params=params)
                 response.raise_for_status()
-                return response.json()
-
+                
+                if response_type == "xml":
+                    return response
+                else:
+                    return response.json()
+                
             except Exception as e:
                 if attempt == self.max_retries - 1:
                     msg = (f"Failed to fetch {url} after "
                            f"{self.max_retries} attempts: {e}")
                     log_error_with_debug(logger, msg)
                     raise
-
+                    
                 msg = f"Attempt {attempt + 1} failed, retrying: {e}"
                 logger.warning(msg)
                 # Exponential backoff
@@ -360,7 +366,7 @@ class PubMedSearch(SearchEngine):
 
     async def fetch_pmcids(self, pmids: List[str]) -> Dict[str, str]:
         """
-        Fetch PMCIDs for a list of PMIDs using the PubMed API.
+        Fetch PMCIDs for a list of PMIDs using the PMC ID Converter API.
         
         Args:
             pmids: List of PubMed IDs
@@ -373,44 +379,62 @@ class PubMedSearch(SearchEngine):
         
         pmid_to_pmcid = {pmid: "" for pmid in pmids}
         
-        try:
-            # Use Entrez.elink to convert PMIDs to PMCIDs
-            handle = Entrez.elink(
-                dbfrom="pubmed",
-                db="pmc",
-                id=pmids,
-                retmode="xml"
-            )
-            link_results = Entrez.read(handle)
-            handle.close()
+        # PMC ID Converter API endpoint
+        base_url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/"
+        
+        # Process PMIDs in batches of 200 (API limit)
+        batch_size = 200
+        for i in range(0, len(pmids), batch_size):
+            batch_pmids = pmids[i:i + batch_size]
             
-            # Parse the results to extract PMCIDs
-            for linkset in link_results:
-                if "LinkSetDb" not in linkset:
-                    continue
-                    
-                # Find the PMID for this linkset
-                pmid = linkset.get("IdList", [""])[0]
-                if not pmid:
-                    continue
+            try:
+                # Make API request with retry logic
+                pmid_string = ",".join(batch_pmids)
+                params = {
+                    "ids": pmid_string,
+                    "idtype": "pmid",
+                    "format": "xml"
+                }
                 
-                # Look for PMC links
-                for link_db in linkset["LinkSetDb"]:
-                    if link_db["DbTo"] == "pmc":
-                        if link_db["Link"]:
-                            # PMCIDs are stored as numeric IDs,
-                            # need to prefix with "PMC"
-                            pmcid = "PMC" + link_db["Link"][0]["Id"]
-                            pmid_to_pmcid[pmid] = pmcid
-                            break
-            
-            successful_count = len([v for v in pmid_to_pmcid.values() if v])
-            logger.info(
-                f"Successfully fetched PMCIDs for {successful_count} "
-                f"out of {len(pmids)} PMIDs"
-            )
-            return pmid_to_pmcid
-            
-        except Exception as e:
-            log_error_with_debug(logger, f"Error fetching PMCIDs: {e}")
-            return pmid_to_pmcid
+                # Add tool and email parameters if available
+                if self.config.email:
+                    params["email"] = self.config.email
+                params["tool"] = "autonima"
+                
+                # Make request with retry logic
+                response = await self._make_request_with_retry(
+                    base_url, params, response_type="xml"
+                )
+                
+                # Parse XML response
+                root = ET.fromstring(response.text)
+                
+                # Extract PMCIDs from response
+                for record in root.findall(".//record"):
+                    requested_id = record.get("requested-id")
+                    pmcid = record.get("pmcid")
+                    
+                    if requested_id and pmcid:
+                        pmid_to_pmcid[requested_id] = pmcid
+                
+                # Rate limiting
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                msg = (f"Failed to fetch PMCIDs for batch starting "
+                       f"at index {i}: {e}")
+                logger.warning(msg)
+                continue
+        
+        successful_count = len([v for v in pmid_to_pmcid.values() if v])
+        logger.info(
+            f"Successfully fetched PMCIDs for {successful_count} "
+            f"out of {len(pmids)} PMIDs using PMC ID Converter API"
+        )
+
+        # Remove prefix "PMC" from PMCIDs
+        pmid_to_pmcid = {
+            pmid: (pmcid[3:] if pmcid.startswith("PMC") else pmcid)
+            for pmid, pmcid in pmid_to_pmcid.items()
+        }
+        return pmid_to_pmcid

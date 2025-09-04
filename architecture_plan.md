@@ -139,8 +139,8 @@ class Study:
     doi: Optional[str]
     keywords: List[str]
     status: StudyStatus  # INCLUDED, EXCLUDED, PENDING
-    screening_reason: Optional[str]
-    full_text_path: Optional[str]
+    abstract_screening_reason: Optional[str]
+    fulltext_screening_reason: Optional[str]
     metadata: Dict[str, Any]
 ```
 

@@ -2,6 +2,8 @@
 
 import logging
 import tempfile
+import pandas as pd
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
@@ -59,7 +61,7 @@ class PubGetRetriever(BaseRetriever):
         """
         # Filter studies that have PMCID (needed for PubGet)
         studies_with_pmcid = [
-            study for study in studies 
+            study for study in studies
             if study.pmcid and study.status == StudyStatus.INCLUDED
         ]
         
@@ -67,16 +69,55 @@ class PubGetRetriever(BaseRetriever):
             logger.info("No studies with PMCID found for retrieval")
             return studies
         
-        logger.info(
-            f"Retrieving full-text for {len(studies_with_pmcid)} studies"
-        )
-        
-        # Extract PMCIDs
-        pmcids = [study.pmcid for study in studies_with_pmcid if study.pmcid]
-        
         # Create output directory
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check existing metadata for already downloaded PMCIDs
+        existing_pmcids = set()
+        data_dir = output_dir / "pubget_data"
+        metadata_file = data_dir / "metadata.csv"
+        
+        if metadata_file.exists():
+            try:
+                existing_df = pd.read_csv(metadata_file)
+                if 'pmcid' in existing_df.columns:
+                    existing_pmcids = set(
+                        existing_df['pmcid'].dropna().astype(str).tolist()
+                    )
+                    logger.info(
+                        f"Found {len(existing_pmcids)} already downloaded "
+                        "PMCIDs"
+                    )
+            except Exception as e:
+                logger.warning(f"Could not read existing metadata: {e}")
+        
+        cached_studies = []
+        studies_to_download = []
+
+        for study in studies_with_pmcid:
+            if study.pmcid and study.pmcid in existing_pmcids:
+                cached_studies.append(study)
+                study.status = StudyStatus.FULLTEXT_CACHED
+            else:
+                studies_to_download.append(study)
+                
+        if not studies_to_download:
+            logger.info("All PMCIDs already downloaded, skipping retrieval")
+            return studies
+        
+        logger.info(
+            f"Retrieving full-text for {len(studies_to_download)} studies "
+            f"(skipping {len(cached_studies)} already downloaded)"
+        )
+        
+        # Extract PMCIDs for studies that need to be downloaded
+        pmcids = [study.pmcid for study in studies_to_download if study.pmcid]
+        # Add PMCID prefix if missing
+        pmcids = [
+            pmcid if pmcid.startswith("PMC") else f"PMC{pmcid}"
+            for pmcid in pmcids
+        ]
         
         # Use temporary directory for pubget processing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -91,10 +132,20 @@ class PubGetRetriever(BaseRetriever):
                     n_docs=kwargs.get('n_docs'),
                     api_key=kwargs.get('api_key')
                 )
-                
+
                 if download_exit_code != 0:
                     logger.warning("Article download was incomplete")
-                
+
+                # Check to see how many articles were downloaded
+                # If no articles were downloaded, skip the rest of the steps
+                if not download_dir or not Path(download_dir).exists():
+                    logger.warning("No articles were downloaded.")
+                    return studies
+                downloaded_files = list(Path(download_dir).rglob('*'))
+                if len(downloaded_files) <= 1:
+                    logger.warning("No articles were downloaded.")
+                    return studies
+                                
                 # Extract articles from bulk download
                 logger.info("Extracting articles...")
                 articles_dir, extract_exit_code = extract_articles(
@@ -117,19 +168,21 @@ class PubGetRetriever(BaseRetriever):
                 if data_exit_code != 0:
                     logger.warning("Data extraction was incomplete")
                 
-                # Move extracted data to output directory
+                # Merge with existing data if it exists
                 final_data_dir = output_dir / "pubget_data"
                 if data_dir.exists():
-                    import shutil
-                    shutil.copytree(
-                        data_dir, final_data_dir, dirs_exist_ok=True
-                    )
-                
-                # Update studies with full-text paths
-                self._update_study_paths(studies_with_pmcid, final_data_dir)
+                    if final_data_dir.exists():
+                        # Merge with existing data
+                        self._merge_pubget_data(data_dir, final_data_dir)
+                    else:
+                        # Move extracted data to output directory
+                        import shutil
+                        shutil.copytree(
+                            data_dir, final_data_dir, dirs_exist_ok=True
+                        )
                 
                 logger.info(
-                    f"Successfully retrieved {len(studies_with_pmcid)} "
+                    f"Successfully retrieved {len(studies_to_download)} "
                     "articles"
                 )
                 
@@ -139,51 +192,74 @@ class PubGetRetriever(BaseRetriever):
         
         return studies
 
-    def _update_study_paths(self, studies: List[Study], data_dir: Path):
+    def _merge_pubget_data(self, new_data_dir: Path, existing_data_dir: Path):
         """
-        Update studies with paths to their full-text files.
+        Merge new pubget data with existing data.
         
         Args:
-            studies: List of studies to update
-            data_dir: Directory containing extracted data
+            new_data_dir: Directory containing new pubget data
+            existing_data_dir: Directory containing existing pubget data
         """
-        # Read metadata to map PMCID to file paths
-        metadata_file = data_dir / "metadata.csv"
-        if not metadata_file.exists():
-            logger.warning("Metadata file not found")
-            return
+        import shutil
         
-        import pandas as pd
-        try:
-            _ = pd.read_csv(metadata_file)
-        except Exception as e:
-            log_error_with_debug(logger, f"Error reading metadata: {e}")
-            return
+        # List of CSV files to merge
+        csv_files = [
+            "metadata.csv",
+            "text.csv",
+            "coordinates.csv",
+            "coordinate_space.csv",
+            "tables.csv",
+            "authors.csv",
+            "links.csv",
+            "neurovault_collections.csv",
+            "neurovault_images.csv"
+        ]
         
-        # Create mapping from PMCID to article directory
-        pmcid_to_path = {}
-        articles_dir = data_dir.parent / "articles"
+        for csv_file in csv_files:
+            new_file = new_data_dir / csv_file
+            existing_file = existing_data_dir / csv_file
+            
+            if new_file.exists():
+                if existing_file.exists():
+                    # Merge the CSV files
+                    try:
+                        new_df = pd.read_csv(new_file)
+                        existing_df = pd.read_csv(existing_file)
+                        
+                        # Concatenate and remove duplicates based on PMCID
+                        if ('pmcid' in new_df.columns and
+                                'pmcid' in existing_df.columns):
+                            # Remove rows from existing data that are in new
+                            # data
+                            existing_df = existing_df[
+                                ~existing_df['pmcid'].isin(new_df['pmcid'])
+                            ]
+                            # Concatenate the dataframes
+                            merged_df = pd.concat(
+                                [existing_df, new_df], ignore_index=True
+                            )
+                        else:
+                            # If no PMCID column, just concatenate
+                            merged_df = pd.concat(
+                                [existing_df, new_df], ignore_index=True
+                            )
+                        
+                        # Save merged data
+                        merged_df.to_csv(existing_file, index=False)
+                        logger.info(f"Merged {csv_file} with existing data")
+                    except Exception as e:
+                        logger.warning(f"Could not merge {csv_file}: {e}")
+                        # Fall back to copying new file
+                        shutil.copy2(new_file, existing_file)
+                else:
+                    # No existing file, just copy the new one
+                    shutil.copy2(new_file, existing_file)
         
-        if articles_dir.exists():
-            for subdir in articles_dir.iterdir():
-                if subdir.is_dir():
-                    for article_dir in subdir.iterdir():
-                        if (article_dir.is_dir() and
-                                article_dir.name.startswith("pmcid_")):
-                            pmcid = article_dir.name.replace("pmcid_", "")
-                            pmcid_to_path[pmcid] = article_dir
-        
-        # Update studies with full-text paths
-        for study in studies:
-            pmcid = study.metadata.get('pmcid')
-            if pmcid and pmcid in pmcid_to_path:
-                article_dir = pmcid_to_path[pmcid]
-                xml_file = article_dir / "article.xml"
-                if xml_file.exists():
-                    study.full_text_path = str(xml_file)
-                    logger.debug(
-                        f"Updated full-text path for study {pmcid}"
-                    )
+        # Copy any other files (like info.json)
+        for other_file in new_data_dir.iterdir():
+            if other_file.is_file() and other_file.name not in csv_files:
+                existing_file = existing_data_dir / other_file.name
+                shutil.copy2(other_file, existing_file)
 
     def validate_retrieval(
         self,
@@ -205,10 +281,22 @@ class PubGetRetriever(BaseRetriever):
             logger.warning("PubGet data directory not found")
             return studies
         
+        all_texts = data_dir / "text.csv"
+        if not all_texts.exists():
+            logger.warning("Extracted text file not found")
+            return studies
+        
+        # Load first column 
+        df = pd.read_csv(all_texts)
+        retrieved_pmcid = set(df['pmcid'].dropna().astype(str).tolist())
+        
         # Check which studies have full-text files
         for study in studies:
-            if study.full_text_path and Path(study.full_text_path).exists():
+            if study.status == StudyStatus.FULLTEXT_CACHED:
+                continue
+            elif study.pmcid in retrieved_pmcid:
                 study.status = StudyStatus.FULLTEXT_RETRIEVED
+                study.retrieved_at = datetime.now()
             else:
                 study.status = StudyStatus.FULLTEXT_UNAVAILABLE
         

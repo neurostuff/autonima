@@ -1,7 +1,7 @@
 """Abstract base class for retrieval modules."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List
 from pathlib import Path
 
 from ..models.types import Study

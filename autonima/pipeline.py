@@ -3,13 +3,12 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from .config import ConfigManager
 from .models.types import (
     PipelineConfig,
     PipelineResult,
-    Study,
     StudyStatus
 )
 from .search import PubMedSearch
@@ -69,7 +68,8 @@ class AutonimaPipeline:
         self._screener = LLMScreener(
             self.config.screening,
             inclusion_criteria=self.config.inclusion_criteria,
-            exclusion_criteria=self.config.exclusion_criteria
+            exclusion_criteria=self.config.exclusion_criteria,
+            output_dir=self.config.output.directory
         )
         
         # Initialize retrieval engine
@@ -175,12 +175,12 @@ class AutonimaPipeline:
                 )
             if study:
                 study.status = result.decision
-                study.screening_reason = result.reason
+                study.abstract_screening_reason = result.reason
                 study.abstract_screening_score = result.confidence
                 study.screened_at = datetime.now()
 
         # Add screening results to pipeline results
-        self.results.screening_results.extend(screening_results)
+        self.results.abstract_screening_results.extend(screening_results)
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
@@ -214,7 +214,9 @@ class AutonimaPipeline:
         # Get included studies that need full-text retrieval
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and not s.full_text_path
+            if s.status == StudyStatus.INCLUDED and
+            s.status not in [StudyStatus.FULLTEXT_RETRIEVED,
+                             StudyStatus.FULLTEXT_CACHED]
         ]
 
         if not included_studies:
@@ -237,44 +239,34 @@ class AutonimaPipeline:
             pmid_to_pmcid = await self._search_engine.fetch_pmcids(pmids)
             
             # Update studies with their PMCIDs
+            not_found = []
             for study in studies_needing_pmcid:
                 if study.pmid in pmid_to_pmcid and pmid_to_pmcid[study.pmid]:
                     study.pmcid = pmid_to_pmcid[study.pmid]
-                    logger.debug(
-                        f"Updated study {study.pmid} with PMCID {study.pmcid}"
-                    )
                 else:
-                    logger.warning(
-                        f"Could not find PMCID for study {study.pmid}"
-                    )
+                    not_found.append(study.pmid)
+
+            if not_found:
+                logger.warning(
+                    f"PMCIDs not found for {len(not_found)} studies."
+                )
 
         # Use PubGet for actual retrieval
         output_dir = Path(self.config.output.directory)
         retrieval_dir = output_dir / "retrieval"
-        
+
         # Retrieve full-text articles
         try:
             api_key = getattr(self.config.retrieval, 'api_key', None)
             n_docs = getattr(self.config.retrieval, 'max_docs', None)
-            
-            retrieved_studies = self._retriever.retrieve(
+
+            _ = self._retriever.retrieve(
                 studies=included_studies,
                 output_dir=retrieval_dir,
                 api_key=api_key,
                 n_docs=n_docs
             )
-            
-            # Update studies in results with retrieved information
-            for retrieved_study in retrieved_studies:
-                # Find matching study in results
-                study = next(
-                    (s for s in self.results.studies
-                     if s.pmid == retrieved_study.pmid),
-                    None
-                )
-                if study and retrieved_study.full_text_path:
-                    study.full_text_path = retrieved_study.full_text_path
-                    study.retrieved_at = datetime.now()
+                   
         except Exception as e:
             log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
 
@@ -289,7 +281,6 @@ class AutonimaPipeline:
                     "pmid": study.pmid,
                     "pmcid": study.pmcid,
                     "title": study.title,
-                    "full_text_path": study.full_text_path,
                     "retrieved_at": (
                         study.retrieved_at.isoformat()
                         if study.retrieved_at else None
@@ -297,10 +288,10 @@ class AutonimaPipeline:
                     "status": study.status.value
                 }
                 for study in self.results.studies
-                if (study.full_text_path or
-                    study.status in [
+                if (study.status in [
                         StudyStatus.FULLTEXT_RETRIEVED,
-                        StudyStatus.FULLTEXT_UNAVAILABLE
+                        StudyStatus.FULLTEXT_UNAVAILABLE,
+                        StudyStatus.FULLTEXT_CACHED
                     ])
             ],
             "timestamp": datetime.now().isoformat()
@@ -310,7 +301,9 @@ class AutonimaPipeline:
             json.dump(retrieval_data, f, indent=2)
 
         retrieved_count = len([
-            s for s in self.results.studies if s.full_text_path
+            s for s in self.results.studies
+            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
+                            StudyStatus.FULLTEXT_CACHED]
         ])
         unavailable_count = len([
             s for s in self.results.studies
@@ -331,7 +324,8 @@ class AutonimaPipeline:
         # Get studies with full text that need screening
         screenable_studies = [
             s for s in self.results.studies
-            if s.full_text_path and s.status == StudyStatus.INCLUDED
+            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
+                            StudyStatus.FULLTEXT_CACHED]
         ]
 
         if not screenable_studies:
@@ -354,12 +348,12 @@ class AutonimaPipeline:
             )
             if study:
                 study.status = result.decision
-                study.screening_reason = result.reason
+                study.fulltext_screening_reason = result.reason
                 study.fulltext_screening_score = result.confidence
                 study.screened_at = datetime.now()
 
         # Add screening results to pipeline results
-        self.results.screening_results.extend(screening_results)
+        self.results.fulltext_screening_results.extend(screening_results)
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
@@ -387,24 +381,6 @@ class AutonimaPipeline:
             f"Full-text screening results saved to "
             f"{fulltext_screening_results_file}"
         )
-
-    async def _mock_fulltext_screening(self, studies: List[Study]):
-        """Mock full-text screening for development purposes."""
-        # Simulate more strict screening for full text
-        for study in studies:
-            # Mock confidence score
-            confidence = 0.7 + (hash(study.pmid) % 100) / 100 * 0.3
-
-            if confidence >= self.config.screening.fulltext.get(
-                'threshold', 0.8
-            ):
-                study.status = StudyStatus.INCLUDED
-                study.screening_reason = "Passed full-text screening"
-                study.fulltext_screening_score = confidence
-            else:
-                study.status = StudyStatus.EXCLUDED
-                study.screening_reason = "Failed full-text screening"
-                study.fulltext_screening_score = confidence
 
     async def _execute_output_phase(self):
         """Execute output generation phase."""
@@ -436,7 +412,7 @@ class AutonimaPipeline:
             "fulltext_assessed": len(included_studies),
             "fulltext_excluded": len(excluded_studies) - len([
                 s for s in excluded_studies
-                if "full-text" in (s.screening_reason or "")
+                if "full-text" in (s.fulltext_screening_reason or "")
             ]),
             "final_included": len(included_studies)
         }
@@ -475,7 +451,14 @@ class AutonimaPipeline:
                     s for s in self.results.studies
                     if s.status == StudyStatus.EXCLUDED
                 ]),
-                "screening_results": len(self.results.screening_results)
+                "abstract_screening_results": len(
+                    self.results.abstract_screening_results),
+                "fulltext_screening_results": len(
+                    self.results.fulltext_screening_results),
+                "total_screening_results": (
+                    len(self.results.abstract_screening_results) +
+                    len(self.results.fulltext_screening_results)
+                )
             },
             "execution": {
                 "started_at": self.results.started_at.isoformat(),

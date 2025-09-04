@@ -15,6 +15,7 @@ class StudyStatus(Enum):
     SCREENING_FAILED = "screening_failed"
     FULLTEXT_RETRIEVED = "fulltext_retrieved"
     FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
+    FULLTEXT_CACHED = "fulltext_cached"
 
 
 @dataclass
@@ -29,8 +30,8 @@ class Study:
     doi: Optional[str] = None
     keywords: List[str] = field(default_factory=list)
     status: StudyStatus = StudyStatus.PENDING
-    screening_reason: Optional[str] = None
-    full_text_path: Optional[str] = None
+    abstract_screening_reason: Optional[str] = None
+    fulltext_screening_reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     abstract_screening_score: Optional[float] = None
     fulltext_screening_score: Optional[float] = None
@@ -51,8 +52,8 @@ class Study:
             "doi": self.doi,
             "keywords": self.keywords,
             "status": self.status.value,
-            "screening_reason": self.screening_reason,
-            "full_text_path": self.full_text_path,
+            "abstract_screening_reason": self.abstract_screening_reason,
+            "fulltext_screening_reason": self.fulltext_screening_reason,
             "metadata": self.metadata,
             "abstract_screening_score": self.abstract_screening_score,
             "fulltext_screening_score": self.fulltext_screening_score,
@@ -63,6 +64,25 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
         }
+    
+    def load_full_text(self, output_dir: str = "test_output") -> str:
+        """Load the full text content for this study.
+        
+        Args:
+            output_dir: Output directory where pubget data is stored
+            
+        Returns:
+            The full text content as a string, or None if not found
+            
+        Raises:
+            ValueError: If output_dir is not provided
+            FileNotFoundError: If the text file doesn't exist at the expected location
+        """
+        # Import here to avoid circular imports
+        from ..retrieval.utils import _load_full_text
+        
+        # Use the _load_full_text function with the output directory
+        return _load_full_text(self, output_dir=output_dir)
 
 
 @dataclass
@@ -82,14 +102,10 @@ class ScreeningConfig:
     abstract: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
         "threshold": 0.75,
-        "temperature": 0.1,
-        "max_tokens": 1000
     })
     fulltext: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
         "threshold": 0.8,
-        "temperature": 0.1,
-        "max_tokens": 2000,
         "adjudicate": True
     })
 
@@ -191,7 +207,10 @@ class PipelineResult:
     """Results from running the complete pipeline."""
     config: PipelineConfig
     studies: List[Study] = field(default_factory=list)
-    screening_results: List[ScreeningResult] = field(default_factory=list)
+    abstract_screening_results: List[ScreeningResult] = field(
+        default_factory=list)
+    fulltext_screening_results: List[ScreeningResult] = field(
+        default_factory=list)
     execution_stats: Dict[str, Any] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     started_at: datetime = field(default_factory=datetime.now)
@@ -202,8 +221,11 @@ class PipelineResult:
         return {
             "config": self.config.to_dict(),
             "studies": [study.to_dict() for study in self.studies],
-            "screening_results": [
-                result.to_dict() for result in self.screening_results
+            "abstract_screening_results": [
+                result.to_dict() for result in self.abstract_screening_results
+            ],
+            "fulltext_screening_results": [
+                result.to_dict() for result in self.fulltext_screening_results
             ],
             "execution_stats": self.execution_stats,
             "errors": self.errors,
