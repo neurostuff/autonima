@@ -31,7 +31,7 @@ class AutonimaPipeline:
     5. Output generation with PRISMA compliance
     """
 
-    def __init__(self, config: PipelineConfig):
+    def __init__(self, config: PipelineConfig, num_workers: int = 1):
         """
         Initialize the pipeline with configuration.
 
@@ -39,6 +39,7 @@ class AutonimaPipeline:
             config: Pipeline configuration
         """
         self.config = config
+        self.num_workers = num_workers
         self.results = PipelineResult(
             config=config,
             started_at=datetime.now()
@@ -69,7 +70,8 @@ class AutonimaPipeline:
             self.config.screening,
             inclusion_criteria=self.config.inclusion_criteria,
             exclusion_criteria=self.config.exclusion_criteria,
-            output_dir=self.config.output.directory
+            output_dir=self.config.output.directory,
+            num_workers=self.num_workers
         )
         
         # Initialize retrieval engine
@@ -165,7 +167,7 @@ class AutonimaPipeline:
 
         # Use LLM-based screening
         screening_results = await self._screener.screen_abstracts(
-            pending_studies)
+            pending_studies, num_workers=self.num_workers)
 
         # Apply screening results to studies
         for result in screening_results:
@@ -337,7 +339,7 @@ class AutonimaPipeline:
 
         # Use LLM-based full-text screening
         screening_results = await self._screener.screen_fulltexts(
-            screenable_studies
+            screenable_studies, num_workers=self.num_workers
         )
 
         # Apply screening results to studies
@@ -477,7 +479,8 @@ class AutonimaPipeline:
 # Convenience function for running pipeline from config file
 async def run_pipeline_from_config(
     config_path: str = None,
-    config: PipelineConfig = None
+    config: PipelineConfig = None,
+    num_workers: int = 1
 ) -> PipelineResult:
     """
     Run pipeline from configuration file or config object.
@@ -495,5 +498,5 @@ async def run_pipeline_from_config(
         config_manager = ConfigManager()
         config = config_manager.load_from_file(config_path)
 
-    pipeline = AutonimaPipeline(config)
+    pipeline = AutonimaPipeline(config, num_workers=num_workers)
     return await pipeline.run()

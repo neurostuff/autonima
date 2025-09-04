@@ -4,6 +4,9 @@ import asyncio
 import logging
 import hashlib
 import json
+import concurrent.futures
+import tqdm
+from typing import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -17,6 +20,25 @@ from ..utils import log_error_with_debug
 logger = logging.getLogger(__name__)
 
 
+def parallelize_screening(func):
+    """Decorator to parallelize screening over individual studies."""
+    def wrapper(self, studies: List[Study], *args, **kwargs):
+        num_workers = kwargs.pop("num_workers", 1)
+        
+        if num_workers <= 1 or len(studies) <= 1:
+            # Serial processing
+            return [func(self, study, *args, **kwargs) for study in tqdm.tqdm(studies)]
+        
+        # Parallel processing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = [executor.submit(func, self, study, *args, **kwargs) for study in studies]
+            results = [future.result() for future in tqdm.tqdm(futures, total=len(futures))]
+        
+        return results
+    
+    return wrapper
+
+
 class LLMScreener(ScreeningEngine):
     """Unified LLM-powered screening engine for both abstract and full-text 
     screening."""
@@ -26,7 +48,8 @@ class LLMScreener(ScreeningEngine):
         config: ScreeningConfig,
         inclusion_criteria: List[str] = None,
         exclusion_criteria: List[str] = None,
-        output_dir: str = "test_output"
+        output_dir: str = "test_output",
+        num_workers: int = 1
     ):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
@@ -38,6 +61,7 @@ class LLMScreener(ScreeningEngine):
         self.exclusion_criteria = exclusion_criteria or []
         self._llm_client: Optional[GenericLLMClient] = None
         self.output_dir = output_dir
+        self.num_workers = num_workers
 
     def _initialize_llm_client(self) -> GenericLLMClient:
         """Initialize the LLM client if not already done."""
@@ -91,10 +115,97 @@ class LLMScreener(ScreeningEngine):
             screening_type=screening_type
         )
 
+    def _screen_single_study(
+        self,
+        study: Study,
+        screening_type: str,
+        config: Dict[str, Any]
+    ) -> ScreeningResult:
+        """Screen a single study (synchronous for parallel execution)."""
+        try:
+            # Check cache first
+            cache_key = self._get_cache_key(study, screening_type)
+            if cache_key in self._cache:
+                logger.info(f"Using cached result for {study.pmid} {screening_type}")
+                cached_result = self._cache[cache_key]
+                return self._create_screening_result(
+                    study,
+                    StudyStatus(cached_result["decision"]),
+                    cached_result["reason"],
+                    cached_result["confidence"],
+                    cached_result["model_used"],
+                    screening_type
+                )
+                
+            # Build prompt with inclusion/exclusion criteria from config
+            prompt = (
+                PromptLibrary.get_abstract_screening_prompt if screening_type == "abstract"
+                else PromptLibrary.get_fulltext_screening_prompt
+            )(
+                study=study,
+                inclusion_criteria=self.inclusion_criteria,
+                exclusion_criteria=self.exclusion_criteria,
+                **(dict(output_dir=self.output_dir) if screening_type == "fulltext" else {})
+            )
+
+            model = config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
+            
+            # Call LLM API
+            screen_method = (
+                self._llm_client.screen_abstract if screening_type == "abstract"
+                else self._llm_client.screen_fulltext
+            )
+            response = screen_method(prompt, model)
+                
+            # Process response
+            decision, reason = self._process_screening_response(response, config, screening_type)
+            result = self._create_screening_result(
+                study, decision, reason, response.confidence,
+                model,
+                screening_type
+            )
+                
+            # Cache the result
+            self._cache[cache_key] = {
+                "decision": decision.value,
+                "reason": reason,
+                "confidence": response.confidence,
+                "model_used": model,
+                "timestamp": datetime.now().isoformat()
+            }
+                
+            return result
+                
+        except Exception as e:
+            log_error_with_debug(
+                logger, f"Error screening {screening_type} for {study.pmid}: {e}"
+            )
+            # Return failed screening result
+            model = config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
+            return self._create_screening_result(
+                study,
+                StudyStatus.SCREENING_FAILED,
+                f"Screening failed: {str(e)}",
+                0.0,
+                model,
+                screening_type
+            )
+
+    @parallelize_screening
+    def _screen_single_study_wrapper(
+        self,
+        study: Study,
+        screening_type: str,
+        config: Dict[str, Any]
+    ) -> ScreeningResult:
+        """Wrapper for parallel screening of individual studies."""
+        return self._screen_single_study(study, screening_type, config)
+
     async def screen_studies(
         self,
         studies: List[Study],
-        screening_type: str = "abstract"
+        screening_type: str = "abstract",
+        num_workers: int = 1
     ) -> List[ScreeningResult]:
         """
         Screen studies using either abstract or fulltext screening.
@@ -102,6 +213,7 @@ class LLMScreener(ScreeningEngine):
         Args:
             studies: List of studies to screen
             screening_type: Either "abstract" or "fulltext"
+            num_workers: Number of parallel workers (default: 1 for serial)
             
         Returns:
             List of screening results
@@ -117,119 +229,140 @@ class LLMScreener(ScreeningEngine):
                 f"without {'abstracts' if screening_type == 'abstract' else 'full text'}"
             )
             
-        results = []
+        if not screenable_studies:
+            return []
+            
         config = self._get_screening_config(screening_type)
         
-        for study in screenable_studies:
-            # Check cache first
-            cache_key = self._get_cache_key(study, screening_type)
-            if cache_key in self._cache:
-                logger.info(f"Using cached result for {study.pmid} {screening_type}")
-                cached_result = self._cache[cache_key]
-                results.append(self._create_screening_result(
-                    study,
-                    StudyStatus(cached_result["decision"]),
-                    cached_result["reason"],
-                    cached_result["confidence"],
-                    cached_result["model_used"],
-                    screening_type
-                ))
-                continue
-                
-            # Build prompt with inclusion/exclusion criteria from config
-            prompt = (
-                PromptLibrary.get_abstract_screening_prompt if screening_type == "abstract"
-                else PromptLibrary.get_fulltext_screening_prompt
-            )(
-                study=study,
-                inclusion_criteria=self.inclusion_criteria,
-                exclusion_criteria=self.exclusion_criteria,
-                **(dict(output_dir=self.output_dir) if screening_type == "fulltext" else {})
+        # Use parallel processing if num_workers > 1
+        if num_workers > 1:
+            logger.info(f"Using {num_workers} workers for parallel screening")
+            # For parallel processing, we need to save cache after all results are collected
+            results = self._screen_single_study_wrapper(
+                screenable_studies,
+                screening_type,
+                config,
+                num_workers=num_workers
             )
+            # Save cache after parallel processing
+            self._save_cache()
+        else:
+            # Serial processing (existing logic)
+            results = []
+            for study in screenable_studies:
+                # Check cache first
+                cache_key = self._get_cache_key(study, screening_type)
+                if cache_key in self._cache:
+                    logger.info(f"Using cached result for {study.pmid} {screening_type}")
+                    cached_result = self._cache[cache_key]
+                    results.append(self._create_screening_result(
+                        study,
+                        StudyStatus(cached_result["decision"]),
+                        cached_result["reason"],
+                        cached_result["confidence"],
+                        cached_result["model_used"],
+                        screening_type
+                    ))
+                    continue
+                    
+                # Build prompt with inclusion/exclusion criteria from config
+                prompt = (
+                    PromptLibrary.get_abstract_screening_prompt if screening_type == "abstract"
+                    else PromptLibrary.get_fulltext_screening_prompt
+                )(
+                    study=study,
+                    inclusion_criteria=self.inclusion_criteria,
+                    exclusion_criteria=self.exclusion_criteria,
+                    **(dict(output_dir=self.output_dir) if screening_type == "fulltext" else {})
+                )
 
-            model = config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
-            
-            try:
-                # Call LLM API
-                screen_method = (
-                    self._llm_client.screen_abstract if screening_type == "abstract"
-                    else self._llm_client.screen_fulltext
-                )
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    screen_method,
-                    prompt,
-                    model
-                )
+                model = config.get("model", "gpt-4o-mini" if screening_type == "abstract" else "gpt-4")
                 
-                # Process response
-                decision, reason = self._process_screening_response(response, config, screening_type)
-                result = self._create_screening_result(
-                    study, decision, reason, response.confidence,
-                    model,
-                    screening_type
-                )
-                
-                results.append(result)
-                
-                # Cache the result
-                self._cache[cache_key] = {
-                    "decision": decision.value,
-                    "reason": reason,
-                    "confidence": response.confidence,
-                    "model_used": model,
-                    "timestamp": datetime.now().isoformat()
-                }
-                self._save_cache()
-                
-                # Rate limiting
-                await asyncio.sleep(0.1)
-                
-            except Exception as e:
-                log_error_with_debug(
-                    logger, f"Error screening {screening_type} for {study.pmid}: {e}"
-                )
-                # Return failed screening result
-                results.append(self._create_screening_result(
-                    study,
-                    StudyStatus.SCREENING_FAILED,
-                    f"Screening failed: {str(e)}",
-                    0.0,
-                    model,
-                    screening_type
-                ))
-                
+                try:
+                    # Call LLM API
+                    screen_method = (
+                        self._llm_client.screen_abstract if screening_type == "abstract"
+                        else self._llm_client.screen_fulltext
+                    )
+                    response = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        screen_method,
+                        prompt,
+                        model
+                    )
+                    
+                    # Process response
+                    decision, reason = self._process_screening_response(response, config, screening_type)
+                    result = self._create_screening_result(
+                        study, decision, reason, response.confidence,
+                        model,
+                        screening_type
+                    )
+                    
+                    results.append(result)
+                    
+                    # Cache the result
+                    self._cache[cache_key] = {
+                        "decision": decision.value,
+                        "reason": reason,
+                        "confidence": response.confidence,
+                        "model_used": model,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self._save_cache()
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.1)
+                    
+                except Exception as e:
+                    log_error_with_debug(
+                        logger, f"Error screening {screening_type} for {study.pmid}: {e}"
+                    )
+                    # Return failed screening result
+                    results.append(self._create_screening_result(
+                        study,
+                        StudyStatus.SCREENING_FAILED,
+                        f"Screening failed: {str(e)}",
+                        0.0,
+                        model,
+                        screening_type
+                    ))
+        
         return results
     
     async def screen_abstracts(
         self,
-        studies: List[Study]
+        studies: List[Study],
+        num_workers: int = 1
     ) -> List[ScreeningResult]:
         """
         Screen study abstracts for inclusion/exclusion.
 
         Args:
             studies: List of studies to screen
+            num_workers: Number of parallel workers (default: 1 for serial)
 
         Returns:
             List of screening results
         """
-        return await self.screen_studies(studies, "abstract")
+        return await self.screen_studies(studies, "abstract", num_workers)
 
     async def screen_fulltexts(
         self,
-        studies: List[Study]
+        studies: List[Study],
+        num_workers: int = 1
     ) -> List[ScreeningResult]:
         """
         Screen full-text articles for inclusion/exclusion.
 
         Args:
             studies: List of studies with full text to screen
+            num_workers: Number of parallel workers (default: 1 for serial)
 
         Returns:
             List of screening results
         """
-        return await self.screen_studies(studies, "fulltext")
+        return await self.screen_studies(studies, "fulltext", num_workers)
 
     def get_screening_info(self) -> Dict[str, Any]:
         """Get information about the screening engine configuration."""
