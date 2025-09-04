@@ -156,22 +156,8 @@ class LLMScreener(ScreeningEngine):
     ) -> ScreeningResult:
         """Screen a single study (synchronous for parallel execution)."""
         try:
-            # Check cache first
+            # Check cache first (although main screening function handles this)
             cache_key = self._get_cache_key(study, screening_type)
-            if cache_key in self._cache:
-                logger.info(
-                    f"Using cached result for {study.pmid} {screening_type}"
-                )
-                cached_result = self._cache[cache_key]
-                return self._create_screening_result(
-                    study,
-                    StudyStatus(cached_result["decision"]),
-                    cached_result["reason"],
-                    cached_result["confidence"],
-                    cached_result["model_used"],
-                    screening_type
-                )
-                
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
