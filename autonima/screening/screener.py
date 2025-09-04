@@ -1,6 +1,5 @@
 """Unified LLM-based screening engine for systematic reviews."""
 
-import asyncio
 import logging
 import hashlib
 import json
@@ -393,8 +392,12 @@ class LLMScreener(ScreeningEngine):
         """Save screening cache to file."""
         try:
             with self._cache_lock:
+                # Create a copy of the cache to avoid "dictionary changed size
+                # during iteration" errors when the cache is modified by other
+                # threads during JSON serialization
+                cache_copy = self._cache.copy()
                 with open(self._cache_file, 'w') as f:
-                    json.dump(self._cache, f, indent=2)
+                    json.dump(cache_copy, f, indent=2)
         except Exception as e:
             log_error_with_debug(logger, f"Failed to save cache: {e}")
 
