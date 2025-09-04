@@ -437,4 +437,8 @@ class PubMedSearch(SearchEngine):
             pmid: (pmcid[3:] if pmcid.startswith("PMC") else pmcid)
             for pmid, pmcid in pmid_to_pmcid.items()
         }
+
+        # Remove empty entries and convert to int
+        pmid_to_pmcid = {pmid: int(pmcid) for pmid, pmcid in pmid_to_pmcid.items() if pmcid}
+
         return pmid_to_pmcid

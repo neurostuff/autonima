@@ -41,9 +41,9 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
         
         # Look for the row matching the study's pmcid
         if study.pmcid:
-            row = df[df['pmcid'] == study.pmcid]
+            row = df[df['pmcid'] == int(study.pmcid)]
             if not row.empty:
-                return row.iloc[0]['text']
+                return row.iloc[0]['body']
         
     except Exception:
         # Handle any errors during file reading or processing
