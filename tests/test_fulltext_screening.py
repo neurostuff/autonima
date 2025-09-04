@@ -11,31 +11,35 @@ from autonima.screening import LLMScreener
 
 def test_fulltext_screening():
     """Test full text screening functionality."""
-    # Create a test CSV file with full text content
-    test_data = {
-        'pmcid': ['PMC123456'],
-        'text': ['This is the full text content for testing full text '
-                 'screening.']
-    }
-    
-    df = pd.DataFrame(test_data)
-    # Use the standard path for pubget data
-    test_dir = (Path(__file__).parent.parent / 'test_output' / 'retrieval' /
-                'pubget_data')
-    test_dir.mkdir(parents=True, exist_ok=True)
-    test_file = test_dir / 'text.csv'
-    df.to_csv(test_file, index=False)
+    # Create a temporary directory for this test
+    import tempfile
+    import shutil
+    temp_dir = Path(tempfile.mkdtemp())
     
     try:
+        # Create a test CSV file with full text content
+        test_data = {
+            'pmcid': ['123456'],
+            'body': ['This is the full text content for testing full text '
+                     'screening.']
+        }
+        
+        df = pd.DataFrame(test_data)
+        # Use the temporary path for pubget data
+        test_dir = temp_dir / 'retrieval' / 'pubget_data'
+        test_dir.mkdir(parents=True, exist_ok=True)
+        test_file = test_dir / 'text.csv'
+        df.to_csv(test_file, index=False)
+        
         # Create a test study with full text
         study = Study(
-            pmid="TEST001",
+            pmid="TEST_FT_001",
             title="fMRI study of working memory in schizophrenia",
             abstract="This is an abstract.",
             authors=["Smith J", "Johnson A"],
             journal="Neuroimage",
             publication_date="2023",
-            pmcid="PMC123456",
+            pmcid="123456",
             status=StudyStatus.FULLTEXT_RETRIEVED
         )
 
@@ -55,8 +59,8 @@ def test_fulltext_screening():
             mock_response.reason = "Meets all inclusion criteria"
             mock_client.screen_fulltext.return_value = mock_response
 
-            # Create unified screener
-            screener = LLMScreener(config, output_dir="test_output")
+            # Create unified screener with temporary output directory
+            screener = LLMScreener(config, output_dir=str(temp_dir))
 
             # Test screening
             studies_list = [study]
@@ -67,7 +71,7 @@ def test_fulltext_screening():
             assert len(results) == 1
             
             result = results[0]
-            assert result.study_id == "TEST001"
+            assert result.study_id == "TEST_FT_001"
             assert hasattr(result, 'decision')
             assert hasattr(result, 'confidence')
             assert hasattr(result, 'reason')
@@ -76,43 +80,52 @@ def test_fulltext_screening():
             mock_client.screen_fulltext.assert_called_once()
             
     finally:
-        # Clean up the test file
-        if test_file.exists():
-            test_file.unlink()
+        # Clean up the temporary directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def test_fulltext_screening_with_missing_pmcid():
     """Test full text screening with missing pmcid."""
-    # Create a test study without pmcid
-    study = Study(
-        pmid="TEST002",
-        title="fMRI study of working memory in schizophrenia",
-        abstract="This is an abstract.",
-        authors=["Smith J", "Johnson A"],
-        journal="Neuroimage",
-        publication_date="2023",
-        status=StudyStatus.FULLTEXT_RETRIEVED
-    )
+    # Create a temporary directory for this test
+    import tempfile
+    import shutil
+    temp_dir = Path(tempfile.mkdtemp())
+    
+    try:
+        # Create a test study without pmcid
+        study = Study(
+            pmid="TEST_FT_002",
+            title="fMRI study of working memory in schizophrenia",
+            abstract="This is an abstract.",
+            authors=["Smith J", "Johnson A"],
+            journal="Neuroimage",
+            publication_date="2023",
+            status=StudyStatus.FULLTEXT_RETRIEVED
+        )
 
-    # Create screening config
-    config = ScreeningConfig()
+        # Create screening config
+        config = ScreeningConfig()
 
-    # Mock the LLM client
-    with patch('autonima.screening.screener.GenericLLMClient') as \
-         mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        
-        # Create unified screener
-        screener = LLMScreener(config, output_dir="test_output")
+        # Mock the LLM client
+        with patch('autonima.screening.screener.GenericLLMClient') as \
+             mock_client_class:
+            mock_client = MagicMock()
+            mock_client_class.return_value = mock_client
+            
+            # Create unified screener with temporary output directory
+            screener = LLMScreener(config, output_dir=str(temp_dir))
 
-        # Test screening - should skip studies with missing pmcid
-        studies_list = [study]
-        results = asyncio.run(screener.screen_fulltexts(studies_list))
+            # Test screening - should skip studies with missing pmcid
+            studies_list = [study]
+            results = asyncio.run(screener.screen_fulltexts(studies_list))
 
-        assert isinstance(results, list)
-        # We should get no results because the pmcid is missing
-        assert len(results) == 0
+            assert isinstance(results, list)
+            # We should get no results because the pmcid is missing
+            assert len(results) == 0
+            
+    finally:
+        # Clean up the temporary directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
