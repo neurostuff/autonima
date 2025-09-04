@@ -41,13 +41,15 @@ class LLMScreener(ScreeningEngine):
 
     async def screen_abstracts(
         self, 
-        studies: List[Study]
+        studies: List[Study],
+        parallel: bool = False
     ) -> List[ScreeningResult]:
         """
         Screen study abstracts for inclusion/exclusion.
 
         Args:
             studies: List of studies to screen
+            parallel: Whether to process studies in parallel
 
         Returns:
             List of screening results
@@ -70,92 +72,207 @@ class LLMScreener(ScreeningEngine):
                 f"without abstracts"
             )
 
-        results = []
-        abstract_config = self.config.abstract
+        if parallel:
+            logger.info("Processing studies in parallel")
+            # Process studies in parallel
+            tasks = [
+                self._screen_single_abstract(study) 
+                for study in screenable_studies
+            ]
+            results = await asyncio.gather(*tasks)
+        else:
+            logger.info("Processing studies sequentially")
+            # Process studies sequentially (original implementation)
+            results = []
+            abstract_config = self.config.abstract
 
-        for study in screenable_studies:
-            # Check cache first
-            cache_key = self._get_cache_key(study, "abstract")
-            if cache_key in self._cache:
-                logger.info(f"Using cached result for {study.pmid} abstract")
-                cached_result = self._cache[cache_key]
-                results.append(ScreeningResult(
-                    study_id=study.pmid,
-                    decision=StudyStatus(cached_result["decision"]),
-                    reason=cached_result["reason"],
-                    confidence=cached_result["confidence"],
-                    model_used=cached_result["model_used"],
-                    screening_type="abstract"
-                ))
-                continue
+            for study in screenable_studies:
+                # Check cache first
+                cache_key = self._get_cache_key(study, "abstract")
+                if cache_key in self._cache:
+                    logger.info(
+                        f"Using cached result for {study.pmid} abstract"
+                    )
+                    cached_result = self._cache[cache_key]
+                    results.append(ScreeningResult(
+                        study_id=study.pmid,
+                        decision=StudyStatus(cached_result["decision"]),
+                        reason=cached_result["reason"],
+                        confidence=cached_result["confidence"],
+                        model_used=cached_result["model_used"],
+                        screening_type="abstract"
+                    ))
+                    continue
 
-            # Build prompt with inclusion/exclusion criteria from config
-            prompt = PromptLibrary.get_abstract_screening_prompt(
-                study=study,
-                inclusion_criteria=self.inclusion_criteria,
-                exclusion_criteria=self.exclusion_criteria
-            )
-
-            try:
-                # Call LLM API
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    self._llm_client.screen_abstract,
-                    prompt,
-                    abstract_config.get("model", "gpt-4o-mini")
+                # Build prompt with inclusion/exclusion criteria from config
+                prompt = PromptLibrary.get_abstract_screening_prompt(
+                    study=study,
+                    inclusion_criteria=self.inclusion_criteria,
+                    exclusion_criteria=self.exclusion_criteria
                 )
 
-                # Apply threshold
-                threshold = abstract_config.get("threshold", 0.75)
-                if response.confidence < threshold:
-                    decision = StudyStatus.EXCLUDED
-                    reason = (f"Confidence {response.confidence:.2f} below "
-                              f"threshold {threshold}. {response.reason}")
-                else:
-                    decision = (StudyStatus.INCLUDED if response.decision ==
-                                "INCLUDED" else StudyStatus.EXCLUDED)
-                    reason = response.reason
+                try:
+                    # Call LLM API
+                    response = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        self._llm_client.screen_abstract,
+                        prompt,
+                        abstract_config.get("model", "gpt-4o-mini")
+                    )
 
-                result = ScreeningResult(
-                    study_id=study.pmid,
-                    decision=decision,
-                    reason=reason,
-                    confidence=response.confidence,
-                    model_used=abstract_config.get("model", "gpt-4o-mini"),
-                    screening_type="abstract"
-                )
+                    # Apply threshold
+                    threshold = abstract_config.get("threshold", 0.75)
+                    if response.confidence < threshold:
+                        decision = StudyStatus.EXCLUDED
+                        reason = (
+                            f"Confidence {response.confidence:.2f} below "
+                            f"threshold {threshold}. {response.reason}"
+                        )
+                    else:
+                        decision = (
+                            StudyStatus.INCLUDED if response.decision ==
+                            "INCLUDED" else StudyStatus.EXCLUDED
+                        )
+                        reason = response.reason
 
-                results.append(result)
+                    result = ScreeningResult(
+                        study_id=study.pmid,
+                        decision=decision,
+                        reason=reason,
+                        confidence=response.confidence,
+                        model_used=abstract_config.get("model", "gpt-4o-mini"),
+                        screening_type="abstract"
+                    )
 
-                # Cache the result
-                self._cache[cache_key] = {
-                    "decision": decision.value,
-                    "reason": reason,
-                    "confidence": response.confidence,
-                    "model_used": abstract_config.get("model", "gpt-4"),
-                    "timestamp": datetime.now().isoformat()
-                }
-                self._save_cache()
+                    results.append(result)
 
-                # Rate limiting
-                await asyncio.sleep(0.1)
+                    # Cache the result
+                    self._cache[cache_key] = {
+                        "decision": decision.value,
+                        "reason": reason,
+                        "confidence": response.confidence,
+                        "model_used": abstract_config.get("model", "gpt-4"),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self._save_cache()
 
-            except Exception as e:
-                log_error_with_debug(
-                    logger,
-                    f"Error screening abstract for {study.pmid}: {e}"
-                )
-                # Return failed screening result
-                results.append(ScreeningResult(
-                    study_id=study.pmid,
-                    decision=StudyStatus.SCREENING_FAILED,
-                    reason=f"Screening failed: {str(e)}",
-                    confidence=0.0,
-                    model_used=abstract_config.get("model", "gpt-4"),
-                    screening_type="abstract"
-                ))
+                    # Rate limiting
+                    await asyncio.sleep(0.1)
+
+                except Exception as e:
+                    log_error_with_debug(
+                        logger,
+                        f"Error screening abstract for {study.pmid}: {e}"
+                    )
+                    # Return failed screening result
+                    results.append(ScreeningResult(
+                        study_id=study.pmid,
+                        decision=StudyStatus.SCREENING_FAILED,
+                        reason=f"Screening failed: {str(e)}",
+                        confidence=0.0,
+                        model_used=abstract_config.get("model", "gpt-4"),
+                        screening_type="abstract"
+                    ))
 
         return results
+
+    async def _screen_single_abstract(
+        self,
+        study: Study
+    ) -> ScreeningResult:
+        """
+        Screen a single study abstract.
+
+        Args:
+            study: Study to screen
+
+        Returns:
+            Screening result for the study
+        """
+        # Check cache first
+        cache_key = self._get_cache_key(study, "abstract")
+        if cache_key in self._cache:
+            logger.info(f"Using cached result for {study.pmid} abstract")
+            cached_result = self._cache[cache_key]
+            return ScreeningResult(
+                study_id=study.pmid,
+                decision=StudyStatus(cached_result["decision"]),
+                reason=cached_result["reason"],
+                confidence=cached_result["confidence"],
+                model_used=cached_result["model_used"],
+                screening_type="abstract"
+            )
+
+        # Initialize LLM client if not already done
+        if self._llm_client is None:
+            self._llm_client = GenericLLMClient()
+
+        # Build prompt with inclusion/exclusion criteria from config
+        prompt = PromptLibrary.get_abstract_screening_prompt(
+            study=study,
+            inclusion_criteria=self.inclusion_criteria,
+            exclusion_criteria=self.exclusion_criteria
+        )
+
+        try:
+            # Call LLM API
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                self._llm_client.screen_abstract,
+                prompt,
+                self.config.abstract.get("model", "gpt-4o-mini")
+            )
+
+            # Apply threshold
+            threshold = self.config.abstract.get("threshold", 0.75)
+            if response.confidence < threshold:
+                decision = StudyStatus.EXCLUDED
+                reason = (
+                    f"Confidence {response.confidence:.2f} below "
+                    f"threshold {threshold}. {response.reason}"
+                )
+            else:
+                decision = (
+                    StudyStatus.INCLUDED if response.decision ==
+                    "INCLUDED" else StudyStatus.EXCLUDED
+                )
+                reason = response.reason
+
+            result = ScreeningResult(
+                study_id=study.pmid,
+                decision=decision,
+                reason=reason,
+                confidence=response.confidence,
+                model_used=self.config.abstract.get("model", "gpt-4o-mini"),
+                screening_type="abstract"
+            )
+
+            # Cache the result
+            self._cache[cache_key] = {
+                "decision": decision.value,
+                "reason": reason,
+                "confidence": response.confidence,
+                "model_used": self.config.abstract.get("model", "gpt-4"),
+                "timestamp": datetime.now().isoformat()
+            }
+            self._save_cache()
+
+            return result
+
+        except Exception as e:
+            log_error_with_debug(
+                logger,
+                f"Error screening abstract for {study.pmid}: {e}"
+            )
+            # Return failed screening result
+            return ScreeningResult(
+                study_id=study.pmid,
+                decision=StudyStatus.SCREENING_FAILED,
+                reason=f"Screening failed: {str(e)}",
+                confidence=0.0,
+                model_used=self.config.abstract.get("model", "gpt-4"),
+                screening_type="abstract"
+            )
 
     async def screen_fulltexts(
         self, 
@@ -235,11 +352,15 @@ class LLMScreener(ScreeningEngine):
                 threshold = fulltext_config.get("threshold", 0.8)
                 if response.confidence < threshold:
                     decision = StudyStatus.EXCLUDED
-                    reason = (f"Confidence {response.confidence:.2f} below "
-                              f"threshold {threshold}. {response.reason}")
+                    reason = (
+                        f"Confidence {response.confidence:.2f} below "
+                        f"threshold {threshold}. {response.reason}"
+                    )
                 else:
-                    decision = (StudyStatus.INCLUDED if response.decision == 
-                                "INCLUDED" else StudyStatus.EXCLUDED)
+                    decision = (
+                        StudyStatus.INCLUDED if response.decision == 
+                        "INCLUDED" else StudyStatus.EXCLUDED
+                    )
                     reason = response.reason
 
                 result = ScreeningResult(
