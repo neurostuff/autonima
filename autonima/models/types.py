@@ -113,7 +113,6 @@ class ScreeningConfig:
 class RetrievalConfig:
     """Configuration for the retrieval phase."""
     sources: List[str] = field(default_factory=lambda: ["pubget", "ace"])
-    fallback: str = "manual"
     timeout: int = 30
     max_retries: int = 3
     download_directory: str = "downloads"
@@ -161,7 +160,6 @@ class PipelineConfig:
             },
             "retrieval": {
                 "sources": self.retrieval.sources,
-                "fallback": self.retrieval.fallback,
                 "timeout": self.retrieval.timeout,
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
