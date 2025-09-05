@@ -8,11 +8,11 @@ class PromptLibrary:
     """Library of prompts for systematic review screening."""
     
     @staticmethod
-    def get_base_prompt() -> str:
+    def get_base_prompt(objective: str = None) -> str:
         """Get the base prompt template for screening."""
-        return """
-You are a systematic review screener. Your task is to evaluate whether a study 
-should be INCLUDED or EXCLUDED in a systematic review based on its content 
+        base_prompt = """
+You are a systematic review screener. Your task is to evaluate whether a study
+should be INCLUDED or EXCLUDED in a systematic review based on its content
 and the provided criteria.
 
 IMPORTANT GUIDELINES:
@@ -21,15 +21,26 @@ IMPORTANT GUIDELINES:
 3. When in doubt, provide a detailed explanation of your reasoning
 4. Use the exact response format specified
 """.strip()
+        
+        if objective:
+            base_prompt = f"""
+REVIEW OBJECTIVE:
+{objective}
+
+{base_prompt}
+""".strip()
+        
+        return base_prompt
 
     @staticmethod
     def get_abstract_screening_prompt(
         study: Study,
         inclusion_criteria: List[str],
-        exclusion_criteria: List[str]
+        exclusion_criteria: List[str],
+        objective: str = None
     ) -> str:
         """Get the prompt for abstract screening."""
-        base_prompt = PromptLibrary.get_base_prompt()
+        base_prompt = PromptLibrary.get_base_prompt(objective)
         
         content = study.abstract or "No abstract available"
         
@@ -72,10 +83,11 @@ EXCLUSION CRITERIA:
         study: Study,
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
-        output_dir: str = "test_output"
+        output_dir: str = "test_output",
+        objective: str = None
     ) -> str:
         """Get the prompt for full-text screening."""
-        base_prompt = PromptLibrary.get_base_prompt()
+        base_prompt = PromptLibrary.get_base_prompt(objective)
         
         # For full-text screening, we load the full text content
         if study.status in (

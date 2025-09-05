@@ -74,7 +74,8 @@ class AutonimaPipeline:
             inclusion_criteria=self.config.inclusion_criteria,
             exclusion_criteria=self.config.exclusion_criteria,
             output_dir=self.config.output.directory,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            objective=self.config.objective
         )
         
         # Initialize retrieval engine

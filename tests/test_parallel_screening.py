@@ -48,7 +48,12 @@ def test_parallel_screening():
             mock_client.screen_abstract.return_value = mock_response
             
             # Create unified screener with temporary output directory
-            screener = LLMScreener(config, num_workers=3, output_dir=str(temp_dir))
+            screener = LLMScreener(
+                config,
+                num_workers=3,
+                output_dir=str(temp_dir),
+                objective="Test objective for parallel screening"
+            )
             
             # Test parallel screening
             start_time = time.time()
@@ -144,7 +149,12 @@ def test_parallel_screening_with_errors():
             mock_client.screen_abstract.side_effect = mock_screen_abstract
             
             # Create unified screener with temporary output directory
-            screener = LLMScreener(config, num_workers=2, output_dir=str(temp_dir))
+            screener = LLMScreener(
+                config,
+                num_workers=2,
+                output_dir=str(temp_dir),
+                objective="Test objective for parallel screening with errors"
+            )
             
             # Test parallel screening with errors
             results = asyncio.run(screener.screen_abstracts(studies, num_workers=2))
