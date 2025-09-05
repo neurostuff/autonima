@@ -1,9 +1,12 @@
 """Test cases for full text loading functionality."""
 
 import sys
+import tempfile
+import shutil
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from autonima.models.types import Study, StudyStatus
 from autonima.retrieval.utils import _load_full_text
@@ -12,7 +15,15 @@ from autonima.retrieval.utils import _load_full_text
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def test_load_full_text():
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing."""
+    temp_dir = Path(tempfile.mkdtemp())
+    yield temp_dir
+    shutil.rmtree(temp_dir)
+
+
+def test_load_full_text(temp_dir):
     """Test the _load_full_text function."""
     # Create a test CSV file
     test_data = {
@@ -22,52 +33,46 @@ def test_load_full_text():
     }
     
     df = pd.DataFrame(test_data)
-    test_file = Path('test_text.csv')
+    test_file = temp_dir / 'test_text.csv'
     df.to_csv(test_file, index=False)
     
-    try:
-        # Create a test study
-        study = Study(
-            pmid="123456",
-            title="Test Study",
-            abstract="Test abstract",
-            authors=["Author1", "Author2"],
-            journal="Test Journal",
-            publication_date="2023-01-01",
-            pmcid="123456"
-        )
-        
-        # Test loading full text
-        result = _load_full_text(study, text_path=str(test_file))
-        
-        # Verify the result
-        expected = 'This is the full text for study 1.'
-        assert result == expected, f"Expected '{expected}', got {result}"
-        
-        # Test with a study that doesn't exist in the CSV
-        study2 = Study(
-            pmid="789012",
-            title="Test Study 2",
-            abstract="Test abstract 2",
-            authors=["Author3", "Author4"],
-            journal="Test Journal 2",
-            publication_date="2023-01-02",
-            pmcid="9999996"  # This PMCID doesn't exist in the CSV
-        )
-        
-        # Modify this to to expect a ValueError
-        # result2 = _load_full_text(study2, text_path=str(test_file))
-        # assert result2 is None, f"Expected None, got {result2}"
-        
-        print("All tests passed!")
-        
-    finally:
-        # Clean up the test file
-        if test_file.exists():
-            test_file.unlink()
+    # Create a test study
+    study = Study(
+        pmid="123456",
+        title="Test Study",
+        abstract="Test abstract",
+        authors=["Author1", "Author2"],
+        journal="Test Journal",
+        publication_date="2023-01-01",
+        pmcid="123456"
+    )
+    
+    # Test loading full text
+    result = _load_full_text(study, text_path=str(test_file))
+    
+    # Verify the result
+    expected = 'This is the full text for study 1.'
+    assert result == expected, f"Expected '{expected}', got {result}"
+    
+    # Test with a study that doesn't exist in the CSV
+    # study2 = Study(
+    #     pmid="789012",
+    #     title="Test Study 2",
+    #     abstract="Test abstract 2",
+    #     authors=["Author3", "Author4"],
+    #     journal="Test Journal 2",
+    #     publication_date="2023-01-02",
+    #     pmcid="9999996"  # This PMCID doesn't exist in the CSV
+    # )
+    
+    # Modify this to to expect a ValueError
+    # result2 = _load_full_text(study2, text_path=str(test_file))
+    # assert result2 is None, f"Expected None, got {result2}"
+    
+    print("All tests passed!")
 
 
-def test_study_load_full_text():
+def test_study_load_full_text(temp_dir):
     """Test the Study.load_full_text method."""
     # Create a test CSV file in the standard location
     test_data = {
@@ -77,44 +82,30 @@ def test_study_load_full_text():
     }
     
     df = pd.DataFrame(test_data)
-    # Use the standard path for pubget data
-    test_dir = (Path(__file__).parent.parent / 'test_output' / 'retrieval' /
-                'pubget_data')
+    # Use the temporary directory for pubget data
+    test_dir = temp_dir / 'retrieval' / 'pubget_data'
     test_dir.mkdir(parents=True, exist_ok=True)
     test_file = test_dir / 'text.csv'
     df.to_csv(test_file, index=False)
     
-    try:
-        # Create a test study
-        study = Study(
-            pmid="123456",
-            title="Test Study",
-            abstract="Test abstract",
-            authors=["Author1", "Author2"],
-            journal="Test Journal",
-            publication_date="2023-01-01",
-            pmcid="123456",
-            status=StudyStatus.FULLTEXT_RETRIEVED
-        )
-        
-        # Test loading full text through the Study method
-        result = study.load_full_text(output_dir="test_output")
-        
-        # Verify the result
-        expected = 'This is the full text for study 1.'
-        assert result == expected, f"Expected '{expected}', got {result}"
-        
-        print("Study load_full_text test passed!")
-        
-    finally:
-        # Clean up the test file
-        if test_file.exists():
-            test_file.unlink()
-        # Clean up the test directory if it's empty
-        if test_dir.exists() and not any(test_dir.iterdir()):
-            test_dir.rmdir()
+    # Create a test study
+    study = Study(
+        pmid="123456",
+        title="Test Study",
+        abstract="Test abstract",
+        authors=["Author1", "Author2"],
+        journal="Test Journal",
+        publication_date="2023-01-01",
+        pmcid="123456",
+        status=StudyStatus.FULLTEXT_RETRIEVED
+    )
+    
+    # Test loading full text through the Study method
+    result = study.load_full_text(output_dir=str(temp_dir))
+    
+    # Verify the result
+    expected = 'This is the full text for study 1.'
+    assert result == expected, f"Expected '{expected}', got {result}"
+    
+    print("Study load_full_text test passed!")
 
-
-if __name__ == "__main__":
-    test_load_full_text()
-    test_study_load_full_text()

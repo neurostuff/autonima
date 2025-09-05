@@ -65,7 +65,7 @@ class Study:
             ),
         }
     
-    def load_full_text(self, output_dir: str = "test_output") -> str:
+    def load_full_text(self, output_dir: str) -> str:
         """Load the full text content for this study.
         
         Args:
@@ -113,7 +113,6 @@ class ScreeningConfig:
 class RetrievalConfig:
     """Configuration for the retrieval phase."""
     sources: List[str] = field(default_factory=lambda: ["pubget", "ace"])
-    fallback: str = "manual"
     timeout: int = 30
     max_retries: int = 3
     download_directory: str = "downloads"
@@ -161,7 +160,6 @@ class PipelineConfig:
             },
             "retrieval": {
                 "sources": self.retrieval.sources,
-                "fallback": self.retrieval.fallback,
                 "timeout": self.retrieval.timeout,
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
@@ -215,11 +213,23 @@ class PipelineResult:
     started_at: datetime = field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert pipeline result to dictionary."""
+    def to_dict(self, final_studies_only: bool = False) -> Dict[str, Any]:
+        """Convert pipeline result to dictionary.
+        
+        Args:
+            final_studies_only: If True, only include studies with status INCLUDED
+        """
+        # Filter studies if requested
+        studies_to_include = self.studies
+        if final_studies_only:
+            studies_to_include = [
+                study for study in self.studies
+                if study.status == StudyStatus.INCLUDED
+            ]
+        
         return {
             "config": self.config.to_dict(),
-            "studies": [study.to_dict() for study in self.studies],
+            "studies": [study.to_dict() for study in studies_to_include],
             "abstract_screening_results": [
                 result.to_dict() for result in self.abstract_screening_results
             ],

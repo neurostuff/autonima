@@ -1,12 +1,35 @@
 """Pytest tests for the screening module."""
 
 import asyncio
+import tempfile
+import shutil
+from pathlib import Path
+import pytest
 from unittest.mock import patch, MagicMock
 from autonima.models.types import Study, StudyStatus, ScreeningConfig
 from autonima.screening import LLMScreener
 
 
-def test_abstract_screening():
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing."""
+    temp_dir = Path(tempfile.mkdtemp())
+    yield temp_dir
+    shutil.rmtree(temp_dir)
+
+
+@pytest.fixture
+def screener(temp_dir):
+    """Create a screener instance for testing."""
+    config = ScreeningConfig()
+    return LLMScreener(
+        config,
+        output_dir=str(temp_dir),
+        objective="Test objective for screening"
+    )
+
+
+def test_abstract_screening(temp_dir):
     """Test abstract screening functionality."""
     # Create a test study with a long abstract
     abstract_text = (
@@ -43,7 +66,11 @@ def test_abstract_screening():
         mock_client.screen_abstract.return_value = mock_response
 
         # Create unified screener
-        screener = LLMScreener(config, output_dir="test_output")
+        screener = LLMScreener(
+            config,
+            output_dir=str(temp_dir),
+            objective="Test objective for screening"
+        )
 
         # Test screening
         studies_list = [study]
@@ -60,24 +87,32 @@ def test_abstract_screening():
         assert hasattr(result, 'reason')
 
 
-def test_screener_initialization():
+def test_screener_initialization(temp_dir):
     """Test screener initialization."""
     # Create screening config
     config = ScreeningConfig()
 
     # Create unified screener
-    screener = LLMScreener(config, output_dir="test_output")
+    screener = LLMScreener(
+        config,
+        output_dir=str(temp_dir),
+        objective="Test objective for screening"
+    )
     
     assert screener.config == config
 
 
-def test_screener_get_info():
+def test_screener_get_info(temp_dir):
     """Test getting screener information."""
     # Create screening config
     config = ScreeningConfig()
 
     # Create unified screener
-    screener = LLMScreener(config, output_dir="test_output")
+    screener = LLMScreener(
+        config,
+        output_dir=str(temp_dir),
+        objective="Test objective for screening"
+    )
 
     # Test screening info
     info = screener.get_screening_info()

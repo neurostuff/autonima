@@ -60,7 +60,11 @@ def test_fulltext_screening():
             mock_client.screen_fulltext.return_value = mock_response
 
             # Create unified screener with temporary output directory
-            screener = LLMScreener(config, output_dir=str(temp_dir))
+            screener = LLMScreener(
+                config,
+                output_dir=str(temp_dir),
+                objective="Test objective for fulltext screening"
+            )
 
             # Test screening
             studies_list = [study]
@@ -113,7 +117,11 @@ def test_fulltext_screening_with_missing_pmcid():
             mock_client_class.return_value = mock_client
             
             # Create unified screener with temporary output directory
-            screener = LLMScreener(config, output_dir=str(temp_dir))
+            screener = LLMScreener(
+                config,
+                output_dir=str(temp_dir),
+                objective="Test objective for fulltext screening with missing PMCID"
+            )
 
             # Test screening - should skip studies with missing pmcid
             studies_list = [study]
