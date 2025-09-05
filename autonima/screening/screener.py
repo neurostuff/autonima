@@ -58,8 +58,12 @@ def load_screening_results_with_lock(
         return []
     finally:
         # Remove lock file
-        if lock_file.exists():
-            lock_file.unlink()
+        try:
+            if lock_file.exists():
+                lock_file.unlink()
+        except FileNotFoundError:
+            # Lock file was already removed, ignore
+            pass
 
 
 def save_screening_result_with_lock(
@@ -130,8 +134,12 @@ def save_screening_result_with_lock(
         return False
     finally:
         # Remove lock file
-        if lock_file.exists():
-            lock_file.unlink()
+        try:
+            if lock_file.exists():
+                lock_file.unlink()
+        except FileNotFoundError:
+            # Lock file was already removed, ignore
+            pass
 
 
 def parallelize_screening(func):
@@ -171,9 +179,9 @@ class LLMScreener(ScreeningEngine):
     def __init__(
         self,
         config: ScreeningConfig,
+        output_dir: str,
         inclusion_criteria: List[str] = None,
         exclusion_criteria: List[str] = None,
-        output_dir: str = "test_output",
         num_workers: int = 1,
         objective: str = None
     ):

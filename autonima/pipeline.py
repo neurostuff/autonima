@@ -429,12 +429,12 @@ class AutonimaPipeline:
             "final_included_count": len(included_studies)
         })
 
-        # Save final results
+        # Save final results with only included studies
         output_dir = Path(self.config.output.directory)
         final_results_file = output_dir / "final_results.json"
         with open(final_results_file, 'w') as f:
             import json
-            json.dump(self.results.to_dict(), f, indent=2)
+            json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
 
         logger.info(f"Final results saved to {final_results_file}")
 

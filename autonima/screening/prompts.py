@@ -60,7 +60,7 @@ Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
 
-OBJECTIVE:
+MEtA-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:
@@ -79,7 +79,7 @@ EXCLUSION CRITERIA:
         study: Study,
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
-        output_dir: str = "test_output",
+        output_dir: str,
         objective: str = None
     ) -> str:
         """Get the prompt for full-text screening."""
@@ -124,7 +124,7 @@ Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
 
-OBJECTIVE:
+MEtA-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:
