@@ -2,8 +2,6 @@
 # Example Autonima pipeline specification
 # Defines a systematic review according to PRISMA steps
 
-objective: "Identify fMRI studies of working memory in schizophrenia"
-
 search:
   database: "pubmed"
   query: "schizophrenia AND working memory AND fMRI"
@@ -12,6 +10,8 @@ search:
   # date_from: "2020/01/01"
   # date_to: "2024/12/31"
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
+
+objective: "Identify fMRI studies of working memory in schizophrenia"
 
 inclusion_criteria:
   - Human participants
