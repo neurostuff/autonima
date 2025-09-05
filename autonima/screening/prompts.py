@@ -12,8 +12,8 @@ class PromptLibrary:
         """Get the base prompt template for screening."""
         base_prompt = """
 You are a systematic review screener. Your task is to evaluate whether a study
-should be INCLUDED or EXCLUDED in a systematic review based on its content
-and the provided criteria.
+should be INCLUDED or EXCLUDED in a systematic review based on its content,
+the meta-analysis objective, and the provided criteria.
 
 IMPORTANT GUIDELINES:
 1. Be objective and consistent in your evaluations
@@ -38,14 +38,15 @@ IMPORTANT GUIDELINES:
         
         instructions = """
 INSTRUCTIONS FOR ABSTRACT SCREENING:
-1. Carefully evaluate the abstract against each criterion
-2. If ANY exclusion criterion is clearly met, EXCLUDE the study
-3. If the abstract provides INSUFFICIENT information to determine inclusion, 
+1. Ensure the study addresses the review objective
+2. Carefully evaluate the abstract against each criterion
+3. If ANY exclusion criterion is clearly met, EXCLUDE the study
+4. If the abstract provides INSUFFICIENT information to determine inclusion, 
    INCLUDE for full-text review
-4. Only EXCLUDE if you are highly confident based on the abstract alone
-5. Provide a confidence score (0.0-1.0) reflecting how certain you are about 
+5. Only EXCLUDE if you are highly confident based on the abstract alone
+6. Provide a confidence score (0.0-1.0) reflecting how certain you are about 
    the decision
-6. Give a brief reason (max 100 words) explaining your decision
+7. Give a brief reason (max 100 words) explaining your decision
 """.strip()
 
         prompt = f"""
@@ -101,14 +102,15 @@ EXCLUSION CRITERIA:
         
         instructions = """
 INSTRUCTIONS FOR FULL-TEXT SCREENING:
-1. Carefully evaluate the full text against each inclusion criterion
-2. Verify that ALL inclusion criteria are met
-3. Check that NO exclusion criteria are violated
-4. Pay special attention to study design, methods, participants, and outcomes
-5. If the study meets all criteria, INCLUDE it
-6. If ANY criterion is not met, EXCLUDE it
-7. Provide a confidence score (0.0-1.0) reflecting your certainty
-8. Give a detailed reason (max 200 words) explaining your decision
+1. Ensure the study addresses the review objective
+2. Carefully evaluate the full text against each inclusion criterion
+3. Verify that ALL inclusion criteria are met
+4. Check that NO exclusion criteria are violated
+5. Pay special attention to study design, methods, participants, and outcomes
+6. If the study meets all criteria, INCLUDE it
+7. If ANY criterion is not met, EXCLUDE it
+8. Provide a confidence score (0.0-1.0) reflecting your certainty
+9. Give a detailed reason (max 200 words) explaining your decision
 """.strip()
 
         prompt = f"""
