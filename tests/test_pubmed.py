@@ -20,12 +20,12 @@ def search_config():
 @pytest.fixture
 def pubmed_search(search_config):
     """Create a PubMedSearch instance for testing."""
-    return PubMedSearch(search_config)
+    return PubMedSearch(search_config, output_dir="test_output")
 
 
 def test_pubmed_search_initialization(search_config):
     """Test PubMedSearch initialization."""
-    search_engine = PubMedSearch(search_config)
+    search_engine = PubMedSearch(search_config, output_dir="test_output")
     
     assert search_engine.config == search_config
     expected_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
@@ -78,7 +78,7 @@ def test_pubmed_search_get_info(pubmed_search):
 def test_pubmed_search_empty_query(search_config):
     """Test PubMed search with empty query."""
     search_config.query = ""
-    search_engine = PubMedSearch(search_config)
+    search_engine = PubMedSearch(search_config, output_dir="test_output")
     
     # Execute the search - should raise an exception for empty query
     with pytest.raises(Exception):
@@ -88,7 +88,7 @@ def test_pubmed_search_empty_query(search_config):
 # Integration test with the actual pipeline
 def test_pubmed_search_integration(search_config):
     """Integration test with PubMed search."""
-    search_engine = PubMedSearch(search_config)
+    search_engine = PubMedSearch(search_config, output_dir="test_output")
     
     # Execute the search
     studies = asyncio.run(search_engine.search(search_config.query))

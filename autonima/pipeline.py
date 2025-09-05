@@ -60,7 +60,10 @@ class AutonimaPipeline:
         """Initialize pipeline components based on configuration."""
         # Initialize search engine
         if self.config.search.database.lower() == "pubmed":
-            self._search_engine = PubMedSearch(self.config.search)
+            self._search_engine = PubMedSearch(
+                self.config.search,
+                output_dir=self.config.output.directory
+            )
         else:
             raise ValueError(
                 f"Unsupported database: {self.config.search.database}")
