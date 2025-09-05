@@ -8,7 +8,7 @@ class PromptLibrary:
     """Library of prompts for systematic review screening."""
     
     @staticmethod
-    def get_base_prompt(objective: str = None) -> str:
+    def get_base_prompt() -> str:
         """Get the base prompt template for screening."""
         base_prompt = """
 You are a systematic review screener. Your task is to evaluate whether a study
@@ -22,14 +22,6 @@ IMPORTANT GUIDELINES:
 4. Use the exact response format specified
 """.strip()
         
-        if objective:
-            base_prompt = f"""
-REVIEW OBJECTIVE:
-{objective}
-
-{base_prompt}
-""".strip()
-        
         return base_prompt
 
     @staticmethod
@@ -40,7 +32,7 @@ REVIEW OBJECTIVE:
         objective: str = None
     ) -> str:
         """Get the prompt for abstract screening."""
-        base_prompt = PromptLibrary.get_base_prompt(objective)
+        base_prompt = PromptLibrary.get_base_prompt()
         
         content = study.abstract or "No abstract available"
         
@@ -67,6 +59,9 @@ Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
 
+OBJECTIVE:
+{objective or 'Not provided'}
+
 INCLUSION CRITERIA:
 {chr(10).join(f"- {criterion}" for criterion in inclusion_criteria)}
 
@@ -87,7 +82,7 @@ EXCLUSION CRITERIA:
         objective: str = None
     ) -> str:
         """Get the prompt for full-text screening."""
-        base_prompt = PromptLibrary.get_base_prompt(objective)
+        base_prompt = PromptLibrary.get_base_prompt()
         
         # For full-text screening, we load the full text content
         if study.status in (
@@ -126,6 +121,9 @@ Authors: {', '.join(study.authors)}
 Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
+
+OBJECTIVE:
+{objective or 'Not provided'}
 
 INCLUSION CRITERIA:
 {chr(10).join(f"- {criterion}" for criterion in inclusion_criteria)}
