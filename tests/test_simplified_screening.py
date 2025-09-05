@@ -1,9 +1,21 @@
 """Pytest tests for the simplified screening module."""
 
 import asyncio
+import tempfile
+import shutil
+from pathlib import Path
+import pytest
 from unittest.mock import patch, MagicMock
 from autonima.models.types import Study, StudyStatus, ScreeningConfig
 from autonima.screening import LLMScreener
+
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing."""
+    temp_dir = Path(tempfile.mkdtemp())
+    yield temp_dir
+    shutil.rmtree(temp_dir)
 
 
 def test_unified_screener_initialization():
@@ -17,7 +29,8 @@ def test_unified_screener_initialization():
 
     # Create unified screener
     screener = LLMScreener(
-        config, 
+        config,
+        output_dir=str(temp_dir),
         inclusion_criteria=config.inclusion_criteria,
         exclusion_criteria=config.exclusion_criteria
     )
@@ -25,7 +38,7 @@ def test_unified_screener_initialization():
     assert screener.config == config
 
 
-def test_unified_screener_abstract_screening():
+def test_unified_screener_abstract_screening(temp_dir):
     """Test the unified LLMScreener abstract screening functionality."""
     # Create a test study with a long abstract
     abstract_text = (
@@ -66,6 +79,7 @@ def test_unified_screener_abstract_screening():
         # Create unified screener
         screener = LLMScreener(
             config,
+            output_dir=str(temp_dir),
             inclusion_criteria=config.inclusion_criteria,
             exclusion_criteria=config.exclusion_criteria
         )
@@ -85,7 +99,7 @@ def test_unified_screener_abstract_screening():
         assert hasattr(result, 'reason')
 
 
-def test_unified_screener_get_info():
+def test_unified_screener_get_info(temp_dir):
     """Test getting screening engine information."""
     # Create screening config
     config = ScreeningConfig()
@@ -95,6 +109,7 @@ def test_unified_screener_get_info():
     # Create unified screener
     screener = LLMScreener(
         config,
+        output_dir=str(temp_dir),
         inclusion_criteria=config.inclusion_criteria,
         exclusion_criteria=config.exclusion_criteria
     )

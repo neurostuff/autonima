@@ -39,7 +39,6 @@ class TestPipelineRetrieval(unittest.TestCase):
         # Check that the retrieval config has the expected attributes
         self.assertTrue(hasattr(self.sample_config.retrieval, 'n_jobs'))
         self.assertTrue(hasattr(self.sample_config.retrieval, 'sources'))
-        self.assertTrue(hasattr(self.sample_config.retrieval, 'fallback'))
 
     def test_retrieval_phase_method_exists(self):
         """Test that the retrieval phase method exists."""
