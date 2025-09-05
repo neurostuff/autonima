@@ -115,3 +115,52 @@ def test_pubmed_search_integration(search_config, temp_dir):
         assert pub_date and isinstance(pub_date, str)
         assert isinstance(study.keywords, list)
         assert study.doi is None or isinstance(study.doi, str)
+
+
+def test_pubmed_search_date_filtering_from_only(search_config, temp_dir):
+    """Test PubMed search with date_from filtering only."""
+    # Update search config with date_from
+    search_config.date_from = "2020/01/01"
+    search_engine = PubMedSearch(search_config, output_dir=str(temp_dir))
+    
+    # Test that the query is built correctly
+    base_query = "test query"
+    full_query = search_engine.build_query(base_query)
+    
+    # Check that the query contains the date filter
+    assert base_query in full_query
+    assert '2020/01/01"[Date - Publication]' in full_query
+    assert '3000"[Date - Publication]' in full_query
+
+
+def test_pubmed_search_date_filtering_to_only(search_config, temp_dir):
+    """Test PubMed search with date_to filtering only."""
+    # Update search config with date_to
+    search_config.date_to = "2020/12/31"
+    search_engine = PubMedSearch(search_config, output_dir=str(temp_dir))
+    
+    # Test that the query is built correctly
+    base_query = "test query"
+    full_query = search_engine.build_query(base_query)
+    
+    # Check that the query contains the date filter
+    assert base_query in full_query
+    assert '1900"[Date - Publication]' in full_query
+    assert '2020/12/31"[Date - Publication]' in full_query
+
+
+def test_pubmed_search_date_filtering_both(search_config, temp_dir):
+    """Test PubMed search with both date_from and date_to filtering."""
+    # Update search config with both date filters
+    search_config.date_from = "2020/01/01"
+    search_config.date_to = "2020/12/31"
+    search_engine = PubMedSearch(search_config, output_dir=str(temp_dir))
+    
+    # Test that the query is built correctly
+    base_query = "test query"
+    full_query = search_engine.build_query(base_query)
+    
+    # Check that the query contains both date filters
+    assert base_query in full_query
+    # Should have two date filter expressions
+    assert full_query.count("[Date - Publication]") == 4

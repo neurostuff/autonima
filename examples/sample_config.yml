@@ -8,6 +8,9 @@ search:
   database: "pubmed"
   query: "schizophrenia AND working memory AND fMRI"
   max_results: 1000
+  # Optional date filtering - format: YYYY/MM/DD
+  # date_from: "2020/01/01"
+  # date_to: "2024/12/31"
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
 
 inclusion_criteria:
