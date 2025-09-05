@@ -20,8 +20,13 @@ logger = logging.getLogger(__name__)
 class PubMedSearch(SearchEngine):
     """PubMed search engine using NCBI Entrez API."""
 
-    def __init__(self, config: SearchConfig):
-        """Initialize PubMed search engine."""
+    def __init__(self, config: SearchConfig, output_dir: str = "results"):
+        """Initialize PubMed search engine.
+        
+        Args:
+            config: Search configuration
+            output_dir: Output directory for saving results
+        """
         super().__init__(config)
         if config.email:
             Entrez.email = config.email  # Required by NCBI
@@ -35,6 +40,7 @@ class PubMedSearch(SearchEngine):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         self.max_retries = 3
         self.retry_delay = 1.0
+        self.output_dir = output_dir
 
     async def search(self, query: str) -> List[Study]:
         """
@@ -60,15 +66,115 @@ class PubMedSearch(SearchEngine):
             if not pmids:
                 return []
 
-            # Fetch details for each PMID
-            studies = await self._fetch_study_details(pmids)
-            logger.info(f"Successfully retrieved {len(studies)} studies")
+            # Load existing search results for caching
+            cached_studies = self._load_cached_search_results()
+            cached_pmids = {study.pmid for study in cached_studies}
+            
+            # Identify PMIDs that need to be fetched
+            new_pmids = [pmid for pmid in pmids if pmid not in cached_pmids]
+            logger.info(f"Found {len(cached_studies)} cached studies, {len(new_pmids)} new studies to fetch")
+
+            # Fetch details for new PMIDs only
+            new_studies = []
+            if new_pmids:
+                new_studies = await self._fetch_study_details(new_pmids)
+                logger.info(f"Successfully retrieved {len(new_studies)} new studies")
+
+            # Combine cached and new studies
+            studies = cached_studies + new_studies
+            logger.info(f"Total studies after caching: {len(studies)}")
 
             return studies
 
         except Exception as e:
             log_error_with_debug(logger, f"Error during PubMed search: {e}")
             raise
+
+    def _load_cached_search_results(self) -> List[Study]:
+        """
+        Load existing search results from search_results.json for caching.
+        
+        Returns:
+            List of cached Study objects
+        """
+        try:
+            import json
+            from pathlib import Path
+            
+            # Use the provided output directory
+            search_results_file = Path(self.output_dir) / "search_results.json"
+            
+            if not search_results_file.exists():
+                logger.info(
+                    f"No existing search results file found at "
+                    f"{search_results_file} for caching"
+                )
+                return []
+            
+            with open(search_results_file, 'r') as f:
+                data = json.load(f)
+            
+            studies_data = data.get("studies", [])
+            cached_studies = []
+            
+            for study_data in studies_data:
+                try:
+                    # Convert dictionary back to Study object
+                    # Handle datetime fields
+                    retrieved_at = None
+                    if study_data.get("retrieved_at"):
+                        retrieved_at = datetime.fromisoformat(
+                            study_data.get("retrieved_at")
+                        )
+                    
+                    screened_at = None
+                    if study_data.get("screened_at"):
+                        screened_at = datetime.fromisoformat(
+                            study_data.get("screened_at")
+                        )
+                    
+                    study = Study(
+                        pmid=study_data.get("pmid", ""),
+                        title=study_data.get("title", ""),
+                        abstract=study_data.get("abstract", ""),
+                        authors=study_data.get("authors", []),
+                        journal=study_data.get("journal", ""),
+                        publication_date=study_data.get(
+                            "publication_date", ""
+                        ),
+                        doi=study_data.get("doi"),
+                        keywords=study_data.get("keywords", []),
+                        status=StudyStatus(
+                            study_data.get("status", "pending")
+                        ),
+                        abstract_screening_reason=study_data.get(
+                            "abstract_screening_reason"
+                        ),
+                        fulltext_screening_reason=study_data.get(
+                            "fulltext_screening_reason"
+                        ),
+                        metadata=study_data.get("metadata", {}),
+                        abstract_screening_score=study_data.get(
+                            "abstract_screening_score"
+                        ),
+                        fulltext_screening_score=study_data.get(
+                            "fulltext_screening_score"
+                        ),
+                        retrieved_at=retrieved_at,
+                        screened_at=screened_at,
+                        pmcid=study_data.get("pmcid")
+                    )
+                    cached_studies.append(study)
+                except Exception as e:
+                    logger.warning(f"Failed to load cached study: {e}")
+                    continue
+            
+            logger.info(f"Loaded {len(cached_studies)} studies from cache")
+            return cached_studies
+            
+        except Exception as e:
+            logger.warning(f"Failed to load cached search results: {e}")
+            return []
 
     async def _execute_search(self, query: str) -> List[str]:
         """
@@ -439,6 +545,8 @@ class PubMedSearch(SearchEngine):
         }
 
         # Remove empty entries and convert to int
-        pmid_to_pmcid = {pmid: int(pmcid) for pmid, pmcid in pmid_to_pmcid.items() if pmcid}
+        pmid_to_pmcid = {
+            pmid: int(pmcid) for pmid, pmcid in pmid_to_pmcid.items() if pmcid
+        }
 
         return pmid_to_pmcid
