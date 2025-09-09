@@ -102,7 +102,7 @@ class PubMedSearch(SearchEngine):
             from pathlib import Path
             
             # Use the provided output directory
-            search_results_file = Path(self.output_dir) / "search_results.json"
+            search_results_file = Path(self.output_dir) / "outputs" / "search_results.json"
             
             if not search_results_file.exists():
                 logger.info(

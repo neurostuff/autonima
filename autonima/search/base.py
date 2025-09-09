@@ -51,19 +51,25 @@ class SearchEngine(ABC):
         query_parts = [base_query]
         
         # Add date filters if specified
-        if self.config.date_from:
-            date_from = self.config.date_from
+        if self.config.date_from and self.config.date_to:
             date_filter = (
-                f'("{date_from}"[Date - Publication] : '
+                f'("{self.config.date_from}"[Date - Publication] : '
+                f'"{self.config.date_to}"[Date - Publication])'
+            )
+            query_parts.append(date_filter)
+
+        elif self.config.date_from:
+            date_filter = (
+                f'("{self.config.date_from}"[Date - Publication] : '
                 f'"3000"[Date - Publication])'
             )
             query_parts.append(date_filter)
-            
-        if self.config.date_to:
+
+        elif self.config.date_to:
             date_filter = (
                 f'("1900"[Date - Publication] : '
                 f'"{self.config.date_to}"[Date - Publication])'
             )
             query_parts.append(date_filter)
-            
+
         return " AND ".join(query_parts)

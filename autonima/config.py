@@ -140,15 +140,44 @@ class ConfigManager:
 
         # Validate inclusion/exclusion criteria
         if not config.inclusion_criteria:
-            raise ConfigurationError("At least one inclusion criterion required")
-
-        # Validate screening thresholds
-        if not 0.0 <= config.screening.abstract.get('threshold', 0.75) <= 1.0:
-            raise ConfigurationError("Abstract screening threshold must be between 0.0 and 1.0")
-
-        if not 0.0 <= config.screening.fulltext.get('threshold', 0.8) <= 1.0:
-            raise ConfigurationError("Full-text screening threshold must be between 0.0 and 1.0")
-
+            raise ConfigurationError(
+                "At least one inclusion criterion required"
+            )
+        
+        # Validate screening thresholds and confidence reporting
+        abstract_config = config.screening.abstract
+        fulltext_config = config.screening.fulltext
+        
+        # Validate confidence reporting flags
+        if not isinstance(
+            abstract_config.get('confidence_reporting', False), bool
+        ):
+            raise ConfigurationError(
+                "Abstract screening confidence_reporting must be a boolean"
+            )
+            
+        if not isinstance(
+            fulltext_config.get('confidence_reporting', False), bool
+        ):
+            raise ConfigurationError(
+                "Full-text screening confidence_reporting must be a boolean"
+            )
+        
+        # Validate screening thresholds (only if confidence reporting is enabled)
+        if abstract_config.get('confidence_reporting', False):
+            threshold = abstract_config.get('threshold', 0.75)
+            if threshold is not None and not 0.0 <= threshold <= 1.0:
+                raise ConfigurationError(
+                    "Abstract screening threshold must be between 0.0 and 1.0"
+                )
+        
+        if fulltext_config.get('confidence_reporting', False):
+            threshold = fulltext_config.get('threshold', 0.8)
+            if threshold is not None and not 0.0 <= threshold <= 1.0:
+                raise ConfigurationError(
+                    "Full-text screening threshold must be between 0.0 and 1.0"
+                )
+        
         # Validate output directory
         if not config.output.directory.strip():
             raise ConfigurationError("Output directory cannot be empty")
