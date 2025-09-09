@@ -165,14 +165,14 @@ class ConfigManager:
         
         # Validate screening thresholds (only if confidence reporting is enabled)
         if abstract_config.get('confidence_reporting', False):
-            threshold = abstract_config.get('threshold', 0.75)
+            threshold = abstract_config.get('threshold', None)
             if threshold is not None and not 0.0 <= threshold <= 1.0:
                 raise ConfigurationError(
                     "Abstract screening threshold must be between 0.0 and 1.0"
                 )
         
         if fulltext_config.get('confidence_reporting', False):
-            threshold = fulltext_config.get('threshold', 0.8)
+            threshold = fulltext_config.get('threshold', None)
             if threshold is not None and not 0.0 <= threshold <= 1.0:
                 raise ConfigurationError(
                     "Full-text screening threshold must be between 0.0 and 1.0"
@@ -209,6 +209,20 @@ class ConfigManager:
 
     def create_sample_config(self) -> PipelineConfig:
         """Create a sample configuration for demonstration purposes."""
+        # Create a screening config with example values
+        screening_config = ScreeningConfig()
+        # Example with confidence reporting enabled and threshold set
+        screening_config.abstract.update({
+            "model": "gpt-4o-mini",
+            "confidence_reporting": True,
+            "threshold": 0.9
+        })
+        screening_config.fulltext.update({
+            "model": "gpt-4",
+            "confidence_reporting": True,
+            "threshold": 0.95
+        })
+        
         return PipelineConfig(
             objective="Identify fMRI studies of working memory in schizophrenia",
             search=SearchConfig(
@@ -228,7 +242,7 @@ class ConfigManager:
                 "Non-fMRI imaging modalities (e.g., PET, EEG, MEG)",
                 "Studies without a control or comparison group"
             ],
-            screening=ScreeningConfig(),
+            screening=screening_config,
             retrieval=RetrievalConfig(),
             output=OutputConfig()
         )

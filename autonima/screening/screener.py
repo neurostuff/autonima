@@ -287,11 +287,6 @@ class LLMScreener(ScreeningEngine):
                 else StudyStatus.EXCLUDED
             )
             reason = response.reason
-            
-            # If confidence reporting is disabled, don't apply threshold logic
-            if not confidence_reporting and threshold is not None:
-                # Respect the LLM's original decision
-                pass
                 
         return decision, reason
 

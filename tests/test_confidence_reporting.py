@@ -41,7 +41,7 @@ def test_screener_with_confidence_reporting_enabled(temp_dir):
     # Create screening config with confidence reporting enabled
     config = ScreeningConfig()
     config.abstract["confidence_reporting"] = True
-    config.abstract["threshold"] = 0.9
+    config.abstract["threshold"] = 0.9  # Explicitly set threshold
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \

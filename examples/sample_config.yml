@@ -34,9 +34,12 @@ retrieval:
 screening:
   abstract:
     model: "gpt-5-mini-2025-08-07"   # LLM for abstract screening
-    threshold: 0.75  # probability cutoff for inclusion
+    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
+    # threshold: 0.9  # Optional: probability cutoff for inclusion (default: none)
   fulltext:
     model: "gpt-5-mini-2025-08-07"
+    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
+    # threshold: 0.95  # Optional: probability cutoff for inclusion (default: none)
 
 output:
   prisma_diagram: true
