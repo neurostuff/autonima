@@ -163,4 +163,4 @@ def test_pubmed_search_date_filtering_both(search_config, temp_dir):
     # Check that the query contains both date filters
     assert base_query in full_query
     # Should have two date filter expressions
-    assert full_query.count("[Date - Publication]") == 4
+    assert full_query.count("[Date - Publication]") == 2

@@ -87,17 +87,19 @@ Where `sample_config.yaml` specifies:
 1. Define your review specification (`YAML` or `JSON`):
 
    ```yaml
-   objective: "Identify fMRI studies of working memory in schizophrenia"
    search:
      database: "pubmed"
      query: "schizophrenia AND working memory AND fMRI"
-   inclusion_criteria:
-     - Human participants
-     - fMRI neuroimaging
-     - Case-control design
-   exclusion_criteria:
-     - Animal studies
-     - Review articles
+   screening:
+     abstract:
+       objective: "Identify fMRI studies of working memory in schizophrenia"
+       inclusion_criteria:
+         - Human participants
+         - fMRI neuroimaging
+         - Case-control design
+       exclusion_criteria:
+         - Animal studies
+         - Review articles
    ```
 
 2. Run Autonima pipeline:

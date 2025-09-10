@@ -180,21 +180,15 @@ class LLMScreener(ScreeningEngine):
         self,
         config: ScreeningConfig,
         output_dir: str,
-        inclusion_criteria: List[str] = None,
-        exclusion_criteria: List[str] = None,
-        num_workers: int = 1,
-        objective: str = None
+        num_workers: int = 1
     ):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
         self._client = None
-        self.inclusion_criteria = inclusion_criteria or []
-        self.exclusion_criteria = exclusion_criteria or []
         self._llm_client: Optional[GenericLLMClient] = None
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.num_workers = num_workers
-        self.objective = objective
         # Load existing results
         self._existing_abstract_results = self._load_existing_results(
             "abstract"
@@ -320,6 +314,12 @@ class LLMScreener(ScreeningEngine):
             # Check if confidence reporting is enabled
             confidence_reporting = config.get("confidence_reporting", False)
             
+            # Get stage-specific criteria and instructions
+            objective = config.get("objective")
+            inclusion_criteria = config.get("inclusion_criteria") or []
+            exclusion_criteria = config.get("exclusion_criteria") or []
+            additional_instructions = config.get("additional_instructions")
+            
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
@@ -327,10 +327,11 @@ class LLMScreener(ScreeningEngine):
                 else PromptLibrary.get_fulltext_screening_prompt
             )(
                 study=study,
-                inclusion_criteria=self.inclusion_criteria,
-                exclusion_criteria=self.exclusion_criteria,
-                objective=self.objective,
+                inclusion_criteria=inclusion_criteria,
+                exclusion_criteria=exclusion_criteria,
+                objective=objective,
                 confidence_reporting=confidence_reporting,
+                additional_instructions=additional_instructions,
                 **(
                     dict(output_dir=str(self.output_dir))
                     if screening_type == "fulltext"

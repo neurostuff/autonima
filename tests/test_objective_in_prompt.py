@@ -34,7 +34,7 @@ def test_objective_in_abstract_prompt():
     
     # Verify objective is in the prompt
     assert objective in prompt
-    assert "MEtA-ANALYSIS OBJECTIVE:" in prompt
+    assert "META-ANALYSIS OBJECTIVE:" in prompt
 
 
 def test_objective_in_fulltext_prompt():
@@ -80,7 +80,7 @@ def test_objective_in_fulltext_prompt():
         
         # Verify objective is in the prompt
         assert objective in prompt
-        assert "MEtA-ANALYSIS OBJECTIVE:" in prompt
+        assert "META-ANALYSIS OBJECTIVE:" in prompt
 
 
 def test_screener_with_objective():
@@ -103,10 +103,14 @@ def test_screener_with_objective():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create unified screener with objective
         objective = "Test objective for systematic review"
+        config.abstract.update({
+            "objective": objective,
+            "inclusion_criteria": ["Test inclusion criterion"],
+            "exclusion_criteria": ["Test exclusion criterion"]
+        })
         screener = LLMScreener(
-            config, 
-            output_dir=str(temp_dir),
-            objective=objective
+            config,
+            output_dir=str(temp_dir)
         )
         
         # Mock the LLM client
@@ -137,7 +141,7 @@ def test_screener_with_objective():
             
             # Verify objective is in the prompt
             assert objective in prompt
-            assert "MEtA-ANALYSIS OBJECTIVE:" in prompt
+            assert "META-ANALYSIS OBJECTIVE:" in prompt
 
 
 if __name__ == "__main__":

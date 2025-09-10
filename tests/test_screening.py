@@ -22,10 +22,14 @@ def temp_dir():
 def screener(temp_dir):
     """Create a screener instance for testing."""
     config = ScreeningConfig()
+    config.abstract.update({
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
     return LLMScreener(
         config,
-        output_dir=str(temp_dir),
-        objective="Test objective for screening"
+        output_dir=str(temp_dir)
     )
 
 
@@ -51,6 +55,11 @@ def test_abstract_screening(temp_dir):
 
     # Create screening config
     config = ScreeningConfig()
+    config.abstract.update({
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -68,8 +77,7 @@ def test_abstract_screening(temp_dir):
         # Create unified screener
         screener = LLMScreener(
             config,
-            output_dir=str(temp_dir),
-            objective="Test objective for screening"
+            output_dir=str(temp_dir)
         )
 
         # Test screening
@@ -91,12 +99,16 @@ def test_screener_initialization(temp_dir):
     """Test screener initialization."""
     # Create screening config
     config = ScreeningConfig()
+    config.abstract.update({
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Create unified screener
     screener = LLMScreener(
         config,
-        output_dir=str(temp_dir),
-        objective="Test objective for screening"
+        output_dir=str(temp_dir)
     )
     
     assert screener.config == config
@@ -106,12 +118,16 @@ def test_screener_get_info(temp_dir):
     """Test getting screener information."""
     # Create screening config
     config = ScreeningConfig()
+    config.abstract.update({
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Create unified screener
     screener = LLMScreener(
         config,
-        output_dir=str(temp_dir),
-        objective="Test objective for screening"
+        output_dir=str(temp_dir)
     )
 
     # Test screening info
