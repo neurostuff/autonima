@@ -123,7 +123,6 @@ def run(
             print("\n" + "="*60)
             print("AUTONIMA PIPELINE COMPLETED")
             print("="*60)
-            print(f"Objective: {pipeline_config.objective}")
             identified = prisma_stats.get('total_identified', 0)
             print(f"Total studies identified: {identified}")
             print(f"Studies included: {prisma_stats.get('final_included', 0)}")
