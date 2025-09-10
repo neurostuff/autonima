@@ -29,24 +29,40 @@ IMPORTANT GUIDELINES:
         study: Study,
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
-        objective: str = None
+        objective: str = None,
+        confidence_reporting: bool = False
     ) -> str:
         """Get the prompt for abstract screening."""
         base_prompt = PromptLibrary.get_base_prompt()
         
         content = study.abstract or "No abstract available"
         
-        instructions = """
+        # Check if confidence reporting is enabled
+        if confidence_reporting:
+            confidence_instruction = (
+                "6. Provide a confidence score (0.0-1.0) reflecting how certain "
+                "you are about\n   the decision\n"
+            )
+            reason_instruction = (
+                "7. Give a brief reason (max 100 words) explaining your "
+                "decision"
+            )
+        else:
+            confidence_instruction = ""
+            reason_instruction = (
+                "6. Give a brief reason (max 100 words) explaining your "
+                "decision"
+            )
+        
+        instructions = f"""
 INSTRUCTIONS FOR ABSTRACT SCREENING:
 1. Ensure the study addresses the review objective
 2. Carefully evaluate the abstract against each criterion
 3. If ANY exclusion criterion is clearly met, EXCLUDE the study
-4. If the abstract provides INSUFFICIENT information to determine inclusion, 
+4. If the abstract provides INSUFFICIENT information to determine inclusion,
    INCLUDE for full-text review
 5. Only EXCLUDE if you are highly confident based on the abstract alone
-6. Provide a confidence score (0.0-1.0) reflecting how certain you are about 
-   the decision
-7. Give a brief reason (max 100 words) explaining your decision
+{confidence_instruction}{reason_instruction}
 """.strip()
 
         prompt = f"""
@@ -80,7 +96,8 @@ EXCLUSION CRITERIA:
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
         output_dir: str,
-        objective: str = None
+        objective: str = None,
+        confidence_reporting: bool = False
     ) -> str:
         """Get the prompt for full-text screening."""
         base_prompt = PromptLibrary.get_base_prompt()
@@ -100,7 +117,24 @@ EXCLUSION CRITERIA:
         else:
             content = "No full text available"
         
-        instructions = """
+        # Check if confidence reporting is enabled
+        if confidence_reporting:
+            confidence_instruction = (
+                "8. Provide a confidence score (0.0-1.0) reflecting your "
+                "certainty\n"
+            )
+            reason_instruction = (
+                "9. Give a detailed reason (max 200 words) explaining your "
+                "decision"
+            )
+        else:
+            confidence_instruction = ""
+            reason_instruction = (
+                "8. Give a detailed reason (max 200 words) explaining your "
+                "decision"
+            )
+        
+        instructions = f"""
 INSTRUCTIONS FOR FULL-TEXT SCREENING:
 1. Ensure the study addresses the review objective
 2. Carefully evaluate the full text against each inclusion criterion
@@ -109,8 +143,7 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 5. Pay special attention to study design, methods, participants, and outcomes
 6. If the study meets all criteria, INCLUDE it
 7. If ANY criterion is not met, EXCLUDE it
-8. Provide a confidence score (0.0-1.0) reflecting your certainty
-9. Give a detailed reason (max 200 words) explaining your decision
+{confidence_instruction}{reason_instruction}
 """.strip()
 
         prompt = f"""

@@ -264,14 +264,19 @@ class LLMScreener(ScreeningEngine):
         self,
         response,
         config,
-        screening_type: str
+        screening_type: str,
+        confidence_reporting: bool = False
     ):
         """Process the LLM response and apply threshold logic."""
-        threshold = config.get(
-            "threshold",
-            0.75 if screening_type == "abstract" else 0.8
+        # Check if threshold should be applied
+        threshold = config.get("threshold")
+        threshold_enabled = (
+            confidence_reporting and
+            threshold is not None and
+            0.0 <= threshold <= 1.0
         )
-        if response.confidence < threshold:
+        
+        if threshold_enabled and response.confidence < threshold:
             decision = StudyStatus.EXCLUDED
             reason = (f"Confidence {response.confidence:.2f} below "
                       f"threshold {threshold}. {response.reason}")
@@ -282,6 +287,7 @@ class LLMScreener(ScreeningEngine):
                 else StudyStatus.EXCLUDED
             )
             reason = response.reason
+                
         return decision, reason
 
     def _create_screening_result(
@@ -311,6 +317,9 @@ class LLMScreener(ScreeningEngine):
     ) -> ScreeningResult:
         """Screen a single study (synchronous for parallel execution)."""
         try:
+            # Check if confidence reporting is enabled
+            confidence_reporting = config.get("confidence_reporting", False)
+            
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
@@ -321,6 +330,7 @@ class LLMScreener(ScreeningEngine):
                 inclusion_criteria=self.inclusion_criteria,
                 exclusion_criteria=self.exclusion_criteria,
                 objective=self.objective,
+                confidence_reporting=confidence_reporting,
                 **(
                     dict(output_dir=str(self.output_dir))
                     if screening_type == "fulltext"
@@ -343,7 +353,7 @@ class LLMScreener(ScreeningEngine):
                 
             # Process response
             decision, reason = self._process_screening_response(
-                response, config, screening_type
+                response, config, screening_type, confidence_reporting
             )
             result = self._create_screening_result(
                 study, decision, reason, response.confidence,
@@ -353,8 +363,10 @@ class LLMScreener(ScreeningEngine):
                 
             # Save result to file after each screening operation
             result_dict = result.to_dict()
+            output_dir = self.output_dir / "outputs"
+            output_dir.mkdir(parents=True, exist_ok=True)
             results_file = (
-                self.output_dir / f"{screening_type}_screening_results.json"
+                output_dir / f"{screening_type}_screening_results.json"
             )
             save_screening_result_with_lock(results_file, result_dict)
                 

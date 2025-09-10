@@ -2,13 +2,16 @@
 # Example Autonima pipeline specification
 # Defines a systematic review according to PRISMA steps
 
-objective: "Identify fMRI studies of working memory in schizophrenia"
-
 search:
   database: "pubmed"
   query: "schizophrenia AND working memory AND fMRI"
-  max_results: 1000
+  max_results: 100
+  # Optional date filtering - format: YYYY/MM/DD
+  # date_from: "2020/01/01"
+  # date_to: "2024/12/31"
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
+
+objective: "Identify fMRI studies of working memory in schizophrenia"
 
 inclusion_criteria:
   - Human participants
@@ -31,9 +34,12 @@ retrieval:
 screening:
   abstract:
     model: "gpt-5-mini-2025-08-07"   # LLM for abstract screening
-    threshold: 0.75  # probability cutoff for inclusion
+    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
+    # threshold: 0.9  # Optional: probability cutoff for inclusion (default: none)
   fulltext:
     model: "gpt-5-mini-2025-08-07"
+    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
+    # threshold: 0.95  # Optional: probability cutoff for inclusion (default: none)
 
 output:
   prisma_diagram: true

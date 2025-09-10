@@ -141,7 +141,8 @@ class AutonimaPipeline:
         })
 
         # Save intermediary results
-        output_dir = Path(self.config.output.directory)
+        output_dir = Path(self.config.output.directory) / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
         search_results_file = output_dir / "search_results.json"
         search_data = {
             "studies": [study.to_dict() for study in studies],
@@ -189,7 +190,8 @@ class AutonimaPipeline:
         self.results.abstract_screening_results.extend(screening_results)
 
         # Save intermediary results
-        output_dir = Path(self.config.output.directory)
+        output_dir = Path(self.config.output.directory) / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
         screening_results_file = output_dir / "abstract_screening_results.json"
         screening_data = {
             "screening_results": [
@@ -280,7 +282,7 @@ class AutonimaPipeline:
         self._retriever.validate_retrieval(included_studies, retrieval_dir)
 
         # Save intermediary results
-        retrieval_results_file = output_dir / "fulltext_retrieval_results.json"
+        retrieval_results_file = output_dir / "outputs" / "fulltext_retrieval_results.json"
         retrieval_data = {
             "studies_with_fulltext": [
                 {
@@ -364,7 +366,7 @@ class AutonimaPipeline:
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
         fulltext_screening_results_file = (
-            output_dir / "fulltext_screening_results.json"
+            output_dir / "outputs" / "fulltext_screening_results.json"
         )
         fulltext_screening_data = {
             "screening_results": [
@@ -431,7 +433,7 @@ class AutonimaPipeline:
 
         # Save final results with only included studies
         output_dir = Path(self.config.output.directory)
-        final_results_file = output_dir / "final_results.json"
+        final_results_file = output_dir / "outputs" / "final_results.json"
         with open(final_results_file, 'w') as f:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
