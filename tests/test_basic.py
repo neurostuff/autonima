@@ -12,10 +12,17 @@ def test_configuration_loading():
     sample_config = config_manager.create_sample_config()
     
     assert isinstance(sample_config, PipelineConfig)
-    assert sample_config.objective is not None
     assert sample_config.search.query is not None
-    assert isinstance(sample_config.inclusion_criteria, list)
-    assert isinstance(sample_config.exclusion_criteria, list)
+    
+    # Check that at least one screening stage has an objective
+    abstract_objective = sample_config.screening.abstract.get('objective')
+    fulltext_objective = sample_config.screening.fulltext.get('objective')
+    assert abstract_objective is not None or fulltext_objective is not None
+    
+    # Check that at least one screening stage has inclusion criteria
+    abstract_inclusion = sample_config.screening.abstract.get('inclusion_criteria')
+    fulltext_inclusion = sample_config.screening.fulltext.get('inclusion_criteria')
+    assert abstract_inclusion is not None or fulltext_inclusion is not None
 
 
 def test_pipeline_initialization():
@@ -83,7 +90,10 @@ def test_pipeline_statistics():
     assert 'execution' in stats
     
     # Verify config stats
-    assert stats['config']['objective'] == sample_config.objective
+    # Check that at least one screening stage has an objective
+    abstract_objective = sample_config.screening.abstract.get('objective')
+    fulltext_objective = sample_config.screening.fulltext.get('objective')
+    assert stats['config']['objective'] == (abstract_objective or fulltext_objective)
     assert stats['config']['database'] == sample_config.search.database
     assert stats['config']['query'] == sample_config.search.query
     

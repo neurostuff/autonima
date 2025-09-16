@@ -148,13 +148,31 @@ class Study:
 ```python
 @dataclass
 class PipelineConfig:
-    objective: str
     search: SearchConfig
-    inclusion_criteria: List[str]
-    exclusion_criteria: List[str]
     screening: ScreeningConfig
     retrieval: RetrievalConfig
     output: OutputConfig
+
+@dataclass
+class ScreeningConfig:
+    abstract: Dict[str, Any] = field(default_factory=lambda: {
+        "model": "gpt-4",
+        "threshold": None,
+        "confidence_reporting": False,
+        "objective": None,
+        "inclusion_criteria": None,
+        "exclusion_criteria": None,
+        "additional_instructions": None,
+    })
+    fulltext: Dict[str, Any] = field(default_factory=lambda: {
+        "model": "gpt-4",
+        "threshold": None,
+        "confidence_reporting": False,
+        "objective": None,
+        "inclusion_criteria": None,
+        "exclusion_criteria": None,
+        "additional_instructions": None,
+    })
 ```
 
 ## Implementation Strategy

@@ -71,11 +71,8 @@ class AutonimaPipeline:
         # Initialize screening engine
         self._screener = LLMScreener(
             self.config.screening,
-            inclusion_criteria=self.config.inclusion_criteria,
-            exclusion_criteria=self.config.exclusion_criteria,
             output_dir=self.config.output.directory,
-            num_workers=self.num_workers,
-            objective=self.config.objective
+            num_workers=self.num_workers
         )
         
         # Initialize retrieval engine
@@ -89,7 +86,11 @@ class AutonimaPipeline:
         Returns:
             PipelineResult containing all results and metadata
         """
-        logger.info(f"Starting Autonima pipeline: {self.config.objective}")
+        # Get objective from screening configuration
+        abstract_objective = self.config.screening.abstract.get('objective')
+        fulltext_objective = self.config.screening.fulltext.get('objective')
+        objective = abstract_objective or fulltext_objective
+        logger.info(f"Starting Autonima pipeline: {objective}")
 
         try:
             # Phase 1: Literature Search
@@ -442,9 +443,14 @@ class AutonimaPipeline:
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""
+        # Get objective from screening configuration
+        abstract_objective = self.config.screening.abstract.get('objective')
+        fulltext_objective = self.config.screening.fulltext.get('objective')
+        objective = abstract_objective or fulltext_objective
+        
         return {
             "config": {
-                "objective": self.config.objective,
+                "objective": objective,
                 "database": self.config.search.database,
                 "query": self.config.search.query,
                 "max_results": self.config.search.max_results

@@ -34,6 +34,11 @@ def test_parallel_screening():
         
         # Create screening config
         config = ScreeningConfig()
+        config.abstract.update({
+            "objective": "Test objective for parallel screening",
+            "inclusion_criteria": ["Test inclusion criterion"],
+            "exclusion_criteria": ["Test exclusion criterion"]
+        })
         
         # Mock the LLM client
         with patch('autonima.screening.screener.GenericLLMClient') as mock_client_class:
@@ -51,8 +56,7 @@ def test_parallel_screening():
             screener = LLMScreener(
                 config,
                 num_workers=3,
-                output_dir=str(temp_dir),
-                objective="Test objective for parallel screening"
+                output_dir=str(temp_dir)
             )
             
             # Test parallel screening
@@ -129,6 +133,11 @@ def test_parallel_screening_with_errors():
         
         # Create screening config
         config = ScreeningConfig()
+        config.abstract.update({
+            "objective": "Test objective for parallel screening with errors",
+            "inclusion_criteria": ["Test inclusion criterion"],
+            "exclusion_criteria": ["Test exclusion criterion"]
+        })
         
         # Mock the LLM client
         with patch('autonima.screening.screener.GenericLLMClient') as mock_client_class:
@@ -152,8 +161,7 @@ def test_parallel_screening_with_errors():
             screener = LLMScreener(
                 config,
                 num_workers=2,
-                output_dir=str(temp_dir),
-                objective="Test objective for parallel screening with errors"
+                output_dir=str(temp_dir)
             )
             
             # Test parallel screening with errors

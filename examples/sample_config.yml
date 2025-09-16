@@ -11,39 +11,48 @@ search:
   # date_to: "2024/12/31"
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
 
-objective: "Identify fMRI studies of working memory in schizophrenia"
-
-inclusion_criteria:
-  - Human participants
-  - fMRI neuroimaging
-  - Case-control or experimental design
-  - Task-based working memory paradigm
-
-exclusion_criteria:
-  - Animal studies
-  - Review articles, meta-analyses, or theoretical papers
-  - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
-  - Studies without a control or comparison group
-
 retrieval:
   sources:
     - pubget
     - ace
-  n_jobs: 1 # number of parallel jobs for processing
 
 screening:
   abstract:
     model: "gpt-5-mini-2025-08-07"   # LLM for abstract screening
+    objective: "Identify fMRI studies of working memory in schizophrenia"
+    inclusion_criteria:
+      - Human participants
+      - fMRI neuroimaging
+      - Case-control or experimental design
+      - Task-based working memory paradigm
+    exclusion_criteria:
+      - Animal studies
+      - Review articles, meta-analyses, or theoretical papers
+      - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
+      - Studies without a control or comparison group
     # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
     # threshold: 0.9  # Optional: probability cutoff for inclusion (default: none)
+    # additional_instructions: "Pay special attention to sample sizes and effect sizes reported."
   fulltext:
     model: "gpt-5-mini-2025-08-07"
+    # objective: "Identify fMRI studies of working memory in schizophrenia"  # Optional: override abstract objective
+    # inclusion_criteria:  # Optional: override abstract inclusion criteria
+    #   - Human participants
+    #   - fMRI neuroimaging
+    #   - Case-control or experimental design
+    #   - Task-based working memory paradigm
+    # exclusion_criteria:  # Optional: override abstract exclusion criteria
+    #   - Animal studies
+    #   - Review articles, meta-analyses, or theoretical papers
+    #   - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
+    #   - Studies without a control or comparison group
     # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
     # threshold: 0.95  # Optional: probability cutoff for inclusion (default: none)
+    # additional_instructions: "Focus on methodological rigor and statistical significance."
 
 output:
-  prisma_diagram: true
   formats:
-    - csv
     - json
-    - pdf
+    - nimads
+    - csv
+  prisma_diagram: true  # Generate a PRISMA flow diagram

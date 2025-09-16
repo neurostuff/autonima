@@ -30,7 +30,8 @@ IMPORTANT GUIDELINES:
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
         objective: str = None,
-        confidence_reporting: bool = False
+        confidence_reporting: bool = False,
+        additional_instructions: str = None
     ) -> str:
         """Get the prompt for abstract screening."""
         base_prompt = PromptLibrary.get_base_prompt()
@@ -54,6 +55,11 @@ IMPORTANT GUIDELINES:
                 "decision"
             )
         
+        # Add additional instructions if provided
+        additional_instructions_text = ""
+        if additional_instructions:
+            additional_instructions_text = f"\n{additional_instructions}\n"
+        
         instructions = f"""
 INSTRUCTIONS FOR ABSTRACT SCREENING:
 1. Ensure the study addresses the review objective
@@ -63,6 +69,7 @@ INSTRUCTIONS FOR ABSTRACT SCREENING:
    INCLUDE for full-text review
 5. Only EXCLUDE if you are highly confident based on the abstract alone
 {confidence_instruction}{reason_instruction}
+{additional_instructions_text}
 """.strip()
 
         prompt = f"""
@@ -76,7 +83,7 @@ Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
 
-MEtA-ANALYSIS OBJECTIVE:
+META-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:
@@ -97,7 +104,8 @@ EXCLUSION CRITERIA:
         exclusion_criteria: List[str],
         output_dir: str,
         objective: str = None,
-        confidence_reporting: bool = False
+        confidence_reporting: bool = False,
+        additional_instructions: str = None
     ) -> str:
         """Get the prompt for full-text screening."""
         base_prompt = PromptLibrary.get_base_prompt()
@@ -134,6 +142,11 @@ EXCLUSION CRITERIA:
                 "decision"
             )
         
+        # Add additional instructions if provided
+        additional_instructions_text = ""
+        if additional_instructions:
+            additional_instructions_text = f"\n{additional_instructions}\n"
+        
         instructions = f"""
 INSTRUCTIONS FOR FULL-TEXT SCREENING:
 1. Ensure the study addresses the review objective
@@ -144,6 +157,7 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 6. If the study meets all criteria, INCLUDE it
 7. If ANY criterion is not met, EXCLUDE it
 {confidence_instruction}{reason_instruction}
+{additional_instructions_text}
 """.strip()
 
         prompt = f"""
@@ -157,7 +171,7 @@ Journal: {study.journal}
 Publication Date: {study.publication_date}
 DOI: {study.doi or 'Not available'}
 
-MEtA-ANALYSIS OBJECTIVE:
+META-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:

@@ -72,10 +72,6 @@ class ConfigManager:
             ConfigurationError: If configuration is invalid
         """
         try:
-            # Validate required fields
-            if 'objective' not in config_dict:
-                raise ConfigurationError("Missing required field: 'objective'")
-
             # Build nested configurations
             search_config = SearchConfig(**config_dict.get('search', {}))
 
@@ -98,10 +94,7 @@ class ConfigManager:
 
             # Create main config
             config = PipelineConfig(
-                objective=config_dict['objective'],
                 search=search_config,
-                inclusion_criteria=config_dict.get('inclusion_criteria', []),
-                exclusion_criteria=config_dict.get('exclusion_criteria', []),
                 screening=screening_config,
                 retrieval=retrieval_config,
                 output=output_config
@@ -124,10 +117,6 @@ class ConfigManager:
         Raises:
             ConfigurationError: If configuration is invalid
         """
-        # Validate objective
-        if not config.objective.strip():
-            raise ConfigurationError("Objective cannot be empty")
-
         # Validate search configuration
         if not config.search.query.strip():
             raise ConfigurationError("Search query cannot be empty")
@@ -138,11 +127,8 @@ class ConfigManager:
         if config.search.database not in ['pubmed', 'pmc']:
             raise ConfigurationError("database must be 'pubmed' or 'pmc'")
 
-        # Validate inclusion/exclusion criteria
-        if not config.inclusion_criteria:
-            raise ConfigurationError(
-                "At least one inclusion criterion required"
-            )
+        # Validate screening configuration
+        self._validate_screening_config(config)
         
         # Validate screening thresholds and confidence reporting
         abstract_config = config.screening.abstract
@@ -215,7 +201,20 @@ class ConfigManager:
         screening_config.abstract.update({
             "model": "gpt-4o-mini",
             "confidence_reporting": True,
-            "threshold": 0.9
+            "threshold": 0.9,
+            "objective": "Identify fMRI studies of working memory in schizophrenia",
+            "inclusion_criteria": [
+                "Human participants",
+                "fMRI neuroimaging",
+                "Case-control or experimental design",
+                "Task-based working memory paradigm"
+            ],
+            "exclusion_criteria": [
+                "Animal studies",
+                "Review articles, meta-analyses, or theoretical papers",
+                "Non-fMRI imaging modalities (e.g., PET, EEG, MEG)",
+                "Studies without a control or comparison group"
+            ]
         })
         screening_config.fulltext.update({
             "model": "gpt-4",
@@ -224,28 +223,59 @@ class ConfigManager:
         })
         
         return PipelineConfig(
-            objective="Identify fMRI studies of working memory in schizophrenia",
             search=SearchConfig(
                 database="pubmed",
                 query="schizophrenia AND working memory AND fMRI",
                 max_results=1000
             ),
-            inclusion_criteria=[
-                "Human participants",
-                "fMRI neuroimaging",
-                "Case-control or experimental design",
-                "Task-based working memory paradigm"
-            ],
-            exclusion_criteria=[
-                "Animal studies",
-                "Review articles, meta-analyses, or theoretical papers",
-                "Non-fMRI imaging modalities (e.g., PET, EEG, MEG)",
-                "Studies without a control or comparison group"
-            ],
             screening=screening_config,
             retrieval=RetrievalConfig(),
             output=OutputConfig()
         )
+
+    def _validate_screening_config(self, config: PipelineConfig) -> None:
+        """
+        Validate the screening configuration.
+
+        Args:
+            config: Configuration to validate
+
+        Raises:
+            ConfigurationError: If screening configuration is invalid
+        """
+        # Validate that at least one screening stage has an objective
+        abstract_objective = config.screening.abstract.get('objective')
+        fulltext_objective = config.screening.fulltext.get('objective')
+        
+        if not abstract_objective and not fulltext_objective:
+            raise ConfigurationError(
+                "At least one screening stage must have an objective"
+            )
+        
+        # Validate that at least one screening stage has inclusion criteria
+        abstract_inclusion = config.screening.abstract.get('inclusion_criteria')
+        fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria')
+        
+        if not abstract_inclusion and not fulltext_inclusion:
+            raise ConfigurationError(
+                "At least one screening stage must have inclusion criteria"
+            )
+        
+        # Validate abstract screening if it has an objective
+        if abstract_objective:
+            if not abstract_inclusion:
+                raise ConfigurationError(
+                    "Abstract screening must have inclusion criteria when "
+                    "objective is specified"
+                )
+        
+        # Validate fulltext screening if it has an objective
+        if fulltext_objective:
+            if not fulltext_inclusion:
+                raise ConfigurationError(
+                    "Fulltext screening must have inclusion criteria when "
+                    "objective is specified"
+                )
 
 
 def load_config(config_path: Union[str, Path]) -> PipelineConfig:

@@ -45,6 +45,11 @@ def test_fulltext_screening():
 
         # Create screening config
         config = ScreeningConfig()
+        config.fulltext.update({
+            "objective": "Test objective for fulltext screening",
+            "inclusion_criteria": ["Test inclusion criterion"],
+            "exclusion_criteria": ["Test exclusion criterion"]
+        })
 
         # Mock the LLM client
         with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -62,8 +67,7 @@ def test_fulltext_screening():
             # Create unified screener with temporary output directory
             screener = LLMScreener(
                 config,
-                output_dir=str(temp_dir),
-                objective="Test objective for fulltext screening"
+                output_dir=str(temp_dir)
             )
 
             # Test screening
@@ -109,6 +113,11 @@ def test_fulltext_screening_with_missing_pmcid():
 
         # Create screening config
         config = ScreeningConfig()
+        config.fulltext.update({
+            "objective": "Test objective for fulltext screening with missing PMCID",
+            "inclusion_criteria": ["Test inclusion criterion"],
+            "exclusion_criteria": ["Test exclusion criterion"]
+        })
 
         # Mock the LLM client
         with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -119,8 +128,7 @@ def test_fulltext_screening_with_missing_pmcid():
             # Create unified screener with temporary output directory
             screener = LLMScreener(
                 config,
-                output_dir=str(temp_dir),
-                objective="Test objective for fulltext screening with missing PMCID"
+                output_dir=str(temp_dir)
             )
 
             # Test screening - should skip studies with missing pmcid

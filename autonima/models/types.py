@@ -103,11 +103,19 @@ class ScreeningConfig:
         "model": "gpt-4",
         "threshold": None,
         "confidence_reporting": False,
+        "objective": None,
+        "inclusion_criteria": None,
+        "exclusion_criteria": None,
+        "additional_instructions": None,
     })
     fulltext: Dict[str, Any] = field(default_factory=lambda: {
         "model": "gpt-4",
         "threshold": None,
         "confidence_reporting": False,
+        "objective": None,
+        "inclusion_criteria": None,
+        "exclusion_criteria": None,
+        "additional_instructions": None,
     })
 
 
@@ -134,10 +142,7 @@ class OutputConfig:
 @dataclass
 class PipelineConfig:
     """Main configuration for the Autonima pipeline."""
-    objective: str
     search: SearchConfig
-    inclusion_criteria: List[str]
-    exclusion_criteria: List[str]
     screening: ScreeningConfig
     retrieval: RetrievalConfig
     output: OutputConfig
@@ -145,7 +150,6 @@ class PipelineConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
         return {
-            "objective": self.objective,
             "search": {
                 "database": self.search.database,
                 "query": self.search.query,
@@ -154,8 +158,6 @@ class PipelineConfig:
                 "date_to": self.search.date_to,
                 "email": self.search.email,
             },
-            "inclusion_criteria": self.inclusion_criteria,
-            "exclusion_criteria": self.exclusion_criteria,
             "screening": {
                 "abstract": self.screening.abstract,
                 "fulltext": self.screening.fulltext,

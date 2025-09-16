@@ -40,8 +40,13 @@ def test_screener_with_confidence_reporting_enabled(temp_dir):
 
     # Create screening config with confidence reporting enabled
     config = ScreeningConfig()
-    config.abstract["confidence_reporting"] = True
-    config.abstract["threshold"] = 0.9  # Explicitly set threshold
+    config.abstract.update({
+        "confidence_reporting": True,
+        "threshold": 0.9,  # Explicitly set threshold
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -60,8 +65,7 @@ def test_screener_with_confidence_reporting_enabled(temp_dir):
         # Create unified screener
         screener = LLMScreener(
             config,
-            output_dir=str(temp_dir),
-            objective="Test objective for screening"
+            output_dir=str(temp_dir)
         )
 
         # Test screening
@@ -101,8 +105,13 @@ def test_screener_with_confidence_reporting_disabled(temp_dir):
 
     # Create screening config with confidence reporting disabled (default)
     config = ScreeningConfig()
-    config.abstract["confidence_reporting"] = False
-    config.abstract["threshold"] = 0.9  # This should be ignored
+    config.abstract.update({
+        "confidence_reporting": False,
+        "threshold": 0.9,  # This should be ignored
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -121,8 +130,7 @@ def test_screener_with_confidence_reporting_disabled(temp_dir):
         # Create unified screener
         screener = LLMScreener(
             config,
-            output_dir=str(temp_dir),
-            objective="Test objective for screening"
+            output_dir=str(temp_dir)
         )
 
         # Test screening
@@ -165,8 +173,13 @@ def test_screener_with_no_threshold(temp_dir):
     # Create screening config with confidence reporting enabled but
     # no threshold
     config = ScreeningConfig()
-    config.abstract["confidence_reporting"] = True
-    config.abstract["threshold"] = None  # No threshold
+    config.abstract.update({
+        "confidence_reporting": True,
+        "threshold": None,  # No threshold
+        "objective": "Test objective for screening",
+        "inclusion_criteria": ["Test inclusion criterion"],
+        "exclusion_criteria": ["Test exclusion criterion"]
+    })
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -184,8 +197,7 @@ def test_screener_with_no_threshold(temp_dir):
         # Create unified screener
         screener = LLMScreener(
             config,
-            output_dir=str(temp_dir),
-            objective="Test objective for screening"
+            output_dir=str(temp_dir)
         )
 
         # Test screening

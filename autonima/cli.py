@@ -88,7 +88,17 @@ def run(
         # Set output directory to the specified output folder
         pipeline_config.output.directory = output_folder
 
-        logger.info(f"Pipeline objective: {pipeline_config.objective}")
+        # Log screening info
+        abstract_config = pipeline_config.screening.abstract
+        abstract_objective = abstract_config.get('objective')
+        if abstract_objective:
+            logger.info(f"Abstract screening objective: {abstract_objective}")
+        
+        fulltext_config = pipeline_config.screening.fulltext
+        fulltext_objective = fulltext_config.get('objective')
+        if fulltext_objective:
+            logger.info(f"Fulltext screening objective: {fulltext_objective}")
+        
         logger.info(f"Search database: {pipeline_config.search.database}")
         logger.info(f"Search query: {pipeline_config.search.query}")
         logger.info(f"Output directory: {pipeline_config.output.directory}")
@@ -113,7 +123,6 @@ def run(
             print("\n" + "="*60)
             print("AUTONIMA PIPELINE COMPLETED")
             print("="*60)
-            print(f"Objective: {pipeline_config.objective}")
             identified = prisma_stats.get('total_identified', 0)
             print(f"Total studies identified: {identified}")
             print(f"Studies included: {prisma_stats.get('final_included', 0)}")
@@ -178,13 +187,35 @@ def validate(config: str, output_folder: str, debug: bool):
         pipeline_config.output.directory = output_folder
 
         print(f"✓ Configuration file is valid: {config_path}")
-        print(f"✓ Objective: {pipeline_config.objective}")
         print(f"✓ Search database: {pipeline_config.search.database}")
         print(f"✓ Search query: {pipeline_config.search.query}")
-        incl_count = len(pipeline_config.inclusion_criteria)
-        excl_count = len(pipeline_config.exclusion_criteria)
-        print(f"✓ Inclusion criteria: {incl_count}")
-        print(f"✓ Exclusion criteria: {excl_count}")
+        
+        # Print abstract screening info if available
+        abstract_config = pipeline_config.screening.abstract
+        abstract_objective = abstract_config.get('objective')
+        abstract_inclusion = abstract_config.get('inclusion_criteria', [])
+        abstract_exclusion = abstract_config.get('exclusion_criteria', [])
+        
+        if abstract_objective:
+            print(f"✓ Abstract screening objective: {abstract_objective}")
+        if abstract_inclusion:
+            print(f"✓ Abstract inclusion criteria: {len(abstract_inclusion)}")
+        if abstract_exclusion:
+            print(f"✓ Abstract exclusion criteria: {len(abstract_exclusion)}")
+        
+        # Print fulltext screening info if available
+        fulltext_config = pipeline_config.screening.fulltext
+        fulltext_objective = fulltext_config.get('objective')
+        fulltext_inclusion = fulltext_config.get('inclusion_criteria', [])
+        fulltext_exclusion = fulltext_config.get('exclusion_criteria', [])
+        
+        if fulltext_objective:
+            print(f"✓ Fulltext screening objective: {fulltext_objective}")
+        if fulltext_inclusion:
+            print(f"✓ Fulltext inclusion criteria: {len(fulltext_inclusion)}")
+        if fulltext_exclusion:
+            print(f"✓ Fulltext exclusion criteria: {len(fulltext_exclusion)}")
+        
         print(f"✓ Output directory: {pipeline_config.output.directory}")
 
     except ConfigurationError as e:

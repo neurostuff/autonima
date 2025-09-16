@@ -23,16 +23,17 @@ def test_unified_screener_initialization():
     # Create screening config with inclusion/exclusion criteria
     config = ScreeningConfig()
     
-    # Add some test criteria
-    config.inclusion_criteria = ["fMRI neuroimaging", "Human participants"]
-    config.exclusion_criteria = ["Animal studies", "Review articles"]
+    # Add some test criteria to abstract screening
+    config.abstract.update({
+        "objective": "Test objective",
+        "inclusion_criteria": ["fMRI neuroimaging", "Human participants"],
+        "exclusion_criteria": ["Animal studies", "Review articles"]
+    })
 
     # Create unified screener
     screener = LLMScreener(
         config,
-        output_dir=str(temp_dir),
-        inclusion_criteria=config.inclusion_criteria,
-        exclusion_criteria=config.exclusion_criteria
+        output_dir=str(temp_dir)
     )
     
     assert screener.config == config
@@ -60,8 +61,11 @@ def test_unified_screener_abstract_screening(temp_dir):
 
     # Create screening config with inclusion/exclusion criteria
     config = ScreeningConfig()
-    config.inclusion_criteria = ["fMRI neuroimaging", "Human participants"]
-    config.exclusion_criteria = ["Animal studies", "Review articles"]
+    config.abstract.update({
+        "objective": "Test objective",
+        "inclusion_criteria": ["fMRI neuroimaging", "Human participants"],
+        "exclusion_criteria": ["Animal studies", "Review articles"]
+    })
 
     # Mock the LLM client
     with patch('autonima.screening.screener.GenericLLMClient') as \
@@ -79,9 +83,7 @@ def test_unified_screener_abstract_screening(temp_dir):
         # Create unified screener
         screener = LLMScreener(
             config,
-            output_dir=str(temp_dir),
-            inclusion_criteria=config.inclusion_criteria,
-            exclusion_criteria=config.exclusion_criteria
+            output_dir=str(temp_dir)
         )
 
         # Test abstract screening
@@ -103,15 +105,16 @@ def test_unified_screener_get_info(temp_dir):
     """Test getting screening engine information."""
     # Create screening config
     config = ScreeningConfig()
-    config.inclusion_criteria = ["fMRI neuroimaging", "Human participants"]
-    config.exclusion_criteria = ["Animal studies", "Review articles"]
+    config.abstract.update({
+        "objective": "Test objective",
+        "inclusion_criteria": ["fMRI neuroimaging", "Human participants"],
+        "exclusion_criteria": ["Animal studies", "Review articles"]
+    })
 
     # Create unified screener
     screener = LLMScreener(
         config,
-        output_dir=str(temp_dir),
-        inclusion_criteria=config.inclusion_criteria,
-        exclusion_criteria=config.exclusion_criteria
+        output_dir=str(temp_dir)
     )
 
     # Test screening info
