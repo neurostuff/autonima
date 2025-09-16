@@ -235,9 +235,60 @@ class AutonimaPipeline:
         if not self._retriever:
             raise RuntimeError("Retriever not initialized")
 
-        # Fetch PMCIDs for included studies that don't have them
+        # Check for existing full texts from user-provided source
+        studies_from_user_source = []
+        studies_for_pubget = included_studies
+        
+        # If full_text_source is configured, try to map PMIDs to existing texts
+        if (hasattr(self.config.retrieval, 'full_text_source') and
+            self.config.retrieval.full_text_source):
+            
+            try:
+                from .retrieval.utils import _map_pmids_to_text
+                
+                # Get the configuration for the full text source
+                full_text_config = self.config.retrieval.full_text_source
+                
+                # Extract PMIDs from included studies
+                pmids = [int(s.pmid) for s in included_studies if s.pmid.isdigit()]
+                
+                # Map PMIDs to text files
+                pmid_to_text_path = _map_pmids_to_text(
+                    root_path=full_text_config['root_path'],
+                    pmid_source=full_text_config['pmid_source'],
+                    text_path_templates=full_text_config.get('text_path_templates'),
+                    pmids_to_include=set(pmids),
+                    json_filename=full_text_config.get('json_filename', 'identifiers.json'),
+                    json_pmid_key=full_text_config.get('json_pmid_key', 'pmid'),
+                    allowed_extensions=full_text_config.get('allowed_extensions')
+                )
+                
+                # Update studies with their full text paths
+                for study in included_studies:
+                    if int(study.pmid) in pmid_to_text_path:
+                        study.full_text_path = str(pmid_to_text_path[int(study.pmid)])
+                        study.status = StudyStatus.FULLTEXT_CACHED
+                        studies_from_user_source.append(study)
+                
+                # Filter out studies that were found in the user source
+                studies_for_pubget = [
+                    s for s in included_studies
+                    if s not in studies_from_user_source
+                ]
+                
+                logger.info(
+                    f"Found {len(studies_from_user_source)} studies in user-provided "
+                    "full text source"
+                )
+                
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load from user-provided full text source: {e}"
+                )
+
+        # Fetch PMCIDs for studies that will use PubGet (those without full_text_path)
         studies_needing_pmcid = [
-            s for s in included_studies if not s.pmcid
+            s for s in studies_for_pubget if not s.pmcid
         ]
         
         if studies_needing_pmcid:
@@ -260,29 +311,31 @@ class AutonimaPipeline:
                     f"PMCIDs not found for {len(not_found)} studies."
                 )
 
-        # Use PubGet for actual retrieval
-        output_dir = Path(self.config.output.directory)
-        retrieval_dir = output_dir / "retrieval"
+        # Use PubGet for actual retrieval (only for studies not found in user source)
+        if studies_for_pubget:
+            output_dir = Path(self.config.output.directory)
+            retrieval_dir = output_dir / "retrieval"
 
-        # Retrieve full-text articles
-        try:
-            api_key = getattr(self.config.retrieval, 'api_key', None)
-            n_docs = getattr(self.config.retrieval, 'max_docs', None)
+            # Retrieve full-text articles
+            try:
+                api_key = getattr(self.config.retrieval, 'api_key', None)
+                n_docs = getattr(self.config.retrieval, 'max_docs', None)
 
-            _ = self._retriever.retrieve(
-                studies=included_studies,
-                output_dir=retrieval_dir,
-                api_key=api_key,
-                n_docs=n_docs
-            )
-                   
-        except Exception as e:
-            log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
+                _ = self._retriever.retrieve(
+                    studies=studies_for_pubget,
+                    output_dir=retrieval_dir,
+                    api_key=api_key,
+                    n_docs=n_docs
+                )
+                    
+            except Exception as e:
+                log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
 
-        # Validate retrieval
-        self._retriever.validate_retrieval(included_studies, retrieval_dir)
+            # Validate retrieval
+            self._retriever.validate_retrieval(studies_for_pubget, retrieval_dir)
 
         # Save intermediary results
+        output_dir = Path(self.config.output.directory)
         retrieval_results_file = output_dir / "outputs" / "fulltext_retrieval_results.json"
         retrieval_data = {
             "studies_with_fulltext": [
@@ -294,7 +347,8 @@ class AutonimaPipeline:
                         study.retrieved_at.isoformat()
                         if study.retrieved_at else None
                     ),
-                    "status": study.status.value
+                    "status": study.status.value,
+                    "full_text_path": study.full_text_path
                 }
                 for study in self.results.studies
                 if (study.status in [

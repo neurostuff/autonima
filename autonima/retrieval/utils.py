@@ -1,14 +1,15 @@
 """Utility functions for retrieval modules."""
 
 import pandas as pd
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, List, Set, Dict
 from ..models.types import Study
 
 
 def _load_full_text(study: Study, text_path: str = None, output_dir: str = None) -> Optional[str]:
     """
-    Load the full text content for a study from a CSV file.
+    Load the full text content for a study from a CSV file or a direct text file.
     
     Args:
         study: The study object containing the pmcid
@@ -23,7 +24,18 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
         FileNotFoundError: If the text file doesn't exist at the expected location
     """
     try:
-        # Determine the text file path
+        # If study has a direct full_text_path, load from that file
+        if study.full_text_path:
+            full_text_file = Path(study.full_text_path)
+            if full_text_file.exists():
+                # If it's a text file, read it directly
+                if full_text_file.suffix.lower() == '.txt':
+                    with open(full_text_file, 'r', encoding='utf-8') as f:
+                        return f.read()
+                else:
+                    raise ValueError(f"Unsupported file format: {full_text_file.suffix}")
+        
+        # Determine the text file path for CSV-based loading
         if text_path:
             text_file = Path(text_path)
         elif output_dir:
