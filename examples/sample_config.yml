@@ -15,7 +15,6 @@ retrieval:
   sources:
     - pubget
     - ace
-  n_jobs: 1 # number of parallel jobs for processing
 
 screening:
   abstract:
@@ -52,8 +51,8 @@ screening:
     # additional_instructions: "Focus on methodological rigor and statistical significance."
 
 output:
-  prisma_diagram: true
   formats:
-    - csv
     - json
-    - pdf
+    - nimads
+    - csv
+  prisma_diagram: true  # Generate a PRISMA flow diagram
