@@ -53,11 +53,8 @@ class PubMedSearch(SearchEngine):
             List of Study objects
         """
         try:
-            logger.info(f"Searching PubMed with query: {query}")
-
             # Build complete query
             full_query = self.build_query(query)
-            logger.info(f"Full query: {full_query}")
 
             # Execute search
             pmids = await self._execute_search(full_query)

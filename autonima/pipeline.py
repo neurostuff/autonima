@@ -122,7 +122,6 @@ class AutonimaPipeline:
 
     async def _execute_search_phase(self):
         """Execute the literature search phase."""
-        logger.info("Starting literature search phase")
 
         if not self._search_engine:
             raise RuntimeError("Search engine not initialized")
@@ -155,7 +154,6 @@ class AutonimaPipeline:
 
     async def _execute_abstract_screening(self):
         """Execute abstract screening phase."""
-        logger.info("Starting abstract screening phase")
 
         # Get studies that need screening
         pending_studies = [
@@ -212,7 +210,6 @@ class AutonimaPipeline:
 
     async def _execute_retrieval_phase(self):
         """Execute full-text retrieval phase."""
-        logger.info("Starting full-text retrieval phase")
 
         # Get included studies that need full-text retrieval
         included_studies = [
@@ -300,11 +297,6 @@ class AutonimaPipeline:
                 else:
                     not_found.append(study.pmid)
 
-            if not_found:
-                logger.warning(
-                    f"PMCIDs not found for {len(not_found)} studies."
-                )
-
         # Use PubGet for actual retrieval (only for studies not found in user source)
         if studies_for_pubget:
             output_dir = Path(self.config.output.directory)
@@ -373,7 +365,6 @@ class AutonimaPipeline:
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""
-        logger.info("Starting full-text screening phase")
 
         # Get studies with full text that need screening
         screenable_studies = [
@@ -431,20 +422,15 @@ class AutonimaPipeline:
         logger.info(
             f"Full-text screening completed: {final_count} studies included"
         )
-        logger.info(
-            f"Full-text screening results saved to "
-            f"{fulltext_screening_results_file}"
-        )
 
     async def _execute_output_phase(self):
         """Execute output generation phase."""
-        logger.info("Starting output generation phase")
 
         # TODO: Implement comprehensive output generation
         # For now, generate basic statistics
         await self._generate_basic_outputs()
 
-        logger.info("Output generation completed")
+        logger.info("Saved final results and statistics")
 
     async def _generate_basic_outputs(self):
         """Generate basic outputs and statistics."""
