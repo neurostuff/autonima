@@ -153,9 +153,6 @@ class AutonimaPipeline:
             import json
             json.dump(search_data, f, indent=2)
 
-        logger.info(f"Search completed: found {len(studies)} studies")
-        logger.info(f"Search results saved to {search_results_file}")
-
     async def _execute_abstract_screening(self):
         """Execute abstract screening phase."""
         logger.info("Starting abstract screening phase")
@@ -211,9 +208,6 @@ class AutonimaPipeline:
         logger.info(
             f"Abstract screening completed: {screened_count} studies "
             "screened"
-        )
-        logger.info(
-            f"Abstract screening results saved to {screening_results_file}"
         )
 
     async def _execute_retrieval_phase(self):
@@ -374,10 +368,7 @@ class AutonimaPipeline:
         ])
         logger.info(
             f"Full-text retrieval completed: {retrieved_count} texts "
-            f"retrieved, {unavailable_count} unavailable"
-        )
-        logger.info(
-            f"Full-text retrieval results saved to {retrieval_results_file}"
+            f"retrieved/cached, {unavailable_count} unavailable"
         )
 
     async def _execute_fulltext_screening(self):
@@ -492,8 +483,6 @@ class AutonimaPipeline:
         with open(final_results_file, 'w') as f:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
-
-        logger.info(f"Final results saved to {final_results_file}")
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""

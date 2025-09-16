@@ -40,7 +40,7 @@ class PubMedSearch(SearchEngine):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         self.max_retries = 3
         self.retry_delay = 1.0
-        self.output_dir = output_dir
+        self.result_dir = output_dir
 
     async def search(self, query: str) -> List[Study]:
         """
@@ -72,7 +72,7 @@ class PubMedSearch(SearchEngine):
             
             # Identify PMIDs that need to be fetched
             new_pmids = [pmid for pmid in pmids if pmid not in cached_pmids]
-            logger.info(f"Found {len(cached_studies)} cached studies, {len(new_pmids)} new studies to fetch")
+            logger.info(f"Found meta-data for {len(cached_studies)} cached studies, {len(new_pmids)} new studies to fetch")
 
             # Fetch details for new PMIDs only
             new_studies = []
@@ -82,7 +82,6 @@ class PubMedSearch(SearchEngine):
 
             # Combine cached and new studies
             studies = cached_studies + new_studies
-            logger.info(f"Total studies after caching: {len(studies)}")
 
             return studies
 
@@ -102,7 +101,7 @@ class PubMedSearch(SearchEngine):
             from pathlib import Path
             
             # Use the provided output directory
-            search_results_file = Path(self.output_dir) / "outputs" / "search_results.json"
+            search_results_file = Path(self.result_dir) / "outputs" / "search_results.json"
             
             if not search_results_file.exists():
                 logger.info(
@@ -169,7 +168,6 @@ class PubMedSearch(SearchEngine):
                     logger.warning(f"Failed to load cached study: {e}")
                     continue
             
-            logger.info(f"Loaded {len(cached_studies)} studies from cache")
             return cached_studies
             
         except Exception as e:
@@ -200,7 +198,6 @@ class PubMedSearch(SearchEngine):
             handle.close()
             
             pmids = search_results.get("IdList", [])
-            logger.info(f"Search returned {len(pmids)} PMIDs")
             
             return pmids
             
