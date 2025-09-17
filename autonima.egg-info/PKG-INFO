@@ -33,6 +33,7 @@ Requires-Dist: datetime
 Requires-Dist: biopython>=1.81
 Requires-Dist: pandas>=2.0
 Requires-Dist: matplotlib>=3.5
+Requires-Dist: pubget>=0.0.8
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
@@ -143,17 +144,19 @@ Where `sample_config.yaml` specifies:
 1. Define your review specification (`YAML` or `JSON`):
 
    ```yaml
-   objective: "Identify fMRI studies of working memory in schizophrenia"
    search:
      database: "pubmed"
      query: "schizophrenia AND working memory AND fMRI"
-   inclusion_criteria:
-     - Human participants
-     - fMRI neuroimaging
-     - Case-control design
-   exclusion_criteria:
-     - Animal studies
-     - Review articles
+   screening:
+     abstract:
+       objective: "Identify fMRI studies of working memory in schizophrenia"
+       inclusion_criteria:
+         - Human participants
+         - fMRI neuroimaging
+         - Case-control design
+       exclusion_criteria:
+         - Animal studies
+         - Review articles
    ```
 
 2. Run Autonima pipeline:

@@ -88,28 +88,10 @@ def run(
         # Set output directory to the specified output folder
         pipeline_config.output.directory = output_folder
 
-        # Log screening info
-        abstract_config = pipeline_config.screening.abstract
-        abstract_objective = abstract_config.get('objective')
-        if abstract_objective:
-            logger.info(f"Abstract screening objective: {abstract_objective}")
-        
-        fulltext_config = pipeline_config.screening.fulltext
-        fulltext_objective = fulltext_config.get('objective')
-        if fulltext_objective:
-            logger.info(f"Fulltext screening objective: {fulltext_objective}")
-        
-        logger.info(f"Search database: {pipeline_config.search.database}")
-        logger.info(f"Search query: {pipeline_config.search.query}")
-        logger.info(f"Output directory: {pipeline_config.output.directory}")
-
         if dry_run:
             logger.info("Dry run completed successfully")
             logger.info("Configuration is valid")
             return
-
-        # Run the pipeline
-        logger.info("Starting pipeline execution...")
 
         async def execute_pipeline():
             results = await run_pipeline_from_config(

@@ -38,6 +38,7 @@ class Study:
     retrieved_at: Optional[datetime] = None
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
+    full_text_path: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -63,6 +64,7 @@ class Study:
             "screened_at": (
                 self.screened_at.isoformat() if self.screened_at else None
             ),
+            "full_text_path": self.full_text_path,
         }
     
     def load_full_text(self, output_dir: str) -> str:
@@ -127,6 +129,8 @@ class RetrievalConfig:
     max_retries: int = 3
     download_directory: str = "downloads"
     n_jobs: int = 1
+    # Optional full text source configuration
+    full_text_source: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -168,6 +172,7 @@ class PipelineConfig:
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
                 "n_jobs": self.retrieval.n_jobs,
+                "full_text_source": self.retrieval.full_text_source,
             },
             "output": {
                 "directory": self.output.directory,
