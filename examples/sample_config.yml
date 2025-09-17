@@ -15,6 +15,11 @@ retrieval:
   sources:
     - pubget
   # full_text_sources:
+  #   # Example for HTML files where filename is the PMID (searches recursively)
+  #   - root_path: "/path/to/your/html/files"
+  #     pmid_source: "file_name"
+  #     allowed_extensions: [".html"]
+  #   # Example for folder-based structure with text files
   #   - root_path: "/path/to/your/first/full/texts"
   #     pmid_source: "folder_name"  # or "json" or "file_name"
   #     text_path_templates:
@@ -25,6 +30,7 @@ retrieval:
   #     # json_pmid_key: "pmid"
   #     # For pmid_source: "file_name", you can customize:
   #     # allowed_extensions: [".txt", ".xml"]
+  #   # Example for another folder-based structure with JSON metadata
   #   - root_path: "/path/to/your/second/full/texts"
   #     pmid_source: "json"
   #     text_path_templates:

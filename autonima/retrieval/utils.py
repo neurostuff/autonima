@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Optional, Union, List, Set, Dict
 from ..models.types import Study
+from bs4 import BeautifulSoup, Comment
 
 
 def _load_full_text(study: Study, text_path: str = None, output_dir: str = None) -> Optional[str]:
@@ -32,6 +33,9 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
                 if full_text_file.suffix.lower() == '.txt':
                     with open(full_text_file, 'r', encoding='utf-8') as f:
                         return f.read()
+                elif full_text_file.suffix.lower() == '.html':
+                    # Load HTML body text
+                    return _safe_clean_html(full_text_file.read_text(encoding='utf-8'))
                 else:
                     raise ValueError(f"Unsupported file format: {full_text_file.suffix}")
         
@@ -111,7 +115,11 @@ def _map_pmids_to_text(
     if pmid_source in ['json', 'folder_name'] and not text_path_templates:
         raise ValueError("`text_path_templates` must be provided for 'json' and 'folder_name' pmid_source.")
 
-    iterator = root.iterdir()
+    # For file_name option, recursively search all files
+    if pmid_source == 'file_name':
+        iterator = root.rglob('*')
+    else:
+        iterator = root.iterdir()
 
     for item in iterator:
         pmid = None
@@ -164,3 +172,23 @@ def _map_pmids_to_text(
                 index[pmid] = text_file_path
 
     return index
+
+
+def _safe_clean_html(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+
+    # 1. Remove non-text tags
+    for tag in soup(["script", "style", "noscript", "iframe", "svg", "canvas"]):
+        tag.decompose()
+
+    # 2. Remove comments
+    for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
+        comment.extract()
+
+    # 3. Strip heavy attributes but keep the tags/text
+    for tag in soup.find_all(True):
+        for attr in list(tag.attrs):
+            if attr in ["style", "onclick", "class", "id", "aria-hidden", "aria-label"]:
+                del tag[attr]
+
+    return str(soup)
