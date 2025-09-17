@@ -318,6 +318,14 @@ class AutonimaPipeline:
             s for s in self.results.studies
             if s.status == StudyStatus.FULLTEXT_UNAVAILABLE
         ])
+
+        # Save .txt file with pmids of unavailable full texts
+        unavailable_pmids_file = output_dir / "outputs" / "unavailable_fulltexts.txt"
+        with open(unavailable_pmids_file, 'w') as f:
+            for study in self.results.studies:
+                if study.status == StudyStatus.FULLTEXT_UNAVAILABLE:
+                    f.write(f"{study.pmid}\n")
+
         logger.info(
             f"Full-text retrieval completed: {retrieved_count} texts "
             f"retrieved, {unavailable_count} unavailable"
