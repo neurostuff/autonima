@@ -226,55 +226,55 @@ class AutonimaPipeline:
         if not self._retriever:
             raise RuntimeError("Retriever not initialized")
 
-        # Check for existing full texts from user-provided source
+        # Check for existing full texts from user-provided sources
         studies_from_user_source = []
         studies_for_pubget = included_studies
         
-        # If full_text_source is configured, try to map PMIDs to existing texts
-        if (hasattr(self.config.retrieval, 'full_text_source') and
-            self.config.retrieval.full_text_source):
+        # If full_text_sources are configured, try to map PMIDs to existing texts
+        if (hasattr(self.config.retrieval, 'full_text_sources') and
+            self.config.retrieval.full_text_sources):
             
             try:
                 from .retrieval.utils import _map_pmids_to_text
                 
-                # Get the configuration for the full text source
-                full_text_config = self.config.retrieval.full_text_source
-                
                 # Extract PMIDs from included studies
                 pmids = [int(s.pmid) for s in included_studies if s.pmid.isdigit()]
+                pmids_set = set(pmids)
                 
-                # Map PMIDs to text files
-                pmid_to_text_path = _map_pmids_to_text(
-                    root_path=full_text_config['root_path'],
-                    pmid_source=full_text_config['pmid_source'],
-                    text_path_templates=full_text_config.get('text_path_templates'),
-                    pmids_to_include=set(pmids),
-                    json_filename=full_text_config.get('json_filename', 'identifiers.json'),
-                    json_pmid_key=full_text_config.get('json_pmid_key', 'pmid'),
-                    allowed_extensions=full_text_config.get('allowed_extensions')
-                )
-                
-                # Update studies with their full text paths
-                for study in included_studies:
-                    if int(study.pmid) in pmid_to_text_path:
-                        study.full_text_path = str(pmid_to_text_path[int(study.pmid)])
-                        study.status = StudyStatus.FULLTEXT_CACHED
-                        studies_from_user_source.append(study)
-                
-                # Filter out studies that were found in the user source
-                studies_for_pubget = [
-                    s for s in included_studies
-                    if s not in studies_from_user_source
-                ]
+                # Process each full text source
+                for i, full_text_config in enumerate(self.config.retrieval.full_text_sources):
+                    if not full_text_config:
+                        continue
+                        
+                    logger.info(f"Processing full text source {i+1}/{len(self.config.retrieval.full_text_sources)}")
+                    
+                    # Map PMIDs to text files
+                    pmid_to_text_path = _map_pmids_to_text(
+                        root_path=full_text_config['root_path'],
+                        pmid_source=full_text_config['pmid_source'],
+                        text_path_templates=full_text_config.get('text_path_templates'),
+                        pmids_to_include=pmids_set,
+                        json_filename=full_text_config.get('json_filename', 'identifiers.json'),
+                        json_pmid_key=full_text_config.get('json_pmid_key', 'pmid'),
+                        allowed_extensions=full_text_config.get('allowed_extensions')
+                    )
+                    
+                    # Update studies with their full text paths
+                    for study in studies_for_pubget[:]:  # Use a copy to safely modify during iteration
+                        if int(study.pmid) in pmid_to_text_path:
+                            study.full_text_path = str(pmid_to_text_path[int(study.pmid)])
+                            study.status = StudyStatus.FULLTEXT_CACHED
+                            studies_from_user_source.append(study)
+                            studies_for_pubget.remove(study)  # Remove from studies_for_pubget
                 
                 logger.info(
                     f"Found {len(studies_from_user_source)} studies in user-provided "
-                    "full text source"
+                    "full text sources"
                 )
                 
             except Exception as e:
                 logger.warning(
-                    f"Failed to load from user-provided full text source: {e}"
+                    f"Failed to load from user-provided full text sources: {e}"
                 )
 
         # Fetch PMCIDs for studies that will use PubGet (those without full_text_path)

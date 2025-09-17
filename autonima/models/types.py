@@ -129,8 +129,8 @@ class RetrievalConfig:
     max_retries: int = 3
     download_directory: str = "downloads"
     n_jobs: int = 1
-    # Optional full text source configuration
-    full_text_source: Optional[Dict[str, Any]] = None
+    # Optional full text source configurations
+    full_text_sources: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -172,7 +172,7 @@ class PipelineConfig:
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
                 "n_jobs": self.retrieval.n_jobs,
-                "full_text_source": self.retrieval.full_text_source,
+                "full_text_sources": self.retrieval.full_text_sources,
             },
             "output": {
                 "directory": self.output.directory,

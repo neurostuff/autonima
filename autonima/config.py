@@ -87,9 +87,22 @@ class ConfigManager:
                         screening_dict['fulltext']
                     )
 
-            retrieval_config = RetrievalConfig(
-                **config_dict.get('retrieval', {})
-            )
+            retrieval_config = RetrievalConfig()
+            if 'retrieval' in config_dict:
+                retrieval_dict = config_dict['retrieval']
+                # Handle backward compatibility for single full_text_source
+                if 'full_text_source' in retrieval_dict:
+                    if retrieval_dict['full_text_source'] is not None:
+                        retrieval_config.full_text_sources = [retrieval_dict['full_text_source']]
+                    # Remove the old key to avoid conflicts
+                    retrieval_dict = {k: v for k, v in retrieval_dict.items() if k != 'full_text_source'}
+                # Handle new full_text_sources
+                if 'full_text_sources' in retrieval_dict:
+                    retrieval_config.full_text_sources = retrieval_dict['full_text_sources']
+                # Set other retrieval config values
+                for key, value in retrieval_dict.items():
+                    if hasattr(retrieval_config, key) and key != 'full_text_sources':
+                        setattr(retrieval_config, key, value)
             output_config = OutputConfig(**config_dict.get('output', {}))
 
             # Create main config

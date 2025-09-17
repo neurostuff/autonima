@@ -14,17 +14,24 @@ search:
 retrieval:
   sources:
     - pubget
-  # full_text_source:
-  #   root_path: "/path/to/your/full/texts"
-  #   pmid_source: "folder_name"  # or "json" or "file_name"
-  #   text_path_templates:
-  #     - "fulltext.txt"
-  #     - "text.txt"
-  #   # For pmid_source: "json", you can customize:
-  #   # json_filename: "identifiers.json"
-  #   # json_pmid_key: "pmid"
-  #   # For pmid_source: "file_name", you can customize:
-  #   # allowed_extensions: [".txt", ".xml"]
+  # full_text_sources:
+  #   - root_path: "/path/to/your/first/full/texts"
+  #     pmid_source: "folder_name"  # or "json" or "file_name"
+  #     text_path_templates:
+  #       - "fulltext.txt"
+  #       - "text.txt"
+  #     # For pmid_source: "json", you can customize:
+  #     # json_filename: "identifiers.json"
+  #     # json_pmid_key: "pmid"
+  #     # For pmid_source: "file_name", you can customize:
+  #     # allowed_extensions: [".txt", ".xml"]
+  #   - root_path: "/path/to/your/second/full/texts"
+  #     pmid_source: "json"
+  #     text_path_templates:
+  #       - "processed/pubget/text.txt"
+  #       - "text.txt"
+  #     json_filename: "identifiers.json"
+  #     json_pmid_key: "pmid"
 
 screening:
   abstract:
