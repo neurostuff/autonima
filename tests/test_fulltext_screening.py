@@ -92,58 +92,6 @@ def test_fulltext_screening():
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def test_fulltext_screening_with_missing_pmcid():
-    """Test full text screening with missing pmcid."""
-    # Create a temporary directory for this test
-    import tempfile
-    import shutil
-    temp_dir = Path(tempfile.mkdtemp())
-    
-    try:
-        # Create a test study without pmcid
-        study = Study(
-            pmid="TEST_FT_002",
-            title="fMRI study of working memory in schizophrenia",
-            abstract="This is an abstract.",
-            authors=["Smith J", "Johnson A"],
-            journal="Neuroimage",
-            publication_date="2023",
-            status=StudyStatus.FULLTEXT_RETRIEVED
-        )
-
-        # Create screening config
-        config = ScreeningConfig()
-        config.fulltext.update({
-            "objective": "Test objective for fulltext screening with missing PMCID",
-            "inclusion_criteria": ["Test inclusion criterion"],
-            "exclusion_criteria": ["Test exclusion criterion"]
-        })
-
-        # Mock the LLM client
-        with patch('autonima.screening.screener.GenericLLMClient') as \
-             mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
-            
-            # Create unified screener with temporary output directory
-            screener = LLMScreener(
-                config,
-                output_dir=str(temp_dir)
-            )
-
-            # Test screening - should skip studies with missing pmcid
-            studies_list = [study]
-            results = asyncio.run(screener.screen_fulltexts(studies_list))
-
-            assert isinstance(results, list)
-            # We should get no results because the pmcid is missing
-            assert len(results) == 0
-            
-    finally:
-        # Clean up the temporary directory
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-
 if __name__ == "__main__":
     test_fulltext_screening()
     test_fulltext_screening_with_missing_pmcid()

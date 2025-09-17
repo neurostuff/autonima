@@ -85,10 +85,6 @@ class PubGetRetriever(BaseRetriever):
                     existing_pmcids = set(
                         existing_df['pmcid'].dropna().astype(int).tolist()
                     )
-                    logger.info(
-                        f"Found {len(existing_pmcids)} already downloaded "
-                        "PMCIDs"
-                    )
             except Exception as e:
                 logger.warning(f"Could not read existing metadata: {e}")
         
@@ -136,11 +132,9 @@ class PubGetRetriever(BaseRetriever):
                 # Check to see how many articles were downloaded
                 # If no articles were downloaded, skip the rest of the steps
                 if not download_dir or not Path(download_dir).exists():
-                    logger.warning("No articles were downloaded.")
                     return studies
                 downloaded_files = list(Path(download_dir).rglob('*'))
                 if len(downloaded_files) <= 1:
-                    logger.warning("No articles were downloaded.")
                     return studies
                                 
                 # Extract articles from bulk download

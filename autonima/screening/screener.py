@@ -186,8 +186,8 @@ class LLMScreener(ScreeningEngine):
         super().__init__(config)
         self._client = None
         self._llm_client: Optional[GenericLLMClient] = None
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.result_dir = Path(output_dir)
+        self.result_dir.mkdir(parents=True, exist_ok=True)
         self.num_workers = num_workers
         # Load existing results
         self._existing_abstract_results = self._load_existing_results(
@@ -208,7 +208,7 @@ class LLMScreener(ScreeningEngine):
             Dictionary mapping study IDs to their screening results
         """
         filename = f"{screening_type}_screening_results.json"
-        results_file = self.output_dir / filename
+        results_file = self.result_dir / "outputs"/ filename
         if not results_file.exists():
             return {}
             
@@ -239,8 +239,7 @@ class LLMScreener(ScreeningEngine):
         else:  # fulltext
             return [
                 s for s in studies
-                if s.pmcid and
-                s.status in [
+                if s.status in [
                     StudyStatus.FULLTEXT_RETRIEVED,
                     StudyStatus.FULLTEXT_CACHED
                 ]
@@ -333,7 +332,7 @@ class LLMScreener(ScreeningEngine):
                 confidence_reporting=confidence_reporting,
                 additional_instructions=additional_instructions,
                 **(
-                    dict(output_dir=str(self.output_dir))
+                    dict(output_dir=str(self.result_dir))
                     if screening_type == "fulltext"
                     else {}
                 )
@@ -364,7 +363,7 @@ class LLMScreener(ScreeningEngine):
                 
             # Save result to file after each screening operation
             result_dict = result.to_dict()
-            output_dir = self.output_dir / "outputs"
+            output_dir = self.result_dir / "outputs"
             output_dir.mkdir(parents=True, exist_ok=True)
             results_file = (
                 output_dir / f"{screening_type}_screening_results.json"
@@ -395,7 +394,7 @@ class LLMScreener(ScreeningEngine):
             # Save failed result to file
             result_dict = result.to_dict()
             results_file = (
-                self.output_dir / f"{screening_type}_screening_results.json"
+                self.result_dir / f"{screening_type}_screening_results.json"
             )
             save_screening_result_with_lock(results_file, result_dict)
             
