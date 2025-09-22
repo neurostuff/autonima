@@ -33,6 +33,12 @@ Autonima enables end-to-end automation of systematic review steps:
    * Produces a final set of included studies for meta-analysis.
    * Uses function calling with Pydantic schemas for structured output.
 
+5. **Enhanced HTML Cleaning**
+
+   * Uses Mozilla's Readability algorithm via `readabilipy` to extract clean text content from HTML.
+   * Falls back to basic HTML cleaning when `readabilipy` is not available.
+   * Install with `pip install -e .[readability]` (requires Node.js).
+
 ---
 
 ## 📊 Benchmarking
@@ -69,6 +75,11 @@ cd autonima
 
 # install
 pip install -e .
+
+# install with enhanced HTML cleaning (requires Node.js)
+pip install -e .[readability]
+
+> Note: The enhanced HTML cleaning feature requires Node.js to be installed on your system.
 
 # run an example review pipeline
 python examples/run_pipeline.py --config examples/sample_config.yaml

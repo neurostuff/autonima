@@ -66,6 +66,9 @@ setup(
         ],
         "llm": [
             "openai>=1.0"
+        ],
+        "readability": [
+            "readabilipy>=0.2.0"
         ]
     },
     entry_points={
