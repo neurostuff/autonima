@@ -172,6 +172,16 @@ class PubGetRetriever(BaseRetriever):
                             data_dir, final_data_dir, dirs_exist_ok=True
                         )
                 
+                # Copy the original articles directory to preserve it in output
+                if articles_dir.exists():
+                    import shutil
+                    articles_output_dir = final_data_dir / "articles"
+                    if articles_output_dir.exists():
+                        # Remove existing articles directory if it exists
+                        shutil.rmtree(articles_output_dir)
+                    # Copy the articles directory
+                    shutil.copytree(articles_dir, articles_output_dir)
+                
                 logger.info(
                     f"Successfully retrieved {len(studies_to_download)} "
                     "articles"

@@ -53,7 +53,9 @@ setup(
         "biopython>=1.81",
         "pandas>=2.0",
         "matplotlib>=3.5",
-        "pubget>=0.0.8"
+        "pubget>=0.0.8",
+        "beautifulsoup4>=4.9.0",
+        "lxml>=4.6.0"
     ],
     extras_require={
         "dev": [
@@ -66,6 +68,9 @@ setup(
         ],
         "llm": [
             "openai>=1.0"
+        ],
+        "readability": [
+            "readabilipy>=0.2.0"
         ]
     },
     entry_points={

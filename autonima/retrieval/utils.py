@@ -2,10 +2,20 @@
 
 import pandas as pd
 import json
+import logging
 from pathlib import Path
 from typing import Optional, Union, List, Set, Dict
 from ..models.types import Study
 from bs4 import BeautifulSoup, Comment
+
+# Try to import readabilipy for enhanced HTML cleaning
+try:
+    from readabilipy import simple_json_from_html_string
+    READABILITY_AVAILABLE = True
+except ImportError:
+    READABILITY_AVAILABLE = False
+    logging.warning("readabilipy not installed. Install with 'pip install readabilipy' for enhanced HTML cleaning. "
+                     "Note: Node.js is also required for readabilipy to work.")
 
 
 def _load_full_text(study: Study, text_path: str = None, output_dir: str = None) -> Optional[str]:
@@ -35,7 +45,7 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
                         return f.read()
                 elif full_text_file.suffix.lower() == '.html':
                     # Load HTML body text
-                    return _safe_clean_html(full_text_file.read_text(encoding='utf-8'))
+                    return _clean_html_with_readability(full_text_file.read_text(encoding='utf-8'))
                 else:
                     raise ValueError(f"Unsupported file format: {full_text_file.suffix}")
         
@@ -192,3 +202,45 @@ def _safe_clean_html(html: str) -> str:
                 del tag[attr]
 
     return str(soup)
+
+
+def _clean_html_with_readability(html: str) -> str:
+    """
+    Clean HTML content using Mozilla's readability algorithm via readabilipy.
+    
+    Falls back to _safe_clean_html if readabilipy is not available or fails.
+    
+    Args:
+        html: The HTML content to clean
+        
+    Returns:
+        The cleaned text content
+    """
+    global READABILITY_AVAILABLE
+    
+    # If readabilipy is not available, fall back to safe cleaning
+    if not READABILITY_AVAILABLE:
+        logging.warning("Falling back to basic HTML cleaning as readabilipy is not available")
+        return _safe_clean_html(html)
+    
+    try:
+        # Use readabilipy with Mozilla's readability algorithm
+        article = simple_json_from_html_string(html, use_readability=True)
+        if article and 'content' in article and article['content']:
+            # Extract text content from the HTML
+            soup = BeautifulSoup(article['content'], "lxml")
+            # Get text content, preserving some structure
+            text_parts = []
+            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+                text = element.get_text(strip=False)
+                if text.strip():
+                    text_parts.append(text.strip())
+            return '\n\n'.join(text_parts) if text_parts else soup.get_text()
+        else:
+            # If readability failed to extract content, fall back to safe cleaning
+            logging.warning("Readability failed to extract content, falling back to basic HTML cleaning")
+            return _safe_clean_html(html)
+    except Exception as e:
+        # If any error occurs, fall back to safe cleaning
+        logging.warning(f"Error using readabilipy, falling back to basic HTML cleaning: {e}")
+        return _safe_clean_html(html)
