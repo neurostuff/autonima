@@ -27,10 +27,22 @@ from .config import PipelineConfig
 # Import retrieval module components
 from .retrieval import BaseRetriever, PubGetRetriever, ACERetriever
 
+# Import coordinate parsing module components
+from .coordinates import CoordinatePoint, Analysis, ParseAnalysesOutput, parse_tables, CoordinateParsingClient
+
+# Import LLM module components
+from .llm.client import GenericLLMClient
+
 __all__ = [
     "AutonimaPipeline",
     "PipelineConfig",
     "BaseRetriever",
     "PubGetRetriever",
-    "ACERetriever"
+    "ACERetriever",
+    "CoordinatePoint",
+    "Analysis",
+    "ParseAnalysesOutput",
+    "parse_tables",
+    "CoordinateParsingClient",
+    "GenericLLMClient"
 ]
