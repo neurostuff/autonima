@@ -17,42 +17,28 @@ logger = logging.getLogger(__name__)
 
 
 def parse_single_table(
-    file_path: str,
+    file_name: str,
+    table_caption: str,
+    table_foot: str,
+    table_text: str,
     client: CoordinateParsingClient,
-    tables_info: Dict[str, Dict[str, str]],
-    input_folder: str,
     model: str = "gpt-4o-mini"
 ) -> Dict[str, Any]:
     """
-    Parse a single table file using the LLM client.
+    Parse a single table using the LLM client.
     
     Args:
-        file_path: Path to the CSV file to parse
+        file_name: Name of the file being parsed
+        table_caption: Caption of the table
+        table_foot: Footer of the table
+        table_text: Text content of the table
         client: CoordinateParsingClient instance
-        tables_info: Dictionary containing table metadata
-        input_folder: Input folder path for relative path calculation
         model: Model to use for parsing
         
     Returns:
         Dictionary containing the parsed results
     """
-    file_name = os.path.basename(file_path)
-    logger.info(f"Processing: {file_path}")
-    
-    # Read raw CSV as text
-    with open(file_path, "r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        rows = list(reader)
-        table_text = "\n".join([",".join(r) for r in rows])
-    
-    # Get table caption and foot if available
-    relative_file_path = os.path.relpath(file_path, input_folder)
-    table_caption = ""
-    table_foot = ""
-    if relative_file_path in tables_info:
-        table_info = tables_info[relative_file_path]
-        table_caption = table_info.get("table_caption", "")
-        table_foot = table_info.get("table_foot", "")
+    logger.info(f"Processing: {file_name}")
     
     # Create detailed prompt
     detailed_prompt = f"""
@@ -70,7 +56,10 @@ Your task:
 3. Each row should be placed inside a `"points"` array under its corresponding analysis.
 4. Missing values must be explicitly represented as `null`.
 5. Coordinates must be grouped into an array with fields `"coordinates"` containing [x, y, z] values and `"space"` indicating the template space (e.g., MNI or TAL).
-6. The top-level JSON must match the provided schema for the `parse_analyses` function, which includes fields: "name", "description", and "points".
+6. IMPORTANT: Only include rows that have valid coordinate data ([x, y, z] values). Skip rows that do not contain coordinate information.
+7. Each point MUST have a "coordinates" field with exactly 3 numeric values [x, y, z].
+8. Rows without valid coordinates should be completely excluded from the points array.
+9. The top-level JSON must match the provided schema for the `parse_analyses` function, which includes fields: "name", "description", and "points".
 
 Input table:
 {table_text}
@@ -152,21 +141,62 @@ def parse_tables(
     if num_workers <= 1 or len(csv_files) <= 1:
         # Serial processing
         logger.info("Using serial processing")
-        parsed_results = [
-            parse_single_table(
-                file_path, client, tables_info, input_folder, model
+        parsed_results = []
+        for file_path in tqdm(csv_files):
+            # Read raw CSV as text
+            with open(file_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                table_text = "\n".join([",".join(r) for r in rows])
+            
+            # Get table caption and foot if available
+            relative_file_path = os.path.relpath(file_path, input_folder)
+            table_caption = ""
+            table_foot = ""
+            if relative_file_path in tables_info:
+                table_info = tables_info[relative_file_path]
+                table_caption = table_info.get("table_caption", "")
+                table_foot = table_info.get("table_foot", "")
+            
+            # Get file name
+            file_name = os.path.basename(file_path)
+            
+            # Parse the table
+            result = parse_single_table(
+                file_name, table_caption, table_foot, table_text, client, model
             )
-            for file_path in tqdm(csv_files)
-        ]
+            parsed_results.append(result)
     else:
         # Parallel processing
         logger.info(f"Using {num_workers} workers for parallel processing")
+        
+        def process_file(file_path):
+            # Read raw CSV as text
+            with open(file_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                table_text = "\n".join([",".join(r) for r in rows])
+            
+            # Get table caption and foot if available
+            relative_file_path = os.path.relpath(file_path, input_folder)
+            table_caption = ""
+            table_foot = ""
+            if relative_file_path in tables_info:
+                table_info = tables_info[relative_file_path]
+                table_caption = table_info.get("table_caption", "")
+                table_foot = table_info.get("table_foot", "")
+            
+            # Get file name
+            file_name = os.path.basename(file_path)
+            
+            # Parse the table
+            return parse_single_table(
+                file_name, table_caption, table_foot, table_text, client, model
+            )
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
             futures = [
-                executor.submit(
-                    parse_single_table,
-                    file_path, client, tables_info, input_folder, model
-                )
+                executor.submit(process_file, file_path)
                 for file_path in csv_files
             ]
             parsed_results = [

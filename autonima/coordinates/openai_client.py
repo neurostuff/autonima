@@ -59,4 +59,27 @@ class CoordinateParsingClient(GenericLLMClient):
         # Parse the result
         import json
         result_dict = json.loads(function_call.arguments)
-        return ParseAnalysesOutput(**result_dict)
+        
+        # Preprocess the result to filter out points without valid coordinates
+        for analysis in result_dict.get("analyses", []):
+            valid_points = []
+            for point in analysis.get("points", []):
+                # Check if the point has valid coordinates
+                coordinates = point.get("coordinates")
+                if (isinstance(coordinates, list) and
+                    len(coordinates) == 3 and
+                    all(isinstance(coord, (int, float)) for coord in coordinates)):
+                    valid_points.append(point)
+            analysis["points"] = valid_points
+        
+        # Validate and return the result
+        try:
+            return ParseAnalysesOutput(**result_dict)
+        except Exception as e:
+            # Log the error and the result that failed validation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Validation error: {e}")
+            logger.error(f"Result that failed validation: {result_dict}")
+            # Re-raise the exception
+            raise
