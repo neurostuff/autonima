@@ -57,9 +57,10 @@ Your task:
 4. Missing values must be explicitly represented as `null`.
 5. Coordinates must be grouped into an array with fields `"coordinates"` containing [x, y, z] values and `"space"` indicating the template space (e.g., MNI or TAL).
 6. IMPORTANT: Only include rows that have valid coordinate data ([x, y, z] values). Skip rows that do not contain coordinate information.
-7. Each point MUST have a "coordinates" field with exactly 3 numeric values [x, y, z].
-8. Rows without valid coordinates should be completely excluded from the points array.
-9. The top-level JSON must match the provided schema for the `parse_analyses` function, which includes fields: "name", "description", and "points".
+7. IDENTIFYING COORDINATES: Look for columns explicitly labeled as X, Y, Z or coordinates. These are typically found under a heading like "MNI coordinates" or similar. Do NOT mistake other numerical values in the table (like Cluster, Volume, Brodmann area, etc.) for coordinates.
+8. Each point MUST have a "coordinates" field with exactly 3 numeric values [x, y, z].
+9. Rows without valid coordinates should be completely excluded from the points array.
+10. The top-level JSON must match the provided schema for the `parse_analyses` function, which includes fields: "name", "description", and "points".
 
 Input table:
 {table_text}
