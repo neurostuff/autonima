@@ -49,50 +49,62 @@ class GenericLLMClient:
         model_class: Type[BaseModel], 
         function_name: str
     ) -> Dict[str, Any]:
-        """Generate OpenAI function schema from Pydantic model.
+        """Generate OpenAI function schema from a Pydantic model with nested handling."""
         
-        Args:
-            model_class: Pydantic model class
-            function_name: Name for the function
+        def convert_field(field_info: Dict[str, Any]) -> Dict[str, Any]:
+            """Recursively convert Pydantic JSON schema fields to OpenAI function schema."""
+            result = {}
             
-        Returns:
-            Dict representing the OpenAI function schema
-        """
-        schema = model_class.model_json_schema()
-        
-        # Convert JSON schema to OpenAI function schema
-        properties = {}
-        required = []
-        
-        for field_name, field_info in schema.get("properties", {}).items():
-            properties[field_name] = {
-                "type": field_info["type"],
-                "description": field_info.get("description", "")
-            }
+            # Handle type
+            if "type" in field_info:
+                result["type"] = field_info["type"]
             
-            # Handle array items
-            if "items" in field_info:
-                properties[field_name]["items"] = field_info["items"]
+            # Description
+            if "description" in field_info:
+                result["description"] = field_info["description"]
             
-            # Handle array constraints
-            if "minItems" in field_info:
-                properties[field_name]["minItems"] = field_info["minItems"]
-            if "maxItems" in field_info:
-                properties[field_name]["maxItems"] = field_info["maxItems"]
-            
-            # Handle enum values
+            # Enum
             if "enum" in field_info:
-                properties[field_name]["enum"] = field_info["enum"]
+                result["enum"] = field_info["enum"]
             
-            # Handle numeric constraints
-            if field_info["type"] == "number":
+            # Handle anyOf/oneOf (e.g., Optional[Literal[...]])
+            if "anyOf" in field_info:
+                # Keep only enum if present
+                for option in field_info["anyOf"]:
+                    if "enum" in option:
+                        result["enum"] = option["enum"]
+                        result["type"] = option.get("type", "string")
+                        break  # take first enum found
+            
+            # Arrays
+            if "items" in field_info:
+                result["items"] = convert_field(field_info["items"])
+            if "minItems" in field_info:
+                result["minItems"] = field_info["minItems"]
+            if "maxItems" in field_info:
+                result["maxItems"] = field_info["maxItems"]
+            
+            # Numeric constraints
+            if field_info.get("type") == "number":
                 if "minimum" in field_info:
-                    properties[field_name]["minimum"] = field_info["minimum"]
+                    result["minimum"] = field_info["minimum"]
                 if "maximum" in field_info:
-                    properties[field_name]["maximum"] = field_info["maximum"]
+                    result["maximum"] = field_info["maximum"]
+            
+            # Nested object via $ref
+            if "$ref" in field_info:
+                result["$ref"] = field_info["$ref"]
+            
+            return result
         
-        # Get required fields
-        required = schema.get("required", [])
+        # Generate full JSON schema including definitions
+        full_schema = model_class.model_json_schema(ref_template="#/$defs/{model}")
+        
+        properties = {}
+        for field_name, field_info in full_schema.get("properties", {}).items():
+            properties[field_name] = convert_field(field_info)
+        
+        required = full_schema.get("required", [])
         
         return {
             "name": function_name,
@@ -100,6 +112,8 @@ class GenericLLMClient:
             "parameters": {
                 "type": "object",
                 "properties": properties,
-                "required": required
+                "required": required,
+                # include all definitions so nested refs work
+                "$defs": full_schema.get("$defs", {})
             }
         }

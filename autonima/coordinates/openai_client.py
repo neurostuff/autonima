@@ -29,7 +29,7 @@ class CoordinateParsingClient(GenericLLMClient):
             ParseAnalysesOutput,
             func_name
         )
-        
+
         # Call the LLM API
         response = self.client.chat.completions.create(
             model=model,

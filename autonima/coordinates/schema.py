@@ -2,12 +2,32 @@
 
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Union
+from pydantic import Field
+from typing_extensions import Literal
+
+class PointsValue(BaseModel):
+    """Represents a value associated with a coordinate point."""
+    value: Optional[Union[float, str]] = Field(
+        None,
+        description="Optional statistical value associated with the point (e.g., t-value, z-value)"
+    )
+    kind: Optional[Literal["z-statistic", "t-statistic", "f-statistics", "correlation", "p-value", "beta", "other"]] = Field(
+        None,
+        description='Type of the value, one of "z-statistic", "t-statistic", "p-value", "beta", or "other"'
+    )
 
 
 class CoordinatePoint(BaseModel):
     """Represents a single coordinate point with its space information."""
-    coordinates: List[float]  # [x, y, z] values
-    space: Optional[str] = None  # Template space (e.g., MNI or TAL)
+    coordinates: List[float] = Field(description="List of three floats representing [x, y, z] coordinates")
+    space: Optional[str] = Field(
+        None,
+        description='Coordinate space, either "MNI", "TAL", or null if unknown'
+    )
+    values: Optional[List[PointsValue]] = Field(
+        None,
+        description="Optional list of statistical values associated with the point"
+    )
     
     @field_validator('coordinates')
     @classmethod
