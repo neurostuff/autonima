@@ -10,15 +10,7 @@ from typing import List
 from ..models.types import Study, StudyStatus, ActivationTable
 from .base import BaseRetriever
 from ..utils import log_error_with_debug
-
-try:
-    from pubget import download_pmcids, extract_articles, extract_data_to_csv
-    PUBGET_AVAILABLE = True
-except ImportError:
-    PUBGET_AVAILABLE = False
-    logging.warning(
-        "pubget not installed. Full-text retrieval will be disabled."
-    )
+from pubget import download_pmcids, extract_articles, extract_data_to_csv
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +26,6 @@ class PubGetRetriever(BaseRetriever):
         Args:
             n_jobs: Number of parallel jobs for processing
         """
-        if not PUBGET_AVAILABLE:
-            raise ImportError(
-                "pubget is not installed. Please install it with: "
-                "pip install pubget"
-            )
-        
         self.n_jobs = n_jobs
 
     def retrieve(
