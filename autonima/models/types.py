@@ -19,6 +19,12 @@ class StudyStatus(Enum):
 
 
 @dataclass
+class ActivationTable:
+    """Represents a table containing activation coordinates from a study."""
+    table_path: str  # Path to the CSV or HTML file representing the table
+
+
+@dataclass
 class Study:
     """Represents a single study in the systematic review."""
     pmid: str
@@ -39,6 +45,7 @@ class Study:
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
+    activation_tables: List[ActivationTable] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -65,6 +72,9 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
             "full_text_path": self.full_text_path,
+            "activation_tables": [
+                {"table_path": table.table_path} for table in self.activation_tables
+            ],
         }
     
     def load_full_text(self, output_dir: str) -> str:
