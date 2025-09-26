@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
+from ..coordinates.schema import Analysis
 
 
 class StudyStatus(Enum):
@@ -22,6 +23,8 @@ class StudyStatus(Enum):
 class ActivationTable:
     """Represents a table containing activation coordinates from a study."""
     table_path: str  # Path to the CSV or HTML file representing the table
+    table_caption: Optional[str] = None  # Caption of the table
+    table_foot: Optional[str] = None  # Footer of the table
 
 
 @dataclass
@@ -46,6 +49,7 @@ class Study:
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
+    analyses: List[Analysis] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -73,8 +77,33 @@ class Study:
             ),
             "full_text_path": self.full_text_path,
             "activation_tables": [
-                {"table_path": table.table_path} for table in self.activation_tables
+                {
+                    "table_path": table.table_path,
+                    "table_caption": table.table_caption,
+                    "table_foot": table.table_foot
+                } for table in self.activation_tables
             ],
+            "analyses": [
+                {
+                    "name": analysis.name,
+                    "description": analysis.description,
+                    "points": [
+                        {
+                            "coordinates": point.coordinates,
+                            "space": point.space,
+                            "values": [
+                                {
+                                    "value": value.value,
+                                    "kind": value.kind
+                                }
+                                for value in point.values or []
+                            ]
+                        }
+                        for point in analysis.points
+                    ]
+                }
+                for analysis in self.analyses
+            ]
         }
     
     def load_full_text(self, output_dir: str) -> str:
@@ -141,6 +170,16 @@ class RetrievalConfig:
     n_jobs: int = 1
     # Optional full text source configurations
     full_text_sources: List[Dict[str, Any]] = field(default_factory=list)
+    # Coordinate parsing configuration
+    parse_coordinates: bool = False
+    coordinate_model: str = "gpt-4o-mini"
+
+
+@dataclass
+class ParsingConfig:
+    """Configuration for the parsing phase."""
+    parse_coordinates: bool = False
+    coordinate_model: str = "gpt-4o-mini"
 
 
 @dataclass
@@ -160,6 +199,7 @@ class PipelineConfig:
     screening: ScreeningConfig
     retrieval: RetrievalConfig
     output: OutputConfig
+    parsing: ParsingConfig = field(default_factory=ParsingConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
@@ -183,6 +223,12 @@ class PipelineConfig:
                 "download_directory": self.retrieval.download_directory,
                 "n_jobs": self.retrieval.n_jobs,
                 "full_text_sources": self.retrieval.full_text_sources,
+                "parse_coordinates": self.retrieval.parse_coordinates,
+                "coordinate_model": self.retrieval.coordinate_model,
+            },
+            "parsing": {
+                "parse_coordinates": self.parsing.parse_coordinates,
+                "coordinate_model": self.parsing.coordinate_model,
             },
             "output": {
                 "directory": self.output.directory,

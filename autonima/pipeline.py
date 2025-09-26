@@ -1,6 +1,7 @@
 """Main pipeline orchestrator for Autonima."""
 
 import logging
+import csv
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -104,8 +105,11 @@ class AutonimaPipeline:
 
             # Phase 4: Full-text Screening
             await self._execute_fulltext_screening()
-
-            # Phase 5: Generate Outputs
+ 
+            # Phase 5: Coordinate Parsing
+            await self._execute_coordinate_parsing()
+ 
+            # Phase 6: Generate Outputs
             await self._execute_output_phase()
 
             # Complete pipeline
@@ -430,7 +434,98 @@ class AutonimaPipeline:
         logger.info(
             f"Full-text screening completed: {final_count} studies included"
         )
+ 
+    async def _execute_coordinate_parsing(self):
+        """Execute coordinate parsing phase."""
+        # Check if coordinate parsing is enabled
+        if not getattr(self.config.parsing, 'parse_coordinates', False):
+            logger.info("Coordinate parsing is disabled")
+            return
+ 
+        # Get studies with activation tables that were retrieved
+        studies_with_tables = [
+            s for s in self.results.studies
+            if s.status in [StudyStatus.FULLTEXT_RETRIEVED, StudyStatus.FULLTEXT_CACHED] and s.activation_tables
+        ]
+ 
+        if not studies_with_tables:
+            logger.info("No studies with activation tables require coordinate parsing")
+            return
+ 
+        try:
+            from .coordinates import CoordinateProcessor
+        except ImportError as e:
+            logger.warning(f"Coordinate parsing module not available: {e}")
+            return
+ 
+        # Initialize the coordinate processor
+        model = getattr(self.config.parsing, 'coordinate_model', 'gpt-4o-mini')
+        processor = CoordinateProcessor(model=model)
+ 
+        # Prepare all table processing jobs
+        table_jobs = []
+        for study in studies_with_tables:
+            for i, table in enumerate(study.activation_tables):
+                table_jobs.append((study, table, i))
+ 
+        if not table_jobs:
+            logger.info("No tables to process")
+            return
+ 
+        # Process tables with or without parallelization
+        if self.num_workers <= 1 or len(table_jobs) <= 1:
+            # Serial processing
+            logger.info("Using serial processing for coordinate parsing")
+            processed_count = 0
+            for study, table, table_index in table_jobs:
+                try:
+                    # Process a single table
+                    table_analyses = processor.process_single_table(table)
+                    
+                    # Add the analyses to the study
+                    study.analyses.extend(table_analyses)
+                    processed_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                    continue
+        else:
+            # Parallel processing over all tables
+            logger.info(f"Using {self.num_workers} workers for parallel coordinate parsing of {len(table_jobs)} tables")
+            import concurrent.futures
+            from tqdm import tqdm
+            
+            def process_single_table_job(job):
+                study, table, table_index = job
+                try:
+                    # Process a single table
+                    table_analyses = processor.process_single_table(table)
+                    return study, table_analyses, table_index
+                except Exception as e:
+                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                    return study, None, table_index
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                futures = [
+                    executor.submit(process_single_table_job, job)
+                    for job in table_jobs
+                ]
+                results = [
+                    future.result()
+                    for future in tqdm(futures, total=len(futures))
+                ]
+            
+            # Apply results to studies
+            processed_count = 0
+            for study, table_analyses, table_index in results:
+                if table_analyses is not None:
+                    study.analyses.extend(table_analyses)
+                    processed_count += 1
 
+        logger.info(
+            f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
+        )
+ 
     async def _execute_output_phase(self):
         """Execute output generation phase."""
 

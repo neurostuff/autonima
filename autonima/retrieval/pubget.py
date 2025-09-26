@@ -338,26 +338,36 @@ class PubGetRetriever(BaseRetriever):
                 filtered_subset = tables_subset[tables_subset['table_id'].isin(coords_subset['table_id'])]
                 filtered_tables_df = pd.concat([filtered_tables_df, filtered_subset], ignore_index=True)
             
-            # Create a mapping of pmcid to table paths
+            # Create a mapping of pmcid to table paths with metadata
             pmcid_to_tables = {}
             for _, row in filtered_tables_df.iterrows():
                 pmcid = row['pmcid']
                 table_data_file = row['table_data_file']
+                table_caption = row.get('table_caption', '')
+                table_foot = row.get('table_foot', '')
                 
                 # Convert to absolute path
                 table_path = str(data_dir / table_data_file)
                 
                 if pmcid not in pmcid_to_tables:
                     pmcid_to_tables[pmcid] = []
-                pmcid_to_tables[pmcid].append(table_path)
+                pmcid_to_tables[pmcid].append({
+                    'table_path': table_path,
+                    'table_caption': table_caption,
+                    'table_foot': table_foot
+                })
             
             # Update studies with activation tables
             for study in studies:
                 if study.pmcid and study.pmcid in pmcid_to_tables:
-                    table_paths = pmcid_to_tables[study.pmcid]
-                    for table_path in table_paths:
+                    table_data = pmcid_to_tables[study.pmcid]
+                    for table_info in table_data:
                         # Add ActivationTable object to the study
-                        study.activation_tables.append(ActivationTable(table_path=table_path))
+                        study.activation_tables.append(ActivationTable(
+                            table_path=table_info['table_path'],
+                            table_caption=table_info['table_caption'],
+                            table_foot=table_info['table_foot']
+                        ))
             
             logger.info(f"Processed activation tables for {len(pmcid_to_tables)} studies")
             
