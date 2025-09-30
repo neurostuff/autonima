@@ -1,53 +1,17 @@
-"""Generic LLM API client for systematic review screening."""
+"""LLM API client for systematic review screening."""
 
-import os
-from typing import Optional, Type, Dict, Any
+from typing import Type, Dict, Any
 from pydantic import BaseModel
-import openai
+from ..llm.client import GenericLLMClient
 from .schema import AbstractScreeningOutput, FullTextScreeningOutput
 
 
-class GenericLLMClient:
-    """Generic LLM API client for screening tasks."""
-    
-    def __init__(
-        self, 
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-    ):
-        """Initialize the generic LLM client.
-        
-        Args:
-            api_key: API key. If not provided, will use appropriate environment 
-                     variable based on the base_url.
-            base_url: Base URL for the API. If not provided, defaults to 
-                      OpenAI's API.
-        """
-        self.base_url = base_url or None
-        
-        # Determine the appropriate API key based on the base URL
-        if api_key:
-            self.api_key = api_key
-        elif self.base_url and "openrouter" in self.base_url:
-            self.api_key = os.getenv("OPENROUTER_API_KEY")
-        else:
-            self.api_key = os.getenv("OPENAI_API_KEY")
-        
-        if not self.api_key:
-            raise ValueError(
-                "API key must be provided either as an argument or "
-                "through the appropriate environment variable"
-            )
-        
-        # Initialize the client with the base URL
-        self.client = openai.OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+class ScreeningLLMClient(GenericLLMClient):
+    """LLM client specifically for screening tasks."""
     
     def _generate_function_schema(
-        self, 
-        model_class: Type[BaseModel], 
+        self,
+        model_class: Type[BaseModel],
         function_name: str
     ) -> Dict[str, Any]:
         """Generate OpenAI function schema from Pydantic model.
@@ -116,7 +80,7 @@ class GenericLLMClient:
         # Generate function schema from Pydantic model
         func_name = "screen_abstract"
         function_schema = self._generate_function_schema(
-            AbstractScreeningOutput, 
+            AbstractScreeningOutput,
             func_name
         )
         
@@ -167,7 +131,7 @@ class GenericLLMClient:
         # Generate function schema from Pydantic model
         func_name = "screen_fulltext"
         function_schema = self._generate_function_schema(
-            FullTextScreeningOutput, 
+            FullTextScreeningOutput,
             func_name
         )
         

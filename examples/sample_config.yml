@@ -73,9 +73,13 @@ screening:
     # threshold: 0.95  # Optional: probability cutoff for inclusion (default: none)
     # additional_instructions: "Focus on methodological rigor and statistical significance."
 
+parsing:
+  # Coordinate parsing options
+  parse_coordinates: true  # Enable coordinate parsing for studies with activation tables
+  coordinate_model: "gpt-4o-mini"  # Model to use for coordinate parsing
+
+
 output:
-  formats:
-    - json
-    - nimads
-    - csv
-  prisma_diagram: true  # Generate a PRISMA flow diagram
+  directory: "results"
+  formats: ["csv", "json"]
+  nimads: false  # Output in NiMADS format (default: false)

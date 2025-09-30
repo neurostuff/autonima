@@ -1,6 +1,8 @@
 """Main pipeline orchestrator for Autonima."""
 
 import logging
+import csv
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -15,6 +17,7 @@ from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .utils import log_error_with_debug
+from .coordinates.nimads_models import convert_to_nimads_studyset
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +107,11 @@ class AutonimaPipeline:
 
             # Phase 4: Full-text Screening
             await self._execute_fulltext_screening()
-
-            # Phase 5: Generate Outputs
+ 
+            # Phase 5: Coordinate Parsing
+            await self._execute_coordinate_parsing()
+ 
+            # Phase 6: Generate Outputs
             await self._execute_output_phase()
 
             # Complete pipeline
@@ -430,13 +436,222 @@ class AutonimaPipeline:
         logger.info(
             f"Full-text screening completed: {final_count} studies included"
         )
-
+ 
+    async def _execute_coordinate_parsing(self):
+        """Execute coordinate parsing phase."""
+        # Check if coordinate parsing is enabled
+        if not getattr(self.config.parsing, 'parse_coordinates', False):
+            logger.info("Coordinate parsing is disabled")
+            return
+ 
+        # Load cached coordinate parsing results
+        await self._load_cached_coordinate_results()
+ 
+        # Get studies with activation tables that were retrieved and don't already have analyses
+        studies_with_tables = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED and s.activation_tables and not s.analyses
+        ]
+ 
+        if not studies_with_tables:
+            logger.info("No studies with activation tables require coordinate parsing")
+            return
+ 
+        try:
+            from .coordinates import CoordinateProcessor
+        except ImportError as e:
+            logger.warning(f"Coordinate parsing module not available: {e}")
+            return
+ 
+        # Initialize the coordinate processor
+        model = getattr(self.config.parsing, 'coordinate_model', 'gpt-4o-mini')
+        processor = CoordinateProcessor(model=model)
+ 
+        # Prepare all table processing jobs
+        table_jobs = []
+        for study in studies_with_tables:
+            for i, table in enumerate(study.activation_tables):
+                table_jobs.append((study, table, i))
+ 
+        if not table_jobs:
+            logger.info("No tables to process")
+            return
+ 
+        # Process tables with or without parallelization
+        if self.num_workers <= 1 or len(table_jobs) <= 1:
+            # Serial processing
+            logger.info("Using serial processing for coordinate parsing")
+            processed_count = 0
+            for study, table, table_index in table_jobs:
+                try:
+                    # Process a single table
+                    table_analyses = processor.process_single_table(table)
+                    
+                    # Add the analyses to the study
+                    study.analyses.extend(table_analyses)
+                    processed_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                    continue
+        else:
+            # Parallel processing over all tables
+            logger.info(f"Using {self.num_workers} workers for parallel coordinate parsing of {len(table_jobs)} tables")
+            import concurrent.futures
+            from tqdm import tqdm
+            
+            def process_single_table_job(job):
+                study, table, table_index = job
+                try:
+                    # Process a single table
+                    table_analyses = processor.process_single_table(table)
+                    return study, table_analyses, table_index
+                except Exception as e:
+                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                    return study, None, table_index
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                futures = [
+                    executor.submit(process_single_table_job, job)
+                    for job in table_jobs
+                ]
+                results = [
+                    future.result()
+                    for future in tqdm(futures, total=len(futures))
+                ]
+            
+            # Apply results to studies
+            processed_count = 0
+            for study, table_analyses, table_index in results:
+                if table_analyses is not None:
+                    study.analyses.extend(table_analyses)
+                    processed_count += 1
+ 
+        # Save coordinate parsing results
+        await self._save_coordinate_parsing_results()
+ 
+        logger.info(
+            f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
+        )
+ 
+    async def _load_cached_coordinate_results(self):
+        """Load cached coordinate parsing results."""
+        try:
+            output_dir = Path(self.config.output.directory)
+            coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
+            
+            if not coordinate_cache_file.exists():
+                logger.info("No cached coordinate parsing results found")
+                return
+            
+            import json
+            with open(coordinate_cache_file, 'r') as f:
+                cached_data = json.load(f)
+            
+            # Apply cached results to studies
+            cached_studies = {study_data['pmid']: study_data for study_data in cached_data.get('studies', [])}
+            loaded_count = 0
+            
+            for study in self.results.studies:
+                if study.pmid in cached_studies and not study.analyses:
+                    cached_study = cached_studies[study.pmid]
+                    # Load analyses from cached data
+                    if 'analyses' in cached_study:
+                        from .coordinates.schema import Analysis, CoordinatePoint, PointsValue
+                        for analysis_data in cached_study['analyses']:
+                            points = []
+                            for point_data in analysis_data.get('points', []):
+                                values = []
+                                for value_data in point_data.get('values', []):
+                                    values.append(PointsValue(
+                                        value=value_data.get('value'),
+                                        kind=value_data.get('kind')
+                                    ))
+                                points.append(CoordinatePoint(
+                                    coordinates=point_data['coordinates'],
+                                    space=point_data.get('space'),
+                                    values=values or None
+                                ))
+                            study.analyses.append(Analysis(
+                                name=analysis_data.get('name'),
+                                description=analysis_data.get('description'),
+                                points=points
+                            ))
+                        loaded_count += 1
+            
+            logger.info(f"Loaded cached coordinate parsing results for {loaded_count} studies")
+            
+        except Exception as e:
+            logger.warning(f"Failed to load cached coordinate parsing results: {e}")
+ 
+    async def _save_coordinate_parsing_results(self):
+        """Save coordinate parsing results to cache."""
+        try:
+            # Get studies with parsed analyses
+            studies_with_analyses = [
+                s for s in self.results.studies
+                if s.status == StudyStatus.INCLUDED and s.analyses
+            ]
+            
+            if not studies_with_analyses:
+                return
+            
+            # Prepare data for saving
+            cached_data = {
+                "studies": [
+                    {
+                        "pmid": study.pmid,
+                        "analyses": [
+                            {
+                                "name": analysis.name,
+                                "description": analysis.description,
+                                "points": [
+                                    {
+                                        "coordinates": point.coordinates,
+                                        "space": point.space,
+                                        "values": [
+                                            {
+                                                "value": value.value,
+                                                "kind": value.kind
+                                            }
+                                            for value in point.values or []
+                                        ]
+                                    }
+                                    for point in analysis.points
+                                ]
+                            }
+                            for analysis in study.analyses
+                        ]
+                    }
+                    for study in studies_with_analyses
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Save to file
+            output_dir = Path(self.config.output.directory)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
+            
+            import json
+            with open(coordinate_cache_file, 'w') as f:
+                json.dump(cached_data, f, indent=2)
+            
+            logger.info(f"Saved coordinate parsing results for {len(studies_with_analyses)} studies")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save coordinate parsing results: {e}")
+ 
     async def _execute_output_phase(self):
         """Execute output generation phase."""
 
         # TODO: Implement comprehensive output generation
         # For now, generate basic statistics
         await self._generate_basic_outputs()
+        
+        # Generate NiMADS output if requested
+        if getattr(self.config.output, 'nimads', False):
+            await self._generate_nimads_output()
 
         logger.info("Saved final results and statistics")
 
@@ -477,6 +692,53 @@ class AutonimaPipeline:
         with open(final_results_file, 'w') as f:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
+
+    async def _generate_nimads_output(self):
+        """Generate NiMADS output for studies with parsed analyses."""
+        # Get included studies that have parsed analyses
+        included_studies_with_analyses = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED and s.analyses
+        ]
+        
+        if not included_studies_with_analyses:
+            logger.info("No studies with parsed analyses found for NiMADS output")
+            return
+        
+        try:
+            # Import NiMADS models
+            from .coordinates.nimads_models import convert_to_nimads_studyset, create_default_annotation
+            
+            # Create a studyset from the included studies
+            studyset_id = f"autonima_studyset_{self.results.started_at.strftime('%Y%m%d_%H%M%S')}"
+            studyset = convert_to_nimads_studyset(
+                studyset_id,
+                included_studies_with_analyses,
+                name="Autonima Generated Studyset"
+            )
+            
+            # Create a default annotation
+            annotation = create_default_annotation(studyset_id, studyset)
+            
+            # Save NiMADS studyset output using the to_dict method
+            output_dir = Path(self.config.output.directory)
+            nimads_output_file = output_dir / "outputs" / "nimads_studyset.json"
+            with open(nimads_output_file, 'w') as f:
+                json.dump(studyset.to_dict(), f, indent=2)
+            
+            # Save NiMADS annotation output using the to_dict method
+            nimads_annotation_file = output_dir / "outputs" / "nimads_annotation.json"
+            with open(nimads_annotation_file, 'w') as f:
+                json.dump(annotation.to_dict(), f, indent=2)
+            
+            logger.info(
+                f"NiMADS output generated: {len(included_studies_with_analyses)} studies "
+                f"with {sum(len(s.analyses) for s in included_studies_with_analyses)} analyses"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to generate NiMADS output: {e}")
+            # Don't raise the error, as this shouldn't stop the pipeline
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""

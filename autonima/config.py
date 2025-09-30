@@ -9,6 +9,7 @@ from .models.types import (
     SearchConfig,
     ScreeningConfig,
     RetrievalConfig,
+    ParsingConfig,
     OutputConfig
 )
 
@@ -110,7 +111,8 @@ class ConfigManager:
                 search=search_config,
                 screening=screening_config,
                 retrieval=retrieval_config,
-                output=output_config
+                output=output_config,
+                parsing=ParsingConfig(**config_dict.get('parsing', {}))
             )
 
             self._validate_config(config)
@@ -243,7 +245,11 @@ class ConfigManager:
             ),
             screening=screening_config,
             retrieval=RetrievalConfig(),
-            output=OutputConfig()
+            output=OutputConfig(nimads=False),
+            parsing=ParsingConfig(
+                parse_coordinates=True,
+                coordinate_model="gpt-4o-mini"
+            )
         )
 
     def _validate_screening_config(self, config: PipelineConfig) -> None:

@@ -7,18 +7,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from ..models.types import Study, StudyStatus
+from ..models.types import Study, StudyStatus, ActivationTable
 from .base import BaseRetriever
 from ..utils import log_error_with_debug
-
-try:
-    from pubget import download_pmcids, extract_articles, extract_data_to_csv
-    PUBGET_AVAILABLE = True
-except ImportError:
-    PUBGET_AVAILABLE = False
-    logging.warning(
-        "pubget not installed. Full-text retrieval will be disabled."
-    )
+from pubget import download_pmcids, extract_articles, extract_data_to_csv
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +26,6 @@ class PubGetRetriever(BaseRetriever):
         Args:
             n_jobs: Number of parallel jobs for processing
         """
-        if not PUBGET_AVAILABLE:
-            raise ImportError(
-                "pubget is not installed. Please install it with: "
-                "pip install pubget"
-            )
-        
         self.n_jobs = n_jobs
 
     def retrieve(
@@ -176,11 +162,12 @@ class PubGetRetriever(BaseRetriever):
                 if articles_dir.exists():
                     import shutil
                     articles_output_dir = final_data_dir / "articles"
+                    # Recursively merge the new articles directory with existing one
                     if articles_output_dir.exists():
-                        # Remove existing articles directory if it exists
-                        shutil.rmtree(articles_output_dir)
-                    # Copy the articles directory
-                    shutil.copytree(articles_dir, articles_output_dir)
+                        self._merge_directories(articles_dir, articles_output_dir)
+                    else:
+                        # Copy the articles directory to the pubget_data directory
+                        shutil.copytree(articles_dir, articles_output_dir)
                 
                 logger.info(
                     f"Successfully retrieved {len(studies_to_download)} "
@@ -215,6 +202,21 @@ class PubGetRetriever(BaseRetriever):
             "neurovault_collections.csv",
             "neurovault_images.csv"
         ]
+        
+        # Also handle the table data files
+        table_data_dir = existing_data_dir / "table_data"
+        new_table_data_dir = new_data_dir / "table_data"
+        
+        if new_table_data_dir.exists():
+            if not table_data_dir.exists():
+                table_data_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copy all table data files
+            import shutil
+            for file in new_table_data_dir.iterdir():
+                if file.is_file():
+                    dest_file = table_data_dir / file.name
+                    shutil.copy2(file, dest_file)
         
         for csv_file in csv_files:
             new_file = new_data_dir / csv_file
@@ -262,6 +264,104 @@ class PubGetRetriever(BaseRetriever):
                 existing_file = existing_data_dir / other_file.name
                 shutil.copy2(other_file, existing_file)
 
+    def _merge_directories(self, src: Path, dest: Path):
+        """
+        Recursively merge source directory into destination directory.
+        
+        Args:
+            src: Source directory path
+            dest: Destination directory path
+        """
+        import shutil
+        
+        if not src.exists():
+            return
+            
+        if not dest.exists():
+            dest.mkdir(parents=True, exist_ok=True)
+            
+        for item in src.iterdir():
+            dest_item = dest / item.name
+            if item.is_dir():
+                # Recursively merge subdirectories
+                self._merge_directories(item, dest_item)
+            else:
+                # Copy files, overwriting if they exist
+                if dest_item.exists():
+                    dest_item.unlink()
+                shutil.copy2(item, dest_item)
+
+    def _process_activation_tables(self, data_dir: Path, studies: List[Study]) -> List[Study]:
+        """
+        Process tables with coordinates and add them as ActivationTable objects to studies.
+        
+        Args:
+            data_dir: Directory containing pubget data files
+            studies: List of studies to process
+            
+        Returns:
+            List of studies with updated activation_tables
+        """
+        try:
+            # Check if required files exist
+            tables_file = data_dir / "tables.csv"
+            coords_file = data_dir / "coordinates.csv"
+            
+            if not tables_file.exists() or not coords_file.exists():
+                logger.info("Tables or coordinates files not found, skipping table processing")
+                return studies
+            
+            # Load using pandas
+            tables_df = pd.read_csv(tables_file)
+            coords_df = pd.read_csv(coords_file)
+            
+            # Filter tables_df to only include rows where 'table_id' is in coords_df['table_id']
+            # for each pmcid separately
+            filtered_tables_df = pd.DataFrame()
+            for pmcid in tables_df['pmcid'].unique():
+                tables_subset = tables_df[tables_df['pmcid'] == pmcid]
+                coords_subset = coords_df[coords_df['pmcid'] == pmcid]
+                filtered_subset = tables_subset[tables_subset['table_id'].isin(coords_subset['table_id'])]
+                filtered_tables_df = pd.concat([filtered_tables_df, filtered_subset], ignore_index=True)
+            
+            # Create a mapping of pmcid to table paths with metadata
+            pmcid_to_tables = {}
+            for _, row in filtered_tables_df.iterrows():
+                pmcid = row['pmcid']
+                table_data_file = row['table_data_file']
+                table_caption = row.get('table_caption', '')
+                table_foot = row.get('table_foot', '')
+                
+                # Convert to absolute path
+                table_path = str(data_dir / table_data_file)
+                
+                if pmcid not in pmcid_to_tables:
+                    pmcid_to_tables[pmcid] = []
+                pmcid_to_tables[pmcid].append({
+                    'table_path': table_path,
+                    'table_caption': table_caption,
+                    'table_foot': table_foot
+                })
+            
+            # Update studies with activation tables
+            for study in studies:
+                if study.pmcid and study.pmcid in pmcid_to_tables:
+                    table_data = pmcid_to_tables[study.pmcid]
+                    for table_info in table_data:
+                        # Add ActivationTable object to the study
+                        study.activation_tables.append(ActivationTable(
+                            table_path=table_info['table_path'],
+                            table_caption=table_info['table_caption'],
+                            table_foot=table_info['table_foot']
+                        ))
+            
+            logger.info(f"Processed activation tables for {len(pmcid_to_tables)} studies")
+            
+        except Exception as e:
+            logger.warning(f"Error processing activation tables: {e}")
+        
+        return studies
+
     def validate_retrieval(
         self,
         studies: List[Study],
@@ -290,6 +390,9 @@ class PubGetRetriever(BaseRetriever):
         # Load first column 
         df = pd.read_csv(all_texts)
         retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
+        
+        # Process activation tables with coordinates
+        studies = self._process_activation_tables(data_dir, studies)
         
         # Check which studies have full-text files
         for study in studies:

@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 
 from .base import ScreeningEngine
 from .prompts import PromptLibrary
-from .openai_client import GenericLLMClient
+from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
 
