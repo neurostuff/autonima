@@ -442,10 +442,13 @@ class AutonimaPipeline:
             logger.info("Coordinate parsing is disabled")
             return
  
-        # Get studies with activation tables that were retrieved
+        # Load cached coordinate parsing results
+        await self._load_cached_coordinate_results()
+ 
+        # Get studies with activation tables that were retrieved and don't already have analyses
         studies_with_tables = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and s.activation_tables
+            if s.status == StudyStatus.INCLUDED and s.activation_tables and not s.analyses
         ]
  
         if not studies_with_tables:
@@ -521,10 +524,121 @@ class AutonimaPipeline:
                 if table_analyses is not None:
                     study.analyses.extend(table_analyses)
                     processed_count += 1
-
+ 
+        # Save coordinate parsing results
+        await self._save_coordinate_parsing_results()
+ 
         logger.info(
             f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
         )
+ 
+    async def _load_cached_coordinate_results(self):
+        """Load cached coordinate parsing results."""
+        try:
+            output_dir = Path(self.config.output.directory)
+            coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
+            
+            if not coordinate_cache_file.exists():
+                logger.info("No cached coordinate parsing results found")
+                return
+            
+            import json
+            with open(coordinate_cache_file, 'r') as f:
+                cached_data = json.load(f)
+            
+            # Apply cached results to studies
+            cached_studies = {study_data['pmid']: study_data for study_data in cached_data.get('studies', [])}
+            loaded_count = 0
+            
+            for study in self.results.studies:
+                if study.pmid in cached_studies and not study.analyses:
+                    cached_study = cached_studies[study.pmid]
+                    # Load analyses from cached data
+                    if 'analyses' in cached_study:
+                        from .coordinates.schema import Analysis, CoordinatePoint, PointsValue
+                        for analysis_data in cached_study['analyses']:
+                            points = []
+                            for point_data in analysis_data.get('points', []):
+                                values = []
+                                for value_data in point_data.get('values', []):
+                                    values.append(PointsValue(
+                                        value=value_data.get('value'),
+                                        kind=value_data.get('kind')
+                                    ))
+                                points.append(CoordinatePoint(
+                                    coordinates=point_data['coordinates'],
+                                    space=point_data.get('space'),
+                                    values=values or None
+                                ))
+                            study.analyses.append(Analysis(
+                                name=analysis_data.get('name'),
+                                description=analysis_data.get('description'),
+                                points=points
+                            ))
+                        loaded_count += 1
+            
+            logger.info(f"Loaded cached coordinate parsing results for {loaded_count} studies")
+            
+        except Exception as e:
+            logger.warning(f"Failed to load cached coordinate parsing results: {e}")
+ 
+    async def _save_coordinate_parsing_results(self):
+        """Save coordinate parsing results to cache."""
+        try:
+            # Get studies with parsed analyses
+            studies_with_analyses = [
+                s for s in self.results.studies
+                if s.status == StudyStatus.INCLUDED and s.analyses
+            ]
+            
+            if not studies_with_analyses:
+                return
+            
+            # Prepare data for saving
+            cached_data = {
+                "studies": [
+                    {
+                        "pmid": study.pmid,
+                        "analyses": [
+                            {
+                                "name": analysis.name,
+                                "description": analysis.description,
+                                "points": [
+                                    {
+                                        "coordinates": point.coordinates,
+                                        "space": point.space,
+                                        "values": [
+                                            {
+                                                "value": value.value,
+                                                "kind": value.kind
+                                            }
+                                            for value in point.values or []
+                                        ]
+                                    }
+                                    for point in analysis.points
+                                ]
+                            }
+                            for analysis in study.analyses
+                        ]
+                    }
+                    for study in studies_with_analyses
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Save to file
+            output_dir = Path(self.config.output.directory)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
+            
+            import json
+            with open(coordinate_cache_file, 'w') as f:
+                json.dump(cached_data, f, indent=2)
+            
+            logger.info(f"Saved coordinate parsing results for {len(studies_with_analyses)} studies")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save coordinate parsing results: {e}")
  
     async def _execute_output_phase(self):
         """Execute output generation phase."""
@@ -532,6 +646,10 @@ class AutonimaPipeline:
         # TODO: Implement comprehensive output generation
         # For now, generate basic statistics
         await self._generate_basic_outputs()
+        
+        # Generate NiMADS output if requested
+        if getattr(self.config.output, 'nimads', False):
+            await self._generate_nimads_output()
 
         logger.info("Saved final results and statistics")
 
@@ -572,6 +690,98 @@ class AutonimaPipeline:
         with open(final_results_file, 'w') as f:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
+
+    async def _generate_nimads_output(self):
+        """Generate NiMADS output for studies with parsed analyses."""
+        # Get included studies that have parsed analyses
+        included_studies_with_analyses = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED and s.analyses
+        ]
+        
+        if not included_studies_with_analyses:
+            logger.info("No studies with parsed analyses found for NiMADS output")
+            return
+        
+        try:
+            # Import NiMADS models
+            from .coordinates.nimads_models import convert_to_nimads_studyset
+            import json
+            
+            # Create a studyset from the included studies
+            studyset_id = f"autonima_studyset_{self.results.started_at.strftime('%Y%m%d_%H%M%S')}"
+            studyset = convert_to_nimads_studyset(
+                studyset_id,
+                included_studies_with_analyses,
+                name="Autonima Generated Studyset"
+            )
+            
+            # Convert to dictionary for JSON serialization
+            def studyset_to_dict(studyset):
+                return {
+                    "id": studyset.id,
+                    "name": studyset.name,
+                    "description": studyset.description,
+                    "publication": studyset.publication,
+                    "doi": studyset.doi,
+                    "pmid": studyset.pmid,
+                    "studies": [study_to_dict(study) for study in studyset.studies]
+                }
+            
+            def study_to_dict(study):
+                return {
+                    "id": study.id,
+                    "doi": study.doi,
+                    "name": study.name,
+                    "metadata": study.metadata,
+                    "description": study.description,
+                    "publication": study.publication,
+                    "pmid": study.pmid,
+                    "authors": study.authors,
+                    "year": study.year,
+                    "analyses": [analysis_to_dict(analysis) for analysis in study.analyses]
+                }
+            
+            def analysis_to_dict(analysis):
+                return {
+                    "id": analysis.id,
+                    "name": analysis.name,
+                    "description": analysis.description,
+                    "weights": analysis.weights,
+                    "points": [point_to_dict(point) for point in analysis.points],
+                    "study_id": analysis.study_id
+                }
+            
+            def point_to_dict(point):
+                return {
+                    "coordinates": point.coordinates,
+                    "space": point.space,
+                    "kind": point.kind,
+                    "label_id": point.label_id,
+                    "values": [point_value_to_dict(value) for value in point.values],
+                    "analysis_id": point.analysis_id
+                }
+            
+            def point_value_to_dict(point_value):
+                return {
+                    "kind": point_value.kind,
+                    "value": point_value.value
+                }
+            
+            # Save NiMADS output
+            output_dir = Path(self.config.output.directory)
+            nimads_output_file = output_dir / "outputs" / "nimads_output.json"
+            with open(nimads_output_file, 'w') as f:
+                json.dump(studyset_to_dict(studyset), f, indent=2)
+            
+            logger.info(
+                f"NiMADS output generated: {len(included_studies_with_analyses)} studies "
+                f"with {sum(len(s.analyses) for s in included_studies_with_analyses)} analyses"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to generate NiMADS output: {e}")
+            # Don't raise the error, as this shouldn't stop the pipeline
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get pipeline execution statistics."""

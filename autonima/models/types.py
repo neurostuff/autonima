@@ -188,8 +188,7 @@ class OutputConfig:
     directory: str = "results"
     prisma_diagram: bool = True
     formats: List[str] = field(default_factory=lambda: ["csv", "json"])
-    include_metadata: bool = True
-    compress_outputs: bool = False
+    nimads: bool = False
 
 
 @dataclass
@@ -234,8 +233,7 @@ class PipelineConfig:
                 "directory": self.output.directory,
                 "prisma_diagram": self.output.prisma_diagram,
                 "formats": self.output.formats,
-                "include_metadata": self.output.include_metadata,
-                "compress_outputs": self.output.compress_outputs,
+                "nimads": self.output.nimads,
             },
         }
 

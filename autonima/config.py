@@ -245,7 +245,7 @@ class ConfigManager:
             ),
             screening=screening_config,
             retrieval=RetrievalConfig(),
-            output=OutputConfig(),
+            output=OutputConfig(nimads=False),
             parsing=ParsingConfig(
                 parse_coordinates=True,
                 coordinate_model="gpt-4o-mini"

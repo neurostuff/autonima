@@ -80,4 +80,6 @@ parsing:
 
 
 output:
-  nimads: true  # Output in NiMARE database format
+  directory: "results"
+  formats: ["csv", "json"]
+  nimads: false  # Output in NiMADS format (default: false)
