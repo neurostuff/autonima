@@ -9,7 +9,7 @@ from .schema import Analysis, CoordinatePoint
 class PointValue:
     """Represents a value associated with a coordinate point."""
     kind: Optional[str] = None
-    value: Optional[float] = None
+    value: Optional[Union[float, str]] = None
 
 
 @dataclass
@@ -72,10 +72,11 @@ def convert_to_nimads_point(analysis_id: str, point: CoordinatePoint) -> Point:
     # Convert point values if they exist
     if point.values:
         for value in point.values:
+            # Preserve the original value
             nimads_point.values.append(
                 PointValue(
                     kind=value.kind,
-                    value=float(value.value) if value.value is not None else None
+                    value=value.value
                 )
             )
     
