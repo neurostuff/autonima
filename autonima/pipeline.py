@@ -2,6 +2,7 @@
 
 import logging
 import csv
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -16,6 +17,7 @@ from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .utils import log_error_with_debug
+from .coordinates.nimads_models import convert_to_nimads_studyset
 
 logger = logging.getLogger(__name__)
 
@@ -705,8 +707,7 @@ class AutonimaPipeline:
         
         try:
             # Import NiMADS models
-            from .coordinates.nimads_models import convert_to_nimads_studyset
-            import json
+            from .coordinates.nimads_models import convert_to_nimads_studyset, create_default_annotation
             
             # Create a studyset from the included studies
             studyset_id = f"autonima_studyset_{self.results.started_at.strftime('%Y%m%d_%H%M%S')}"
@@ -716,63 +717,19 @@ class AutonimaPipeline:
                 name="Autonima Generated Studyset"
             )
             
-            # Convert to dictionary for JSON serialization
-            def studyset_to_dict(studyset):
-                return {
-                    "id": studyset.id,
-                    "name": studyset.name,
-                    "description": studyset.description,
-                    "publication": studyset.publication,
-                    "doi": studyset.doi,
-                    "pmid": studyset.pmid,
-                    "studies": [study_to_dict(study) for study in studyset.studies]
-                }
+            # Create a default annotation
+            annotation = create_default_annotation(studyset_id, studyset)
             
-            def study_to_dict(study):
-                return {
-                    "id": study.id,
-                    "doi": study.doi,
-                    "name": study.name,
-                    "metadata": study.metadata,
-                    "description": study.description,
-                    "publication": study.publication,
-                    "pmid": study.pmid,
-                    "authors": study.authors,
-                    "year": study.year,
-                    "analyses": [analysis_to_dict(analysis) for analysis in study.analyses]
-                }
-            
-            def analysis_to_dict(analysis):
-                return {
-                    "id": analysis.id,
-                    "name": analysis.name,
-                    "description": analysis.description,
-                    "weights": analysis.weights,
-                    "points": [point_to_dict(point) for point in analysis.points],
-                    "study_id": analysis.study_id
-                }
-            
-            def point_to_dict(point):
-                return {
-                    "coordinates": point.coordinates,
-                    "space": point.space,
-                    "kind": point.kind,
-                    "label_id": point.label_id,
-                    "values": [point_value_to_dict(value) for value in point.values],
-                    "analysis_id": point.analysis_id
-                }
-            
-            def point_value_to_dict(point_value):
-                return {
-                    "kind": point_value.kind,
-                    "value": point_value.value
-                }
-            
-            # Save NiMADS output
+            # Save NiMADS studyset output using the to_dict method
             output_dir = Path(self.config.output.directory)
-            nimads_output_file = output_dir / "outputs" / "nimads_output.json"
+            nimads_output_file = output_dir / "outputs" / "nimads_studyset.json"
             with open(nimads_output_file, 'w') as f:
-                json.dump(studyset_to_dict(studyset), f, indent=2)
+                json.dump(studyset.to_dict(), f, indent=2)
+            
+            # Save NiMADS annotation output using the to_dict method
+            nimads_annotation_file = output_dir / "outputs" / "nimads_annotation.json"
+            with open(nimads_annotation_file, 'w') as f:
+                json.dump(annotation.to_dict(), f, indent=2)
             
             logger.info(
                 f"NiMADS output generated: {len(included_studies_with_analyses)} studies "
