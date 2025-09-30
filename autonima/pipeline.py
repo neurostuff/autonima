@@ -445,7 +445,7 @@ class AutonimaPipeline:
         # Get studies with activation tables that were retrieved
         studies_with_tables = [
             s for s in self.results.studies
-            if s.status in [StudyStatus.FULLTEXT_RETRIEVED, StudyStatus.FULLTEXT_CACHED] and s.activation_tables
+            if s.status == StudyStatus.INCLUDED and s.activation_tables
         ]
  
         if not studies_with_tables:

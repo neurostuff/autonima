@@ -11,9 +11,9 @@ class PointsValue(BaseModel):
         None,
         description="Optional statistical value associated with the point (e.g., t-value, z-value)"
     )
-    kind: Optional[Literal["z-statistic", "t-statistic", "f-statistics", "correlation", "p-value", "beta", "other"]] = Field(
+    kind: Optional[Literal["z-statistic", "t-statistic", "f-statistic", "correlation", "p-value", "beta", "other"]] = Field(
         None,
-        description='Type of the value, one of "z-statistic", "t-statistic", "p-value", "beta", or "other"'
+        description='Type of the value'
     )
 
 
