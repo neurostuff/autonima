@@ -33,6 +33,13 @@ from .coordinates import CoordinatePoint, Analysis, ParseAnalysesOutput, parse_t
 # Import LLM module components
 from .llm.client import GenericLLMClient
 
+# Import meta-analysis module components
+try:
+    from .meta import run_meta_analyses
+    HAS_META = True
+except ImportError:
+    HAS_META = False
+
 __all__ = [
     "AutonimaPipeline",
     "PipelineConfig",
@@ -46,3 +53,6 @@ __all__ = [
     "CoordinateParsingClient",
     "GenericLLMClient"
 ]
+
+if HAS_META:
+    __all__.append("run_meta_analyses")

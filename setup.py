@@ -71,6 +71,9 @@ setup(
         ],
         "readability": [
             "readabilipy>=0.2.0"
+        ],
+        "meta": [
+            "nimare>=0.1.0"
         ]
     },
     entry_points={
