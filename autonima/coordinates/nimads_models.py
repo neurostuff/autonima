@@ -155,11 +155,17 @@ class Studyset:
         }
 
 
-def convert_to_nimads_point(analysis_id: str, point: CoordinatePoint) -> Point:
+def convert_to_nimads_point(analysis_id: str, point: CoordinatePoint, study_space: Optional[str] = None) -> Point:
     """Convert a coordinate point to a NiMADS point."""
+    # Sanitize the coordinate space
+    sanitized_space = sanitize_coordinate_space(point.space, study_space)
+    
+    # Sanitize the coordinates to ensure they are integers
+    sanitized_coordinates = sanitize_coordinates(point.coordinates)
+    
     nimads_point = Point(
-        coordinates=point.coordinates,
-        space=point.space,
+        coordinates=sanitized_coordinates,
+        space=sanitized_space,
         analysis_id=analysis_id
     )
     
@@ -177,7 +183,7 @@ def convert_to_nimads_point(analysis_id: str, point: CoordinatePoint) -> Point:
     return nimads_point
 
 
-def convert_to_nimads_analysis(analysis_id: str, analysis: Analysis, study_id: str) -> NimadsAnalysis:
+def convert_to_nimads_analysis(analysis_id: str, analysis: Analysis, study_id: str, study_space: Optional[str] = None) -> NimadsAnalysis:
     """Convert an analysis to a NiMADS analysis."""
     nimads_analysis = NimadsAnalysis(
         id=analysis_id,
@@ -188,7 +194,7 @@ def convert_to_nimads_analysis(analysis_id: str, analysis: Analysis, study_id: s
     
     # Convert points
     for point in analysis.points:
-        nimads_point = convert_to_nimads_point(analysis_id, point)
+        nimads_point = convert_to_nimads_point(analysis_id, point, study_space)
         nimads_analysis.points.append(nimads_point)
     
     return nimads_analysis
@@ -216,10 +222,13 @@ def convert_to_nimads_study(study_id: str, autonima_study: 'autonima.models.type
         year=year
     )
     
+    # Get the study's coordinate space
+    study_space = getattr(autonima_study, 'coordinate_space', None)
+    
     # Convert analyses
     for i, analysis in enumerate(autonima_study.analyses):
         analysis_id = f"{study_id}_analysis_{i}"
-        nimads_analysis = convert_to_nimads_analysis(analysis_id, analysis, study_id)
+        nimads_analysis = convert_to_nimads_analysis(analysis_id, analysis, study_id, study_space)
         nimads_study.analyses.append(nimads_analysis)
     
     return nimads_study
@@ -303,3 +312,41 @@ def create_default_annotation(studyset_id: str, studyset: Studyset) -> Annotatio
             annotation.notes.append(note)
     
     return annotation
+
+def sanitize_coordinate_space(point_space: Optional[str], study_space: Optional[str]) -> Optional[str]:
+    """
+    Sanitize coordinate space values for NiMADS outputs.
+    
+    Args:
+        point_space: The space value from the LLM extracted point
+        study_space: The default space value from the study
+        
+    Returns:
+        The sanitized space value (MNI, TAL, or None)
+    """
+    # Valid space values
+    valid_spaces = ['MNI', 'TAL']
+    
+    # If the point space is already valid, return it
+    if point_space in valid_spaces:
+        return point_space
+    
+    # If the point space is invalid but we have a valid study space, use that
+    if study_space in valid_spaces:
+        return study_space
+    
+    # If neither is valid, return None
+    return None
+
+def sanitize_coordinates(coordinates: List[float]) -> List[int]:
+    """
+    Sanitize coordinate values to ensure they are integers as required by NiMADS.
+    
+    Args:
+        coordinates: List of coordinate values (x, y, z)
+        
+    Returns:
+        List of integer coordinate values
+    """
+    # Convert float coordinates to integers
+    return [int(round(coord)) for coord in coordinates]

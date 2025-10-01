@@ -362,6 +362,51 @@ class PubGetRetriever(BaseRetriever):
         
         return studies
 
+    def _process_coordinate_space(self, data_dir: Path, studies: List[Study]) -> List[Study]:
+        """
+        Process coordinate_space.csv and store the coordinate space for each study.
+        
+        Args:
+            data_dir: Directory containing pubget data files
+            studies: List of studies to process
+            
+        Returns:
+            List of studies with updated coordinate_space
+        """
+        try:
+            # Check if coordinate_space.csv exists
+            coord_space_file = data_dir / "coordinate_space.csv"
+            if not coord_space_file.exists():
+                logger.info("Coordinate space file not found, skipping coordinate space processing")
+                return studies
+            
+            # Load coordinate space data
+            coord_space_df = pd.read_csv(coord_space_file)
+            
+            # Create a mapping of pmcid to coordinate space
+            pmcid_to_space = {}
+            for _, row in coord_space_df.iterrows():
+                pmcid = row['pmcid']
+                space = row['coordinate_space']
+                # Only store valid space values (MNI, TAL, or null)
+                if space in ['MNI', 'TAL']:
+                    pmcid_to_space[pmcid] = space
+                elif pd.isna(space) or space == 'null':
+                    pmcid_to_space[pmcid] = None
+                # For other values, we'll handle them during sanitization
+            
+            # Update studies with coordinate space
+            for study in studies:
+                if study.pmcid and study.pmcid in pmcid_to_space:
+                    study.coordinate_space = pmcid_to_space[study.pmcid]
+            
+            logger.info(f"Processed coordinate space for {len(pmcid_to_space)} studies")
+            
+        except Exception as e:
+            logger.warning(f"Error processing coordinate space: {e}")
+        
+        return studies
+
     def validate_retrieval(
         self,
         studies: List[Study],
@@ -393,6 +438,9 @@ class PubGetRetriever(BaseRetriever):
         
         # Process activation tables with coordinates
         studies = self._process_activation_tables(data_dir, studies)
+        
+        # Read coordinate_space.csv and store the coordinate space for each study
+        studies = self._process_coordinate_space(data_dir, studies)
         
         # Check which studies have full-text files
         for study in studies:
