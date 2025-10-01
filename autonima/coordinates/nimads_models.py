@@ -291,13 +291,13 @@ def convert_to_nimads_studyset(studyset_id: str, studies: List['autonima.models.
 
 
 def create_default_annotation(studyset_id: str, studyset: Studyset) -> Annotation:
-    """Create a default annotation with include=True for all analyses in the studyset."""
+    """Create a default annotation with all_analyses=True for all analyses in the studyset."""
     annotation_id = f"annotation_{studyset_id}"
     annotation = Annotation(
         id=annotation_id,
         name="replication_annotations",
         description="",
-        note_keys={"include": "boolean"},
+        note_keys={"all_analyses": "boolean"},
         studyset_id=studyset_id
     )
     
@@ -305,7 +305,7 @@ def create_default_annotation(studyset_id: str, studyset: Studyset) -> Annotatio
     for study in studyset.studies:
         for analysis in study.analyses:
             note = NoteCollection(
-                note={"include": True},
+                note={"all_analyses": True},
                 analysis_id=analysis.id,
                 annotation_id=annotation_id
             )
