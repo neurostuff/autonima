@@ -4,6 +4,7 @@ autonima/__init__.py
 autonima/__main__.py
 autonima/cli.py
 autonima/config.py
+autonima/meta.py
 autonima/pipeline.py
 autonima/utils.py
 autonima.egg-info/PKG-INFO
@@ -12,6 +13,14 @@ autonima.egg-info/dependency_links.txt
 autonima.egg-info/entry_points.txt
 autonima.egg-info/requires.txt
 autonima.egg-info/top_level.txt
+autonima/coordinates/__init__.py
+autonima/coordinates/nimads_models.py
+autonima/coordinates/openai_client.py
+autonima/coordinates/parser.py
+autonima/coordinates/processor.py
+autonima/coordinates/schema.py
+autonima/llm/__init__.py
+autonima/llm/client.py
 autonima/models/__init__.py
 autonima/models/types.py
 autonima/retrieval/__init__.py

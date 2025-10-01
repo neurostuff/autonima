@@ -262,6 +262,19 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
         import json
         from pathlib import Path
         
+        # Try to import NiMARE dependencies
+        try:
+            from .meta import run_meta_analyses
+        except ImportError as e:
+            log_error_with_debug(
+                logger,
+                "NiMARE is not installed. Please install with: pip install autonima[meta]"
+            )
+            if debug:
+                import pdb
+                pdb.post_mortem()
+            sys.exit(1)
+        
         # Parse estimator and corrector arguments
         try:
             estimator_args_dict = json.loads(estimator_args)
@@ -272,9 +285,6 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
                 import pdb
                 pdb.post_mortem()
             sys.exit(1)
-        
-        # Import the meta-analysis function
-        from .meta import run_meta_analyses
         
         # Run meta-analyses
         results = run_meta_analyses(

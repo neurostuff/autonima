@@ -5,11 +5,22 @@ import os
 from pathlib import Path
 import json
 import importlib
-from nimare.correct import FDRCorrector, FWECorrector
-from nimare.workflows import CBMAWorkflow
-from nimare.meta.cbma import MKDADensity, ALE, KDA
-from nimare.nimads import Studyset, Annotation
-from nimare.reports.base import run_reports
+
+# Try to import NiMARE dependencies
+try:
+    from nimare.correct import FDRCorrector, FWECorrector
+    from nimare.workflows import CBMAWorkflow
+    from nimare.meta.cbma import MKDADensity, ALE, KDA
+    from nimare.nimads import Studyset, Annotation
+    from nimare.reports.base import run_reports
+    NIMARE_AVAILABLE = True
+except ImportError:
+    NIMARE_AVAILABLE = False
+
+if not NIMARE_AVAILABLE:
+    raise ImportError(
+        "NiMARE is not installed. Please install with: pip install autonima[meta]"
+    )
 
 
 def create_estimator(estimator_name, estimator_args):
