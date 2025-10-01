@@ -112,7 +112,8 @@ class ConfigManager:
                 screening=screening_config,
                 retrieval=retrieval_config,
                 output=output_config,
-                parsing=ParsingConfig(**config_dict.get('parsing', {}))
+                parsing=ParsingConfig(**config_dict.get('parsing', {})),
+                annotation=self._load_annotation_config(config_dict.get('annotation', {}))
             )
 
             self._validate_config(config)
@@ -249,7 +250,12 @@ class ConfigManager:
             parsing=ParsingConfig(
                 parse_coordinates=True,
                 coordinate_model="gpt-4o-mini"
-            )
+            ),
+            annotation=self._load_annotation_config({
+                "model": "gpt-4o-mini",
+                "include_all_analyses": True,
+                "annotations": []
+            })
         )
 
     def _validate_screening_config(self, config: PipelineConfig) -> None:
@@ -295,6 +301,42 @@ class ConfigManager:
                     "Fulltext screening must have inclusion criteria when "
                     "objective is specified"
                 )
+
+    def _load_annotation_config(self, annotation_dict: Dict[str, Any]) -> 'AnnotationConfig':
+        """
+        Load annotation configuration from dictionary.
+        
+        Args:
+            annotation_dict: Annotation configuration dictionary
+            
+        Returns:
+            AnnotationConfig: Annotation configuration object
+        """
+        if not annotation_dict:
+            from ..annotation.schema import AnnotationConfig
+            return AnnotationConfig()
+        
+        try:
+            from ..annotation.schema import AnnotationConfig, AnnotationCriteriaConfig
+            
+            # Extract annotations
+            annotations = []
+            if 'annotations' in annotation_dict:
+                for criteria_dict in annotation_dict['annotations']:
+                    criteria = AnnotationCriteriaConfig(**criteria_dict)
+                    annotations.append(criteria)
+            
+            # Create annotation config
+            annotation_config = AnnotationConfig(
+                model=annotation_dict.get('model', 'gpt-4o-mini'),
+                include_all_analyses=annotation_dict.get('include_all_analyses', True),
+                annotations=annotations,
+                enabled=annotation_dict.get('enabled', True)
+            )
+            
+            return annotation_config
+        except Exception as e:
+            raise ConfigurationError(f"Error loading annotation configuration: {e}")
 
 
 def load_config(config_path: Union[str, Path]) -> PipelineConfig:

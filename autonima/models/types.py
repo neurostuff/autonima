@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
 from ..coordinates.schema import Analysis
+from ..annotation.schema import AnnotationConfig
 
 
 class StudyStatus(Enum):
@@ -193,6 +194,7 @@ class OutputConfig:
     nimads: bool = False
 
 
+
 @dataclass
 class PipelineConfig:
     """Main configuration for the Autonima pipeline."""
@@ -201,7 +203,7 @@ class PipelineConfig:
     retrieval: RetrievalConfig
     output: OutputConfig
     parsing: ParsingConfig = field(default_factory=ParsingConfig)
-
+    annotation: AnnotationConfig = field(default_factory=AnnotationConfig)
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
         return {
@@ -230,6 +232,21 @@ class PipelineConfig:
             "parsing": {
                 "parse_coordinates": self.parsing.parse_coordinates,
                 "coordinate_model": self.parsing.coordinate_model,
+            },
+            "annotation": {
+                "model": self.annotation.model,
+                "include_all_analyses": self.annotation.include_all_analyses,
+                "annotations": [
+                    {
+                        "name": criteria.name,
+                        "description": criteria.description,
+                        "inclusion_criteria": criteria.inclusion_criteria,
+                        "exclusion_criteria": criteria.exclusion_criteria,
+                        "metadata_fields": criteria.metadata_fields,
+                    }
+                    for criteria in self.annotation.annotations
+                ],
+                "enabled": self.annotation.enabled,
             },
             "output": {
                 "directory": self.output.directory,

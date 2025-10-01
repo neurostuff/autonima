@@ -1,0 +1,57 @@
+"""Pydantic models for annotation configuration and results."""
+
+from pydantic import BaseModel, field_validator
+from typing import List, Optional, Dict, Any
+from typing_extensions import Literal
+from datetime import datetime
+
+
+class AnnotationCriteriaConfig(BaseModel):
+    """Configuration for a single annotation criteria."""
+    name: str
+    description: Optional[str] = None
+    inclusion_criteria: List[str] = []
+    exclusion_criteria: List[str] = []
+    metadata_fields: List[str] = [
+        "analysis_name",
+        "analysis_description", 
+        "table_caption",
+        "study_title"
+    ]
+
+
+class AnnotationConfig(BaseModel):
+    """Configuration for the annotation phase."""
+    model: str = "gpt-4o-mini"
+    include_all_analyses: bool = True
+    annotations: List[AnnotationCriteriaConfig] = []
+    enabled: bool = True
+
+
+class AnnotationDecision(BaseModel):
+    """Result of an annotation decision for a single analysis."""
+    annotation_name: str
+    analysis_id: str
+    study_id: str
+    include: bool
+    reasoning: str
+    confidence: Optional[float] = None
+    model_used: str
+    timestamp: datetime = datetime.now()
+
+
+class AnalysisMetadata(BaseModel):
+    """Metadata for an analysis used in annotation decisions."""
+    analysis_id: str
+    study_id: str
+    analysis_name: Optional[str] = None
+    analysis_description: Optional[str] = None
+    table_caption: Optional[str] = None
+    table_footer: Optional[str] = None
+    study_title: Optional[str] = None
+    study_abstract: Optional[str] = None
+    study_authors: Optional[List[str]] = None
+    study_journal: Optional[str] = None
+    study_publication_date: Optional[str] = None
+    # Add any other fields as needed
+    custom_fields: Dict[str, Any] = {}

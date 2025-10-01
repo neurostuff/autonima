@@ -83,3 +83,25 @@ output:
   directory: "results"
   formats: ["csv", "json"]
   nimads: false  # Output in NiMADS format (default: false)
+
+# Annotation configuration for categorizing analyses
+annotation:
+  enabled: true
+  model: "gpt-4o-mini"
+  include_all_analyses: true  # Create annotation with all analyses included
+  # Define custom annotations with inclusion/exclusion criteria
+  # annotations:
+  #   - name: "working_memory"
+  #     description: "Working memory task-based analyses"
+  #     inclusion_criteria:
+  #       - "Analysis involves working memory tasks (n-back, digit span, etc.)"
+  #       - "Task-based fMRI with cognitive load manipulation"
+  #     exclusion_criteria:
+  #       - "Resting-state or passive viewing"
+  #       - "Non-cognitive motor-only tasks"
+  #     metadata_fields:
+  #       - "analysis_name"
+  #       - "analysis_description"
+  #       - "table_caption"
+  #       - "study_title"
+  #       - "study_abstract"

@@ -321,6 +321,56 @@ def create_default_annotation(studyset_id: str, studyset: Studyset) -> Annotatio
     
     return annotation
 
+
+def create_annotations_from_results(
+    studyset_id: str,
+    studyset: Studyset,
+    annotation_results: List['autonima.annotation.schema.AnnotationDecision']
+) -> List[Annotation]:
+    """
+    Create annotations from annotation results.
+    
+    Args:
+        studyset_id: ID of the studyset
+        studyset: The studyset
+        annotation_results: List of annotation decisions
+        
+    Returns:
+        List of annotations
+    """
+    # Group annotation results by annotation name
+    annotations_by_name = {}
+    for result in annotation_results:
+        if result.annotation_name not in annotations_by_name:
+            annotations_by_name[result.annotation_name] = []
+        annotations_by_name[result.annotation_name].append(result)
+    
+    # Create annotations
+    annotations = []
+    for annotation_name, results in annotations_by_name.items():
+        annotation_id = f"annotation_{studyset_id}_{annotation_name}"
+        annotation = Annotation(
+            id=annotation_id,
+            name=annotation_name,
+            description=f"Annotation for {annotation_name}",
+            note_keys={"include": "boolean"},
+            studyset_id=studyset_id
+        )
+        
+        # Create notes for each analysis
+        for result in results:
+            note = NoteCollection(
+                note={"include": result.include},
+                analysis_id=result.analysis_id,
+                annotation_id=annotation_id
+            )
+            annotation.notes.append(note)
+        
+        annotations.append(annotation)
+    
+    return annotations
+
+
 def sanitize_coordinate_space(point_space: Optional[str], study_space: Optional[str]) -> Optional[str]:
     """
     Sanitize coordinate space values for NiMADS outputs.

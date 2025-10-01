@@ -18,6 +18,7 @@ from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .utils import log_error_with_debug
 from .coordinates.nimads_models import convert_to_nimads_studyset
+from .annotation.processor import AnnotationProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,10 @@ class AutonimaPipeline:
             # Phase 5: Coordinate Parsing
             await self._execute_coordinate_parsing()
  
-            # Phase 6: Generate Outputs
+            # Phase 6: Analysis Annotation
+            await self._execute_annotation_phase()
+ 
+            # Phase 7: Generate Outputs
             await self._execute_output_phase()
 
             # Complete pipeline
@@ -534,6 +538,41 @@ class AutonimaPipeline:
             f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
         )
  
+    async def _execute_annotation_phase(self):
+        """Execute annotation phase for parsed analyses."""
+        # Check if annotation is enabled
+        if not getattr(self.config.annotation, 'enabled', True):
+            logger.info("Annotation phase is disabled")
+            return
+        
+        # Get studies with parsed analyses
+        studies_with_analyses = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED and s.analyses
+        ]
+        
+        if not studies_with_analyses:
+            logger.info("No studies with parsed analyses found for annotation")
+            return
+        
+        try:
+            # Initialize the annotation processor
+            processor = AnnotationProcessor(self.config.annotation)
+            
+            # Process studies
+            annotation_results = processor.process_studies(
+                studies_with_analyses,
+                self.config.output.directory
+            )
+            
+            logger.info(
+                f"Annotation phase completed: {len(annotation_results)} annotation decisions made"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to execute annotation phase: {e}")
+            # Don't raise the error, as this shouldn't stop the pipeline
+ 
     async def _load_cached_coordinate_results(self):
         """Load cached coordinate parsing results."""
         try:
@@ -707,7 +746,11 @@ class AutonimaPipeline:
         
         try:
             # Import NiMADS models
-            from .coordinates.nimads_models import convert_to_nimads_studyset, create_default_annotation
+            from .coordinates.nimads_models import (
+                convert_to_nimads_studyset,
+                create_default_annotation,
+                create_annotations_from_results
+            )
             
             # Create a studyset from the included studies
             studyset_id = f"autonima_studyset_{self.results.started_at.strftime('%Y%m%d_%H%M%S')}"
@@ -717,19 +760,48 @@ class AutonimaPipeline:
                 name="Autonima Generated Studyset"
             )
             
-            # Create a default annotation
-            annotation = create_default_annotation(studyset_id, studyset)
-            
             # Save NiMADS studyset output using the to_dict method
             output_dir = Path(self.config.output.directory)
             nimads_output_file = output_dir / "outputs" / "nimads_studyset.json"
             with open(nimads_output_file, 'w') as f:
                 json.dump(studyset.to_dict(), f, indent=2)
             
-            # Save NiMADS annotation output using the to_dict method
-            nimads_annotation_file = output_dir / "outputs" / "nimads_annotation.json"
-            with open(nimads_annotation_file, 'w') as f:
-                json.dump(annotation.to_dict(), f, indent=2)
+            # Create annotations based on annotation results
+            # First, try to load annotation results from the annotation processor
+            try:
+                # Import the annotation processor to access its results
+                from .annotation.processor import AnnotationProcessor
+                annotation_processor = AnnotationProcessor(self.config.annotation)
+                
+                # Load cached annotation results
+                annotation_results = annotation_processor._load_cached_results(
+                    self.config.output.directory
+                )
+                
+                if annotation_results:
+                    # Create annotations from results
+                    annotations = create_annotations_from_results(
+                        studyset_id, studyset, annotation_results
+                    )
+                    
+                    # Save all annotations to a single file
+                    annotations_data = [annotation.to_dict() for annotation in annotations]
+                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                    with open(nimads_annotations_file, 'w') as f:
+                        json.dump(annotations_data, f, indent=2)
+                else:
+                    # Create a default annotation if no results are available
+                    annotation = create_default_annotation(studyset_id, studyset)
+                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                    with open(nimads_annotations_file, 'w') as f:
+                        json.dump([annotation.to_dict()], f, indent=2)
+            except Exception as annotation_error:
+                logger.warning(f"Failed to create annotations from results: {annotation_error}")
+                # Create a default annotation as fallback
+                annotation = create_default_annotation(studyset_id, studyset)
+                nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                with open(nimads_annotations_file, 'w') as f:
+                    json.dump([annotation.to_dict()], f, indent=2)
             
             logger.info(
                 f"NiMADS output generated: {len(included_studies_with_analyses)} studies "
