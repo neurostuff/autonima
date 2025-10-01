@@ -48,6 +48,7 @@ class Study:
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
+    coordinate_space: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
 
@@ -76,6 +77,7 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
             "full_text_path": self.full_text_path,
+            "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {
                     "table_path": table.table_path,
