@@ -217,6 +217,85 @@ def validate(config: str, output_folder: str, debug: bool):
 
 
 @click.command()
+@click.argument('output_folder', type=click.Path(exists=True))
+@click.option('--estimator',
+              type=click.Choice(['ale', 'mkdadensity', 'kda']),
+              default='mkdadensity',
+              help='CBMA estimator to use (default: mkdadensity)')
+@click.option('--estimator-args',
+              type=str,
+              default='{}',
+              help='JSON string of arguments for the estimator (default: {})')
+@click.option('--corrector',
+              type=click.Choice(['fdr', 'montecarlo', 'bonferroni']),
+              default='fdr',
+              help='Corrector to use (default: fdr)')
+@click.option('--corrector-args',
+              type=str,
+              default='{}',
+              help='JSON string of arguments for the corrector (default: {})')
+@click.option('--debug', is_flag=True,
+              help='Enable debug mode with post-mortem debugging on errors')
+def meta(output_folder: str, estimator: str, estimator_args: str,
+         corrector: str, corrector_args: str, debug: bool):
+    """
+    Run meta-analyses on Autonima output using NiMARE.
+
+    This command runs coordinate-based meta-analyses on the results
+    from an Autonima systematic review pipeline.
+
+    Arguments:
+        OUTPUT_FOLDER   Output folder containing NiMADS files
+
+    Options:
+        --estimator              CBMA estimator to use (ale, mkdadensity, kda)
+        --estimator-args         JSON string of arguments for the estimator
+        --corrector              Corrector to use (fdr, montecarlo, bonferroni)
+        --corrector-args         JSON string of arguments for the corrector
+
+    Examples:
+        autonima meta results/outputs
+        autonima meta results/outputs --estimator ale --corrector montecarlo
+        autonima meta results/outputs --estimator-args '{"n_iters": 1000}' --corrector-args '{"alpha": 0.01}'
+    """
+    try:
+        import json
+        from pathlib import Path
+        
+        # Parse estimator and corrector arguments
+        try:
+            estimator_args_dict = json.loads(estimator_args)
+            corrector_args_dict = json.loads(corrector_args)
+        except json.JSONDecodeError as e:
+            log_error_with_debug(logger, f"Error parsing JSON arguments: {e}")
+            if debug:
+                import pdb
+                pdb.post_mortem()
+            sys.exit(1)
+        
+        # Import the meta-analysis function
+        from .meta import run_meta_analyses
+        
+        # Run meta-analyses
+        results = run_meta_analyses(
+            output_folder,
+            estimator_name=estimator,
+            estimator_args=estimator_args_dict,
+            corrector_name=corrector,
+            corrector_args=corrector_args_dict
+        )
+        
+        print(f"Completed meta-analyses for {len(results)} columns")
+        
+    except Exception as e:
+        log_error_with_debug(logger, f"Meta-analysis execution failed: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
+        sys.exit(1)
+
+
+@click.command()
 def create_sample_config():
     """
     Create a sample configuration file.
@@ -261,6 +340,7 @@ def cli():
 cli.add_command(run)
 cli.add_command(validate)
 cli.add_command(create_sample_config)
+cli.add_command(meta)
 
 
 def main():
