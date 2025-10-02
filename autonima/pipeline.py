@@ -555,23 +555,19 @@ class AutonimaPipeline:
             logger.info("No studies with parsed analyses found for annotation")
             return
         
-        try:
-            # Initialize the annotation processor
-            processor = AnnotationProcessor(self.config.annotation)
+        # Initialize the annotation processor
+        processor = AnnotationProcessor(self.config.annotation)
+        
+        # Process studies
+        annotation_results = processor.process_studies(
+            studies_with_analyses,
+            self.config.output.directory
+        )
+        
+        logger.info(
+            f"Annotation phase completed: {len(annotation_results)} annotation decisions made"
+        )
             
-            # Process studies
-            annotation_results = processor.process_studies(
-                studies_with_analyses,
-                self.config.output.directory
-            )
-            
-            logger.info(
-                f"Annotation phase completed: {len(annotation_results)} annotation decisions made"
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to execute annotation phase: {e}")
-            # Don't raise the error, as this shouldn't stop the pipeline
  
     async def _load_cached_coordinate_results(self):
         """Load cached coordinate parsing results."""
@@ -785,21 +781,21 @@ class AutonimaPipeline:
                     )
                     
                     # Save all annotations to a single file
-                    annotations_data = [annotation.to_dict() for annotation in annotations]
-                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                    annotations_data = annotations.to_dict()
+                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
                     with open(nimads_annotations_file, 'w') as f:
                         json.dump(annotations_data, f, indent=2)
                 else:
                     # Create a default annotation if no results are available
                     annotation = create_default_annotation(studyset_id, studyset)
-                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                    nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
                     with open(nimads_annotations_file, 'w') as f:
                         json.dump([annotation.to_dict()], f, indent=2)
             except Exception as annotation_error:
                 logger.warning(f"Failed to create annotations from results: {annotation_error}")
                 # Create a default annotation as fallback
                 annotation = create_default_annotation(studyset_id, studyset)
-                nimads_annotations_file = output_dir / "outputs" / "nimads_annotations.json"
+                nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
                 with open(nimads_annotations_file, 'w') as f:
                     json.dump([annotation.to_dict()], f, indent=2)
             

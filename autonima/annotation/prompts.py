@@ -6,7 +6,8 @@ from .schema import AnalysisMetadata, AnnotationCriteriaConfig
 
 def create_annotation_prompt(
     metadata: AnalysisMetadata,
-    criteria: AnnotationCriteriaConfig
+    criteria: AnnotationCriteriaConfig,
+    metadata_fields: List[str] = None
 ) -> str:
     """
     Create a prompt for the LLM to decide if an analysis should be included in an annotation.
@@ -15,42 +16,49 @@ def create_annotation_prompt(
         metadata: Analysis metadata to include in the prompt
         criteria: Annotation criteria configuration
         
-    Returns:
         Formatted prompt string
     """
+    # Use the provided metadata_fields or fall back to criteria.metadata_fields
+    fields_to_use = metadata_fields or criteria.metadata_fields or [
+        "analysis_name",
+        "analysis_description",
+        "table_caption",
+        "study_title"
+    ]
+    
     # Build the metadata section based on configured fields
     metadata_lines = []
     
-    if "analysis_name" in criteria.metadata_fields and metadata.analysis_name:
+    if "analysis_name" in fields_to_use and metadata.analysis_name:
         metadata_lines.append(f"- Name: {metadata.analysis_name}")
         
-    if "analysis_description" in criteria.metadata_fields and metadata.analysis_description:
+    if "analysis_description" in fields_to_use and metadata.analysis_description:
         metadata_lines.append(f"- Description: {metadata.analysis_description}")
         
-    if "table_caption" in criteria.metadata_fields and metadata.table_caption:
+    if "table_caption" in fields_to_use and metadata.table_caption:
         metadata_lines.append(f"- Table Caption: {metadata.table_caption}")
         
-    if "table_footer" in criteria.metadata_fields and metadata.table_footer:
+    if "table_footer" in fields_to_use and metadata.table_footer:
         metadata_lines.append(f"- Table Footer: {metadata.table_footer}")
         
-    if "study_title" in criteria.metadata_fields and metadata.study_title:
+    if "study_title" in fields_to_use and metadata.study_title:
         metadata_lines.append(f"- Study Title: {metadata.study_title}")
         
-    if "study_abstract" in criteria.metadata_fields and metadata.study_abstract:
+    if "study_abstract" in fields_to_use and metadata.study_abstract:
         metadata_lines.append(f"- Study Abstract: {metadata.study_abstract}")
         
-    if "study_authors" in criteria.metadata_fields and metadata.study_authors:
+    if "study_authors" in fields_to_use and metadata.study_authors:
         metadata_lines.append(f"- Study Authors: {', '.join(metadata.study_authors)}")
         
-    if "study_journal" in criteria.metadata_fields and metadata.study_journal:
+    if "study_journal" in fields_to_use and metadata.study_journal:
         metadata_lines.append(f"- Study Journal: {metadata.study_journal}")
         
-    if "study_publication_date" in criteria.metadata_fields and metadata.study_publication_date:
+    if "study_publication_date" in fields_to_use and metadata.study_publication_date:
         metadata_lines.append(f"- Study Publication Date: {metadata.study_publication_date}")
     
     # Add any custom fields
     for field_name, field_value in metadata.custom_fields.items():
-        if field_name in criteria.metadata_fields and field_value:
+        if field_name in fields_to_use and field_value:
             metadata_lines.append(f"- {field_name.replace('_', ' ').title()}: {field_value}")
     
     # Format inclusion and exclusion criteria
@@ -60,6 +68,11 @@ def create_annotation_prompt(
     # Create the prompt
     prompt = f"""
 You are a neuroimaging meta-analysis expert evaluating whether an analysis meets specific inclusion criteria.
+
+The following analysis has been extracted from within a table of a published fMRI/neuroimaging article.
+You will be provided with metadata about the analysis, the table it was extracted from, and the study it belongs to.
+Note that since each table may have contained multiple analyses, the table caption may describe multiple analyses that are not relevant to this specific analysis.
+As such, while taking into account the table caption, please focus primarily on the analysis name and description for your decision.
 
 STUDY CONTEXT:
 {chr(10).join(metadata_lines) if metadata_lines else "No metadata available"}

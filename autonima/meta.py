@@ -131,6 +131,7 @@ def run_meta_analyses(output_folder, estimator_name="mkdadensity", estimator_arg
                       corrector_name="fdr", corrector_args=None):
     """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
     # Find the NiMADS files
+    output_folder = Path(output_folder) / "outputs"
     studyset_file, annotation_file = find_nimads_files(output_folder)
     
     # Create output directory

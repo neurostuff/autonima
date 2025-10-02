@@ -82,9 +82,7 @@ class AnnotationProcessor:
         self._save_results(all_decisions, output_dir)
         self.annotation_results = all_decisions
         
-        except Exception as e:
-            logger.error(f"Error processing studies for annotation: {e}")
-            raise
+        return all_decisions
     
     def _create_all_analyses_annotations(self, studies: List[Study]) -> List[AnnotationDecision]:
         """
@@ -155,7 +153,25 @@ class AnnotationProcessor:
             decisions = self._process_parallel(analysis_annotation_pairs, model)
         else:
             # Process sequentially
-            for metadata, criteria in tqdm(analysis_annotation_pairs, desc="Processing annotations"):
+            # Update each criteria with the top-level metadata_fields if not already set
+            updated_pairs = []
+            for metadata, criteria in analysis_annotation_pairs:
+                # If criteria doesn't have metadata_fields set, use the top-level ones
+                if not criteria.metadata_fields and self.config.metadata_fields:
+                    # Create a copy of the criteria with the top-level metadata_fields
+                    from .schema import AnnotationCriteriaConfig
+                    updated_criteria = AnnotationCriteriaConfig(
+    name=criteria.name,
+    description=criteria.description,
+    inclusion_criteria=(self.config.inclusion_criteria + criteria.inclusion_criteria),
+    exclusion_criteria=(self.config.exclusion_criteria + criteria.exclusion_criteria),
+    metadata_fields=self.config.metadata_fields
+)
+                    updated_pairs.append((metadata, updated_criteria))
+                else:
+                    updated_pairs.append((metadata, criteria))
+            
+            for metadata, criteria in tqdm(updated_pairs, desc="Processing annotations"):
                 decision = self.client.make_decision(metadata, criteria, model)
                 decisions.append(decision)
         
@@ -163,9 +179,7 @@ class AnnotationProcessor:
         logger.info(f"Processed {len(decisions)} annotation decisions ({included_count} included)")
         
         return decisions
-        except Exception as e:
-            logger.error(f"Error processing custom annotations: {e}")
-            raise
+
     
     def _process_parallel(self, pairs: List[tuple], model: str, max_workers: int = 4) -> List[AnnotationDecision]:
         """
@@ -181,15 +195,33 @@ class AnnotationProcessor:
         """
         decisions = []
         
+        # Update each criteria with the top-level metadata_fields if not already set
+        updated_pairs = []
+        for metadata, criteria in pairs:
+            # If criteria doesn't have metadata_fields set, use the top-level ones
+            if not criteria.metadata_fields and self.config.metadata_fields:
+                # Create a copy of the criteria with the top-level metadata_fields
+                from .schema import AnnotationCriteriaConfig
+                updated_criteria = AnnotationCriteriaConfig(
+    name=criteria.name,
+    description=criteria.description,
+    inclusion_criteria=(self.config.inclusion_criteria + criteria.inclusion_criteria),
+    exclusion_criteria=(self.config.exclusion_criteria + criteria.exclusion_criteria),
+    metadata_fields=self.config.metadata_fields
+)
+                updated_pairs.append((metadata, updated_criteria))
+            else:
+                updated_pairs.append((metadata, criteria))
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
             future_to_pair = {
                 executor.submit(self._process_single_decision, metadata, criteria, model): (metadata, criteria)
-                for metadata, criteria in pairs
+                for metadata, criteria in updated_pairs
             }
             
             # Collect results
-            for future in tqdm(as_completed(future_to_pair), total=len(pairs), desc="Processing annotations"):
+            for future in tqdm(as_completed(future_to_pair), total=len(updated_pairs), desc="Processing annotations"):
                 try:
                     decision = future.result()
                     decisions.append(decision)
@@ -208,9 +240,6 @@ class AnnotationProcessor:
                     decisions.append(decision)
         
         return decisions
-        except Exception as e:
-            logger.error(f"Error processing annotations in parallel: {e}")
-            raise
     
     def _process_single_decision(self, metadata: AnalysisMetadata, criteria: "AnnotationCriteriaConfig", model: str) -> AnnotationDecision:
         """
@@ -263,10 +292,7 @@ class AnnotationProcessor:
         )
         
         return metadata
-        except Exception as e:
-            logger.error(f"Error extracting analysis metadata: {e}")
-            raise
-    
+
     def _are_cached_results_valid(self, cached_results: List[AnnotationDecision]) -> bool:
         """
         Check if cached results are still valid based on current configuration.
@@ -351,8 +377,8 @@ class AnnotationProcessor:
             output_path.mkdir(parents=True, exist_ok=True)
             cache_file = output_path / "annotation_results.json"
             
-            # Convert to dictionaries
-            data = [decision.model_dump() for decision in decisions]
+            # Convert to dictionaries, excluding timestamp to avoid JSON serialization issues
+            data = [decision.model_dump(exclude={'timestamp'}) for decision in decisions]
             
             with open(cache_file, 'w') as f:
                 json.dump(data, f, indent=2)

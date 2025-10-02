@@ -12,12 +12,8 @@ class AnnotationCriteriaConfig(BaseModel):
     description: Optional[str] = None
     inclusion_criteria: List[str] = []
     exclusion_criteria: List[str] = []
-    metadata_fields: List[str] = [
-        "analysis_name",
-        "analysis_description", 
-        "table_caption",
-        "study_title"
-    ]
+    metadata_fields: List[str] = []
+
 
 
 class AnnotationConfig(BaseModel):
@@ -26,6 +22,14 @@ class AnnotationConfig(BaseModel):
     include_all_analyses: bool = True
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
+    metadata_fields: List[str] = [
+        "analysis_name",
+        "analysis_description",
+        "table_caption",
+        "study_title"
+    ]
+    inclusion_criteria: List[str] = []
+    exclusion_criteria: List[str] = []
 
 
 class AnnotationDecision(BaseModel):
@@ -55,3 +59,19 @@ class AnalysisMetadata(BaseModel):
     study_publication_date: Optional[str] = None
     # Add any other fields as needed
     custom_fields: Dict[str, Any] = {}
+    
+    @field_validator('analysis_name', 'analysis_description', 'table_caption', 'table_footer', 'study_title', 'study_abstract', 'study_journal', 'study_publication_date', mode='before')
+    @classmethod
+    def validate_string_fields(cls, v):
+        """Validate that string fields are properly formatted and handle nan values."""
+        if v is None:
+            return None
+        # Handle nan values (both float nan and string 'nan')
+        if isinstance(v, float):
+            import math
+            if math.isnan(v):
+                return None
+        if isinstance(v, str) and v.lower() == 'nan':
+            return None
+        # Convert to string if needed
+        return str(v) if v is not None else None
