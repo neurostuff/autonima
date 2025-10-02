@@ -4,7 +4,9 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
-from ..llm.client import OpenAIClient
+import sys
+import os
+from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,7 @@ class AnnotationClient:
     
     def __init__(self):
         """Initialize the annotation client."""
-        self._client = OpenAIClient()
+        self._client = GenericLLMClient()
     
     def make_decision(
         self,
@@ -43,10 +45,12 @@ class AnnotationClient:
         try:
             # Create the prompt
             from .prompts import create_annotation_prompt
-            prompt = create_annotation_prompt(metadata, criteria)
+            # Get metadata_fields from the criteria or use default
+            metadata_fields = getattr(criteria, 'metadata_fields', None)
+            prompt = create_annotation_prompt(metadata, criteria, metadata_fields)
             
             # Get the response from the LLM
-            response = self._client.chat_completion(
+            response_text = self.chat_completion(
                 messages=[
                     {
                         "role": "system",
@@ -58,13 +62,12 @@ class AnnotationClient:
                     }
                 ],
                 model=model,
-                temperature=0.0,
                 response_format={"type": "json_object"}
             )
             
             # Parse the response
             try:
-                response_data = json.loads(response)
+                response_data = json.loads(response_text)
                 decision_output = AnnotationDecisionOutput(**response_data)
             except Exception as e:
                 logger.warning(f"Failed to parse JSON response: {e}. Response: {response}")
@@ -140,3 +143,27 @@ class AnnotationClient:
                 pass
                 
         return AnnotationDecisionOutput(include=include, reasoning=reasoning)
+    
+    def chat_completion(self, messages, model, response_format=None):
+        """
+        Get a chat completion from the LLM.
+        
+        Args:
+            messages: List of messages for the conversation
+            model: Model to use
+            temperature: Temperature for generation
+            response_format: Response format (e.g., {"type": "json_object"})
+            
+        Returns:
+            String response from the LLM
+        """
+        try:
+            response = self._client.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format=response_format
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error in chat completion: {e}")
+            raise

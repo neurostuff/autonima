@@ -313,11 +313,11 @@ class ConfigManager:
             AnnotationConfig: Annotation configuration object
         """
         if not annotation_dict:
-            from ..annotation.schema import AnnotationConfig
+            from .annotation.schema import AnnotationConfig
             return AnnotationConfig()
         
         try:
-            from ..annotation.schema import AnnotationConfig, AnnotationCriteriaConfig
+            from .annotation.schema import AnnotationConfig, AnnotationCriteriaConfig
             
             # Extract annotations
             annotations = []
@@ -331,7 +331,15 @@ class ConfigManager:
                 model=annotation_dict.get('model', 'gpt-4o-mini'),
                 include_all_analyses=annotation_dict.get('include_all_analyses', True),
                 annotations=annotations,
-                enabled=annotation_dict.get('enabled', True)
+                enabled=annotation_dict.get('enabled', True),
+                metadata_fields=annotation_dict.get('metadata_fields', [
+                    "analysis_name",
+                    "analysis_description",
+                    "table_caption",
+                    "study_title"
+                ]),
+                inclusion_criteria=annotation_dict.get('inclusion_criteria', []),
+                exclusion_criteria=annotation_dict.get('exclusion_criteria', [])
             )
             
             return annotation_config

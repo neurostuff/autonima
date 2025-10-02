@@ -328,7 +328,7 @@ def create_annotations_from_results(
     annotation_results: List['autonima.annotation.schema.AnnotationDecision']
 ) -> List[Annotation]:
     """
-    Create annotations from annotation results.
+    Create a single consolidated annotation from annotation results.
     
     Args:
         studyset_id: ID of the studyset
@@ -336,39 +336,56 @@ def create_annotations_from_results(
         annotation_results: List of annotation decisions
         
     Returns:
-        List of annotations
+        List containing a single annotation with multiple note_keys
     """
-    # Group annotation results by annotation name
+    if not annotation_results:
+        return []
+    
+    # Group annotation results by annotation name and analysis_id
     annotations_by_name = {}
+    all_analysis_ids = set()
+    
     for result in annotation_results:
         if result.annotation_name not in annotations_by_name:
-            annotations_by_name[result.annotation_name] = []
-        annotations_by_name[result.annotation_name].append(result)
+            annotations_by_name[result.annotation_name] = {}
+        annotations_by_name[result.annotation_name][result.analysis_id] = result.include
+        all_analysis_ids.add(result.analysis_id)
     
-    # Create annotations
-    annotations = []
-    for annotation_name, results in annotations_by_name.items():
-        annotation_id = f"annotation_{studyset_id}_{annotation_name}"
-        annotation = Annotation(
-            id=annotation_id,
-            name=annotation_name,
-            description=f"Annotation for {annotation_name}",
-            note_keys={"include": "boolean"},
-            studyset_id=studyset_id
+    # Create note_keys with all annotation names as boolean columns
+    note_keys = {}
+    for annotation_name in annotations_by_name.keys():
+        note_keys[annotation_name] = "boolean"
+    
+    # Create single consolidated annotation
+    annotation_id = f"annotation_{studyset_id}"
+    annotation = Annotation(
+        id=annotation_id,
+        name="autonima_annotations",
+        description="Consolidated annotations from autonima pipeline",
+        note_keys=note_keys,
+        studyset_id=studyset_id
+    )
+    
+    # Create notes for each analysis with all annotation decisions
+    for analysis_id in sorted(all_analysis_ids):
+        note_data = {}
+        
+        # For each annotation type, check if this analysis was included
+        for annotation_name in annotations_by_name.keys():
+            if analysis_id in annotations_by_name[annotation_name]:
+                note_data[annotation_name] = annotations_by_name[annotation_name][analysis_id]
+            else:
+                # Default to False if no decision was made for this analysis-annotation pair
+                note_data[annotation_name] = False
+        
+        note = NoteCollection(
+            note=note_data,
+            analysis_id=analysis_id,
+            annotation_id=annotation_id
         )
-        
-        # Create notes for each analysis
-        for result in results:
-            note = NoteCollection(
-                note={"include": result.include},
-                analysis_id=result.analysis_id,
-                annotation_id=annotation_id
-            )
-            annotation.notes.append(note)
-        
-        annotations.append(annotation)
+        annotation.notes.append(note)
     
-    return annotations
+    return annotation
 
 
 def sanitize_coordinate_space(point_space: Optional[str], study_space: Optional[str]) -> Optional[str]:
