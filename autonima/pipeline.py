@@ -17,7 +17,9 @@ from .models.types import (
 from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
-from .retrieval.utils import _map_pmcids_to_activation_tables
+from .retrieval.utils import (
+        _map_pmcids_to_activation_tables, _apply_activation_tables_to_studies
+    )
 from .utils import log_error_with_debug
 from .coordinates.nimads_models import convert_to_nimads_studyset
 from .annotation.processor import AnnotationProcessor
@@ -294,27 +296,17 @@ class AutonimaPipeline:
                     for full_text_config in self.config.retrieval.full_text_sources:
                         if not full_text_config:
                             continue
-                            
-                        # Map PMCIDs to activation tables
+
                         pmcid_to_tables = _map_pmcids_to_activation_tables(
                             full_text_config, pmcids_set
                         )
-                        
-                        # Update studies with their activation tables
-                        for study in self.results.studies:
-                            if study.pmcid and study.pmcid in pmcid_to_tables:
-                                # Clear existing activation tables to avoid duplicates
-                                study.activation_tables.clear()
-                                
-                                # Add new activation tables
-                                for table_data in pmcid_to_tables[study.pmcid]:
-                                    study.activation_tables.append(ActivationTable(
-                                        table_id=table_data['table_id'],
-                                        table_label=table_data['table_label'],
-                                        table_path=table_data['table_path'],
-                                        table_caption=table_data['table_caption'],
-                                        table_foot=table_data['table_foot']
-                                    ))
+
+                        _apply_activation_tables_to_studies(
+                            studies=self.results.studies,
+                            pmcid_to_tables=pmcid_to_tables,
+                            clear_existing=True,
+                        )
+
                                     
                 except Exception as table_error:
                     logger.warning(

@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional, Union, List, Set, Dict, Any
-from ..models.types import Study
+from ..models.types import Study, ActivationTable
 from bs4 import BeautifulSoup, Comment
 
 # Try to import readabilipy for enhanced HTML cleaning
@@ -245,111 +245,152 @@ def _clean_html_with_readability(html: str) -> str:
         logging.warning(f"Error using readabilipy, falling back to basic HTML cleaning: {e}")
         return _safe_clean_html(html)
 
-def _load_activation_tables_from_csv(
-    table_source: str,
-    root_path: str,
-    pmcids_to_include: Optional[Set[str]] = None
+
+def _load_activation_table_metadata(
+    df: pd.DataFrame,
+    root_path: Path,
+    pmcids_to_include: Optional[Set[str]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Load activation tables from a CSV file and map them to PMCIDs.
-    
-    Args:
-        table_source: Path to the table.csv file
-        root_path: Root path for resolving relative paths in table_raw_file
-        pmcids_to_include: Optional set of PMCIDs to filter for
-        
-    Returns:
-        Dictionary mapping PMCIDs to lists of table metadata dictionaries
+    Turn a tables dataframe into a mapping of pmcid -> list of table metadata.
     """
-    try:
-        # Read the CSV file
-        df = pd.read_csv(table_source)
-        
-        # Required columns
-        required_columns = [
-            'pmcid', 'table_id', 'table_label', 'table_caption',
-            'table_foot', 'table_raw_file'
-        ]
-        
-        # Check if all required columns are present
-        missing_columns = [
-            col for col in required_columns if col not in df.columns
-        ]
-        if missing_columns:
-            raise ValueError(
-                "Missing required columns in table source CSV: "
-                f"{missing_columns}"
-            )
-        
-        # Create a mapping of pmcid to table metadata
-        pmcid_to_tables = {}
-        
-        for _, row in df.iterrows():
-            pmcid = str(row['pmcid'])
-            
-            # Skip if filtering and this PMCID is not included
-            if (pmcids_to_include is not None and
-                    pmcid not in pmcids_to_include):
-                continue
-            
-            # Create absolute path for table_raw_file
-            table_raw_file = row['table_raw_file']
-            if table_raw_file:
-                # Resolve relative path against root_path
-                table_path = str(Path(root_path) / table_raw_file)
-            else:
-                table_path = None
-            
-            # Create table metadata dictionary
-            table_metadata = {
-                'table_id': str(row['table_id']),
-                'table_label': str(row['table_label']),
-                'table_path': table_path,
-                'table_caption': (
-                    row['table_caption'] if pd.notna(row['table_caption'])
-                    else None
-                ),
-                'table_foot': (
-                    row['table_foot'] if pd.notna(row['table_foot'])
-                    else None
-                )
-            }
-            
-            # Add to mapping
-            if pmcid not in pmcid_to_tables:
-                pmcid_to_tables[pmcid] = []
-            pmcid_to_tables[pmcid].append(table_metadata)
-            
-        return pmcid_to_tables
-        
-    except Exception as e:
-        logging.warning(f"Failed to load activation tables from CSV: {e}")
+
+    # Ensure at least one of the "file path" columns exists
+    has_raw_file = 'table_raw_file' in df.columns
+    has_data_file = 'table_data_file' in df.columns
+    if not (has_raw_file or has_data_file):
+        raise ValueError(
+            "Missing required columns: must have either "
+            "'table_raw_file' or 'table_data_file'"
+        )
+
+    # Required metadata columns
+    required_columns = ['pmcid', 'table_id', 'table_label', 'table_caption', 'table_foot']
+    missing = [c for c in required_columns if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    pmcid_to_tables: Dict[str, List[Dict[str, Any]]] = {}
+
+    for _, row in df.iterrows():
+        pmcid = str(row['pmcid'])
+
+        if pmcids_to_include is not None and pmcid not in pmcids_to_include:
+            continue
+
+        # Resolve file paths if present
+        table_path = (
+            str(root_path / row['table_raw_file'])
+            if has_raw_file and pd.notna(row['table_raw_file'])
+            and row['table_raw_file']
+            else None
+        )
+
+        table_data_path = (
+            str(root_path / row['table_data_file'])
+            if has_data_file and pd.notna(row['table_data_file'])
+            and row['table_data_file']
+            else None
+        )
+
+        table_metadata = {
+            'table_id': str(row['table_id']),
+            'table_label': str(row['table_label']),
+            'table_path': table_path,
+            'table_data_path': table_data_path,
+            'table_caption': (
+                row['table_caption'] if pd.notna(row['table_caption']) else None
+            ),
+            'table_foot': (
+                row['table_foot'] if pd.notna(row['table_foot']) else None
+            ),
+        }
+
+        pmcid_to_tables.setdefault(pmcid, []).append(table_metadata)
+
+    return pmcid_to_tables
+
+
+def load_activation_table_map(
+    data_dir: Path,
+    pmcids_to_include: Optional[Set[str]] = None,
+    filter_by_coordinates: bool = True,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Core function: Load and (optionally) filter activation tables.
+    Returns pmcid -> list of table metadata dicts.
+    """
+    tables_file = data_dir / "tables.csv"
+    if not tables_file.exists():
+        logging.info(f"No tables.csv in {data_dir}, skipping...")
         return {}
+
+    try:
+        df = pd.read_csv(tables_file)
+
+        # Optional coordinate filtering
+        coords_file = data_dir / "coordinates.csv"
+        if filter_by_coordinates and coords_file.exists():
+            coords_df = pd.read_csv(coords_file)
+            df = df[
+                df.set_index(["pmcid", "table_id"]).index
+                .isin(coords_df.set_index(["pmcid", "table_id"]).index)
+            ]
+
+        return _load_activation_table_metadata(
+            df=df,
+            root_path=data_dir,
+            pmcids_to_include=pmcids_to_include,
+        )
+
+    except Exception as e:
+        logging.warning(f"Failed to load activation tables: {e}")
+        return {}
+
 
 
 def _map_pmcids_to_activation_tables(
     full_text_config: Dict[str, Any],
-    pmcids_to_include: Optional[Set[str]] = None
+    pmcids_to_include: Optional[Set[str]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Map PMCIDs to activation tables from user-provided table sources.
-    
-    Args:
-        full_text_config: Configuration dictionary for a full text source
-        pmcids_to_include: Optional set of PMCIDs to filter for
-        
-    Returns:
-        Dictionary mapping PMCIDs to lists of table metadata dictionaries
-    """
-    # Check if table_source is specified in the configuration
-    table_source = full_text_config.get('table_source')
-    if not table_source:
+    processed_data = full_text_config.get("processed_data")
+    if not processed_data:
         return {}
-    
-    # Get root path from the configuration
-    root_path = full_text_config.get('root_path', '.')
-    
-    # Load activation tables from CSV
-    return _load_activation_tables_from_csv(
-        table_source, root_path, pmcids_to_include
+
+    data_dir = Path(processed_data)
+    return load_activation_table_map(
+        data_dir=data_dir,
+        pmcids_to_include=pmcids_to_include,
+        filter_by_coordinates=False,  # 🚫 No coords in this flow
     )
+
+
+def _apply_activation_tables_to_studies(
+    studies: List["Study"],
+    pmcid_to_tables: Dict[str, List[Dict[str, Any]]],
+    clear_existing: bool = True,
+) -> None:
+    """
+    Attach activation tables to studies based on PMCID mappings.
+    """
+    for study in studies:
+        if not study.pmcid:
+            continue
+
+        if study.pmcid not in pmcid_to_tables:
+            continue
+
+        if clear_existing:
+            study.activation_tables.clear()
+
+        for t in pmcid_to_tables[study.pmcid]:
+            study.activation_tables.append(
+                ActivationTable(
+                    table_id=t['table_id'],
+                    table_label=t['table_label'],
+                    table_path=t['table_path'],
+                    table_data_path=t.get('table_data_path'),
+                    table_caption=t['table_caption'],
+                    table_foot=t['table_foot'],
+                )
+            )

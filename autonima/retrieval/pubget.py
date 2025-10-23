@@ -7,9 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from ..models.types import Study, StudyStatus, ActivationTable
+from ..models.types import Study, StudyStatus
 from .base import BaseRetriever
 from ..utils import log_error_with_debug
+from .utils import (
+    load_activation_table_map, _apply_activation_tables_to_studies
+)
 from pubget import download_pmcids, extract_articles, extract_data_to_csv
 
 logger = logging.getLogger(__name__)
@@ -291,77 +294,6 @@ class PubGetRetriever(BaseRetriever):
                     dest_item.unlink()
                 shutil.copy2(item, dest_item)
 
-    def _process_activation_tables(self, data_dir: Path, studies: List[Study]) -> List[Study]:
-        """
-        Process tables with coordinates and add them as ActivationTable objects to studies.
-        
-        Args:
-            data_dir: Directory containing pubget data files
-            studies: List of studies to process
-            
-        Returns:
-            List of studies with updated activation_tables
-        """
-        try:
-            # Check if required files exist
-            tables_file = data_dir / "tables.csv"
-            coords_file = data_dir / "coordinates.csv"
-            
-            if not tables_file.exists() or not coords_file.exists():
-                logger.info("Tables or coordinates files not found, skipping table processing")
-                return studies
-            
-            # Load using pandas
-            tables_df = pd.read_csv(tables_file)
-            coords_df = pd.read_csv(coords_file)
-            
-            # Filter tables_df to only include rows where 'table_id' is in coords_df['table_id']
-            # for each pmcid separately
-            filtered_tables_df = pd.DataFrame()
-            for pmcid in tables_df['pmcid'].unique():
-                tables_subset = tables_df[tables_df['pmcid'] == pmcid]
-                coords_subset = coords_df[coords_df['pmcid'] == pmcid]
-                filtered_subset = tables_subset[tables_subset['table_id'].isin(coords_subset['table_id'])]
-                filtered_tables_df = pd.concat([filtered_tables_df, filtered_subset], ignore_index=True)
-            
-            # Create a mapping of pmcid to table paths with metadata
-            pmcid_to_tables = {}
-            for _, row in filtered_tables_df.iterrows():
-                pmcid = row['pmcid']
-                table_data_file = row['table_data_file']
-                table_caption = row.get('table_caption', '')
-                table_foot = row.get('table_foot', '')
-                
-                # Convert to absolute path
-                table_path = str(data_dir / table_data_file)
-                
-                if pmcid not in pmcid_to_tables:
-                    pmcid_to_tables[pmcid] = []
-                pmcid_to_tables[pmcid].append({
-                    'table_path': table_path,
-                    'table_caption': table_caption,
-                    'table_foot': table_foot
-                })
-            
-            # Update studies with activation tables
-            for study in studies:
-                if study.pmcid and study.pmcid in pmcid_to_tables:
-                    table_data = pmcid_to_tables[study.pmcid]
-                    for table_info in table_data:
-                        # Add ActivationTable object to the study
-                        study.activation_tables.append(ActivationTable(
-                            table_path=table_info['table_path'],
-                            table_caption=table_info['table_caption'],
-                            table_foot=table_info['table_foot']
-                        ))
-            
-            logger.info(f"Processed activation tables for {len(pmcid_to_tables)} studies")
-            
-        except Exception as e:
-            logger.warning(f"Error processing activation tables: {e}")
-        
-        return studies
-
     def _process_coordinate_space(self, data_dir: Path, studies: List[Study]) -> List[Study]:
         """
         Process coordinate_space.csv and store the coordinate space for each study.
@@ -436,11 +368,16 @@ class PubGetRetriever(BaseRetriever):
         df = pd.read_csv(all_texts)
         retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
         
-        # Process activation tables with coordinates
-        studies = self._process_activation_tables(data_dir, studies)
-        
-        # Read coordinate_space.csv and store the coordinate space for each study
-        studies = self._process_coordinate_space(data_dir, studies)
+        pmcid_to_tables = load_activation_table_map(
+            data_dir=data_dir,
+            filter_by_coordinates=True,
+        )
+
+        _apply_activation_tables_to_studies(
+            studies=studies,
+            pmcid_to_tables=pmcid_to_tables,
+            clear_existing=False,
+        )
         
         # Check which studies have full-text files
         for study in studies:

@@ -28,6 +28,7 @@ class ActivationTable:
     table_path: str  # Path to the raw table file (HTML/CSV/etc)
     table_caption: Optional[str] = None  # Caption of the table
     table_foot: Optional[str] = None  # Footer of the table
+    table_data_path: Optional[str] = None  # Path to processed table data file
 
 
 @dataclass
@@ -87,7 +88,8 @@ class Study:
                     "table_label": table.table_label,
                     "table_path": table.table_path,
                     "table_caption": table.table_caption,
-                    "table_foot": table.table_foot
+                    "table_foot": table.table_foot,
+                    "table_data_path": table.table_data_path
                 } for table in self.activation_tables
             ],
             "analyses": [
