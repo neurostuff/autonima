@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Union, List, Set, Dict
+from typing import Optional, Union, List, Set, Dict, Any
 from ..models.types import Study
 from bs4 import BeautifulSoup, Comment
 
@@ -244,3 +244,112 @@ def _clean_html_with_readability(html: str) -> str:
         # If any error occurs, fall back to safe cleaning
         logging.warning(f"Error using readabilipy, falling back to basic HTML cleaning: {e}")
         return _safe_clean_html(html)
+
+def _load_activation_tables_from_csv(
+    table_source: str,
+    root_path: str,
+    pmcids_to_include: Optional[Set[str]] = None
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Load activation tables from a CSV file and map them to PMCIDs.
+    
+    Args:
+        table_source: Path to the table.csv file
+        root_path: Root path for resolving relative paths in table_raw_file
+        pmcids_to_include: Optional set of PMCIDs to filter for
+        
+    Returns:
+        Dictionary mapping PMCIDs to lists of table metadata dictionaries
+    """
+    try:
+        # Read the CSV file
+        df = pd.read_csv(table_source)
+        
+        # Required columns
+        required_columns = [
+            'pmcid', 'table_id', 'table_label', 'table_caption',
+            'table_foot', 'table_raw_file'
+        ]
+        
+        # Check if all required columns are present
+        missing_columns = [
+            col for col in required_columns if col not in df.columns
+        ]
+        if missing_columns:
+            raise ValueError(
+                "Missing required columns in table source CSV: "
+                f"{missing_columns}"
+            )
+        
+        # Create a mapping of pmcid to table metadata
+        pmcid_to_tables = {}
+        
+        for _, row in df.iterrows():
+            pmcid = str(row['pmcid'])
+            
+            # Skip if filtering and this PMCID is not included
+            if (pmcids_to_include is not None and
+                    pmcid not in pmcids_to_include):
+                continue
+            
+            # Create absolute path for table_raw_file
+            table_raw_file = row['table_raw_file']
+            if table_raw_file:
+                # Resolve relative path against root_path
+                table_path = str(Path(root_path) / table_raw_file)
+            else:
+                table_path = None
+            
+            # Create table metadata dictionary
+            table_metadata = {
+                'table_id': str(row['table_id']),
+                'table_label': str(row['table_label']),
+                'table_path': table_path,
+                'table_caption': (
+                    row['table_caption'] if pd.notna(row['table_caption'])
+                    else None
+                ),
+                'table_foot': (
+                    row['table_foot'] if pd.notna(row['table_foot'])
+                    else None
+                )
+            }
+            
+            # Add to mapping
+            if pmcid not in pmcid_to_tables:
+                pmcid_to_tables[pmcid] = []
+            pmcid_to_tables[pmcid].append(table_metadata)
+            
+        return pmcid_to_tables
+        
+    except Exception as e:
+        logging.warning(f"Failed to load activation tables from CSV: {e}")
+        return {}
+
+
+def _map_pmcids_to_activation_tables(
+    full_text_config: Dict[str, Any],
+    pmcids_to_include: Optional[Set[str]] = None
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Map PMCIDs to activation tables from user-provided table sources.
+    
+    Args:
+        full_text_config: Configuration dictionary for a full text source
+        pmcids_to_include: Optional set of PMCIDs to filter for
+        
+    Returns:
+        Dictionary mapping PMCIDs to lists of table metadata dictionaries
+    """
+    # Check if table_source is specified in the configuration
+    table_source = full_text_config.get('table_source')
+    if not table_source:
+        return {}
+    
+    # Get root path from the configuration
+    root_path = full_text_config.get('root_path', '.')
+    
+    # Load activation tables from CSV
+    return _load_activation_tables_from_csv(
+        table_source, root_path, pmcids_to_include
+    )

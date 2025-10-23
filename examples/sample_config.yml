@@ -38,6 +38,38 @@ retrieval:
   #       - "text.txt"
   #     json_filename: "identifiers.json"
   #     json_pmid_key: "pmid"
+  
+  # full_text_sources:
+  #   # Example for HTML files where filename is the PMID (searches recursively)
+  #   - root_path: "/path/to/your/html/files"
+  #     pmid_source: "file_name"
+  #     allowed_extensions: [".html"]
+  #     # Table source for this specific source
+  #     # table_source: "path/to/table.csv"  # CSV file with table metadata
+  #     #   Required columns: pmcid,table_id,table_label,table_caption,table_foot,table_raw_file
+  #     #   table_raw_file should be relative path to raw table file (HTML/CSV/etc)
+  #   # Example for folder-based structure with text files
+  #   - root_path: "/path/to/your/first/full/texts"
+  #     pmid_source: "folder_name"  # or "json" or "file_name"
+  #     text_path_templates:
+  #       - "fulltext.txt"
+  #       - "text.txt"
+  #     # Table source for this specific source
+  #     # table_source: "path/to/table.csv"  # CSV file with table metadata
+  #     #   Required columns: pmcid,table_id,table_label,table_caption,table_foot,table_raw_file
+  #     #   table_raw_file should be relative path to raw table file (HTML/CSV/etc)
+  #   # Example for another folder-based structure with JSON metadata
+  #   - root_path: "/path/to/your/second/full/texts"
+  #     pmid_source: "json"
+  #     text_path_templates:
+  #       - "processed/pubget/text.txt"
+  #       - "text.txt"
+  #     json_filename: "identifiers.json"
+  #     json_pmid_key: "pmid"
+  #     # Table source for this specific source
+  #     # table_source: "path/to/table.csv"  # CSV file with table metadata
+  #     #   Required columns: pmcid,table_id,table_label,table_caption,table_foot,table_raw_file
+  #     #   table_raw_file should be relative path to raw table file (HTML/CSV/etc)
 
 screening:
   abstract:

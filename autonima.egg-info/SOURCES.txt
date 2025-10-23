@@ -13,6 +13,11 @@ autonima.egg-info/dependency_links.txt
 autonima.egg-info/entry_points.txt
 autonima.egg-info/requires.txt
 autonima.egg-info/top_level.txt
+autonima/annotation/__init__.py
+autonima/annotation/client.py
+autonima/annotation/processor.py
+autonima/annotation/prompts.py
+autonima/annotation/schema.py
 autonima/coordinates/__init__.py
 autonima/coordinates/nimads_models.py
 autonima/coordinates/openai_client.py

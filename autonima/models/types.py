@@ -23,7 +23,9 @@ class StudyStatus(Enum):
 @dataclass
 class ActivationTable:
     """Represents a table containing activation coordinates from a study."""
-    table_path: str  # Path to the CSV or HTML file representing the table
+    table_id: str  # New identifier for the table
+    table_label: str  # Label or identifier for the table
+    table_path: str  # Path to the raw table file (HTML/CSV/etc)
     table_caption: Optional[str] = None  # Caption of the table
     table_foot: Optional[str] = None  # Footer of the table
 
@@ -81,6 +83,8 @@ class Study:
             "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {
+                    "table_id": table.table_id,  # Added table_id
+                    "table_label": table.table_label,
                     "table_path": table.table_path,
                     "table_caption": table.table_caption,
                     "table_foot": table.table_foot
@@ -120,7 +124,8 @@ class Study:
             
         Raises:
             ValueError: If output_dir is not provided
-            FileNotFoundError: If the text file doesn't exist at the expected location
+            FileNotFoundError: If the text file doesn't exist at the
+            expected location
         """
         # Import here to avoid circular imports
         from ..retrieval.utils import _load_full_text
@@ -204,6 +209,7 @@ class PipelineConfig:
     output: OutputConfig
     parsing: ParsingConfig = field(default_factory=ParsingConfig)
     annotation: AnnotationConfig = field(default_factory=AnnotationConfig)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
         return {
@@ -299,7 +305,8 @@ class PipelineResult:
         """Convert pipeline result to dictionary.
         
         Args:
-            final_studies_only: If True, only include studies with status INCLUDED
+            final_studies_only: If True, only include studies with status
+            INCLUDED
         """
         # Filter studies if requested
         studies_to_include = self.studies
