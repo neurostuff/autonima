@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 import tempfile
 
-from autonima.retrieval import PubGetRetriever, ACERetriever
+from autonima.retrieval import PubGetRetriever
 from autonima.models.types import Study, StudyStatus
 
 
@@ -76,24 +76,6 @@ class TestRetrieval(unittest.TestCase):
         except ImportError:
             self.skipTest("PubGet not installed")
 
-    def test_ace_retriever_initialization(self):
-        """Test ACERetriever initialization."""
-        retriever = ACERetriever()
-        self.assertIsInstance(retriever, ACERetriever)
-
-    def test_ace_retrieve_method_signature(self):
-        """Test ACERetriever retrieve method signature."""
-        retriever = ACERetriever()
-        # Just test that the method exists and has the right signature
-        self.assertTrue(hasattr(retriever, 'retrieve'))
-        self.assertTrue(callable(getattr(retriever, 'retrieve')))
-
-    def test_ace_validate_retrieval_method_signature(self):
-        """Test ACERetriever validate_retrieval method signature."""
-        retriever = ACERetriever()
-        # Just test that the method exists and has the right signature
-        self.assertTrue(hasattr(retriever, 'validate_retrieval'))
-        self.assertTrue(callable(getattr(retriever, 'validate_retrieval')))
 
     def test_base_retriever_imports(self):
         """Test that BaseRetriever can be imported."""

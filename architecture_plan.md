@@ -28,7 +28,6 @@ autonima/
 ├── retrieval/
 │   ├── __init__.py
 │   ├── pubget.py          # PubGet integration
-│   ├── ace.py             # ACE integration
 │   └── base.py            # Abstract retrieval interface
 ├── output/
 │   ├── __init__.py
@@ -90,7 +89,6 @@ autonima/
 - **Purpose**: Download full-text articles
 - **Features**:
   - PubGet integration for open-access papers from PubMed Central
-  - ACE (Academic Citation Engine) integration (stub implementation)
   - Fallback mechanisms for paywalled content
   - PDF/text extraction and parsing
   - Support for parallel processing with configurable number of jobs
@@ -197,7 +195,7 @@ class ScreeningConfig:
 5. Implement prompt library and Pydantic schemas
 
 ### Phase 4: Advanced Features
-1. Integrate with PubGet and ACE (PubGet implemented, ACE stubbed)
+1. Integrate with PubGet
 2. Implement PRISMA diagram generation
 3. Add PDF processing capabilities
 4. Implement benchmarking framework

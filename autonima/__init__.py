@@ -7,7 +7,7 @@ and meta-analyses in neuroimaging, following the PRISMA framework.
 This package provides automated tools for:
 - Literature search via PubMed API
 - Abstract and full-text screening using LLMs
-- Full-text retrieval via PubGet and ACE
+- Full-text retrieval via PubGet
 - PRISMA-compliant workflow management
 - Output generation for downstream meta-analysis
 
@@ -25,7 +25,7 @@ from .pipeline import AutonimaPipeline
 from .config import PipelineConfig
 
 # Import retrieval module components
-from .retrieval import BaseRetriever, PubGetRetriever, ACERetriever
+from .retrieval import BaseRetriever, PubGetRetriever
 
 # Import coordinate parsing module components
 from .coordinates import CoordinatePoint, Analysis, ParseAnalysesOutput, parse_tables, CoordinateParsingClient
@@ -45,7 +45,6 @@ __all__ = [
     "PipelineConfig",
     "BaseRetriever",
     "PubGetRetriever",
-    "ACERetriever",
     "CoordinatePoint",
     "Analysis",
     "ParseAnalysesOutput",
