@@ -1,10 +1,17 @@
-# sample_config.yaml
 # Example Autonima pipeline specification
 # Defines a systematic review according to PRISMA steps
 
 search:
   database: "pubmed"
+  # Option 1: Specify a search query
   query: "schizophrenia AND working memory AND fMRI"
+  # Option 2: Provide a list of PMIDs directly
+  # pmids_list:
+  #   - "12345678"
+  #   - "23456789"
+  #   - "34567890"
+  # Option 3: Provide a file with one PMID per line
+  # pmids_file: "path/to/pmids.txt"
   max_results: 100
   # Optional date filtering - format: YYYY/MM/DD
   # date_from: "2020/01/01"
@@ -19,33 +26,8 @@ retrieval:
   #   - root_path: "/path/to/your/html/files"
   #     pmid_source: "file_name"
   #     allowed_extensions: [".html"]
-  #   # Example for folder-based structure with text files
-  #   - root_path: "/path/to/your/first/full/texts"
-  #     pmid_source: "folder_name"  # or "json" or "file_name"
-  #     text_path_templates:
-  #       - "fulltext.txt"
-  #       - "text.txt"
-  #     # For pmid_source: "json", you can customize:
-  #     # json_filename: "identifiers.json"
-  #     # json_pmid_key: "pmid"
-  #     # For pmid_source: "file_name", you can customize:
-  #     # allowed_extensions: [".txt", ".xml"]
-  #   # Example for another folder-based structure with JSON metadata
-  #   - root_path: "/path/to/your/second/full/texts"
-  #     pmid_source: "json"
-  #     text_path_templates:
-  #       - "processed/pubget/text.txt"
-  #       - "text.txt"
-  #     json_filename: "identifiers.json"
-  #     json_pmid_key: "pmid"
-  
-  # full_text_sources:
-  #   # Example for HTML files where filename is the PMID (searches recursively)
-  #   - root_path: "/path/to/your/html/files"
-  #     pmid_source: "file_name"
-  #     allowed_extensions: [".html"]
   #     # Table source for this specific source (pubget-like format)
-  #     processed_data: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
+  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
   #       This directory should contain coordinates.csv and tables.csv files like pubget output
   #   # Example for folder-based structure with text files
   #   - root_path: "/path/to/your/first/full/texts"
@@ -54,7 +36,7 @@ retrieval:
   #       - "fulltext.txt"
   #       - "text.txt"
   #     # Table source for this specific source (pubget-like format)
-  #     processed_data: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
+  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
   #   # Example for another folder-based structure with JSON metadata
   #   - root_path: "/path/to/your/second/full/texts"
   #     pmid_source: "json"
@@ -64,7 +46,7 @@ retrieval:
   #     json_filename: "identifiers.json"
   #     json_pmid_key: "pmid"
   #     # Table source for this specific source (pubget-like format)
-  #     processed_data: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
+  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
 
 screening:
   abstract:

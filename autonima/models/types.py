@@ -25,10 +25,10 @@ class ActivationTable:
     """Represents a table containing activation coordinates from a study."""
     table_id: str  # New identifier for the table
     table_label: str  # Label or identifier for the table
-    table_path: str  # Path to the raw table file (HTML/CSV/etc)
     table_caption: Optional[str] = None  # Caption of the table
     table_foot: Optional[str] = None  # Footer of the table
     table_data_path: Optional[str] = None  # Path to processed table data file
+    table_raw_path: Optional[str] = None  # Path to raw table data file
 
 
 @dataclass
@@ -86,10 +86,10 @@ class Study:
                 {
                     "table_id": table.table_id,  # Added table_id
                     "table_label": table.table_label,
-                    "table_path": table.table_path,
                     "table_caption": table.table_caption,
                     "table_foot": table.table_foot,
-                    "table_data_path": table.table_data_path
+                    "table_data_path": table.table_data_path,
+                    "table_raw_path": table.table_raw_path
                 } for table in self.activation_tables
             ],
             "analyses": [
@@ -145,6 +145,8 @@ class SearchConfig:
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     email: Optional[str] = None  # Required for NCBI API
+    pmids_file: Optional[str] = None  # Path to file with PMIDs (one per line)
+    pmids_list: Optional[List[str]] = None  # Direct list of PMIDs
 
 
 @dataclass
@@ -201,7 +203,6 @@ class OutputConfig:
     nimads: bool = False
 
 
-
 @dataclass
 class PipelineConfig:
     """Main configuration for the Autonima pipeline."""
@@ -222,6 +223,8 @@ class PipelineConfig:
                 "date_from": self.search.date_from,
                 "date_to": self.search.date_to,
                 "email": self.search.email,
+                "pmids_file": self.search.pmids_file,
+                "pmids_list": self.search.pmids_list,
             },
             "screening": {
                 "abstract": self.screening.abstract,

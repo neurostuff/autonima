@@ -86,7 +86,8 @@ def _map_pmids_to_text(
     pmids_to_include: Optional[Set[int]] = None,
     json_filename: str = 'identifiers.json',
     json_pmid_key: str = 'pmid',
-    allowed_extensions: Optional[List[str]] = None
+    allowed_extensions: Optional[List[str]] = None,
+    processed_data_path: Optional[str] = None
 ) -> Dict[int, Path]:
     """
     Generically maps PubMed IDs (PMIDs) to their full-text file paths.
@@ -110,13 +111,14 @@ def _map_pmids_to_text(
         allowed_extensions (Optional[List[str]]): A list of file extensions (e.g., ['.txt', '.xml'])
                                                   to consider when pmid_source is 'file_name'.
                                                   Defaults to ['.txt'].
+        processed_data_path (Optional[str]): The path to the processed data directory.
 
     Returns:
         Dict[int, Path]: A dictionary mapping integer PMIDs to the Path object of their text file.
     """
     root = Path(root_path)
     index = {}
-    
+
     # Set default for file_name mode
     if pmid_source == 'file_name' and allowed_extensions is None:
         allowed_extensions = ['.txt']
@@ -181,7 +183,19 @@ def _map_pmids_to_text(
             if pmids_to_include is None or pmid in pmids_to_include:
                 index[pmid] = text_file_path
 
-    return index
+    if processed_data_path:
+        # Load activation tables from source
+        processed_data_path = Path(processed_data_path)
+        tables = load_activation_table_map(
+            data_dir=processed_data_path,
+            ids_to_include=pmids_to_include,
+            filter_by_coordinates=True,
+            identifier_key='pmid',
+        )
+    else:
+        tables = None
+
+    return index, tables
 
 
 def _safe_clean_html(html: str) -> str:
@@ -249,10 +263,17 @@ def _clean_html_with_readability(html: str) -> str:
 def _load_activation_table_metadata(
     df: pd.DataFrame,
     root_path: Path,
-    pmcids_to_include: Optional[Set[str]] = None,
+    ids_to_include: Optional[Set[str]] = None,
+    identifier_key: str = "pmcid",
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Turn a tables dataframe into a mapping of pmcid -> list of table metadata.
+    Turn a tables dataframe into a mapping of identifier -> list of table metadata.
+    
+    Args:
+        df: DataFrame containing table metadata
+        root_path: Root path for resolving file paths
+        ids_to_include: Optional set of identifiers to include
+        identifier_key: Column name to use as identifier (default: "pmcid")
     """
 
     # Ensure at least one of the "file path" columns exists
@@ -265,21 +286,21 @@ def _load_activation_table_metadata(
         )
 
     # Required metadata columns
-    required_columns = ['pmcid', 'table_id', 'table_label', 'table_caption', 'table_foot']
+    required_columns = [identifier_key, 'table_id', 'table_label', 'table_caption', 'table_foot']
     missing = [c for c in required_columns if c not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
-    pmcid_to_tables: Dict[str, List[Dict[str, Any]]] = {}
+    id_to_tables: Dict[str, List[Dict[str, Any]]] = {}
 
     for _, row in df.iterrows():
-        pmcid = str(row['pmcid'])
+        identifier = row[identifier_key]
 
-        if pmcids_to_include is not None and pmcid not in pmcids_to_include:
+        if ids_to_include is not None and identifier not in ids_to_include:
             continue
 
         # Resolve file paths if present
-        table_path = (
+        table_raw_path = (
             str(root_path / row['table_raw_file'])
             if has_raw_file and pd.notna(row['table_raw_file'])
             and row['table_raw_file']
@@ -296,7 +317,7 @@ def _load_activation_table_metadata(
         table_metadata = {
             'table_id': str(row['table_id']),
             'table_label': str(row['table_label']),
-            'table_path': table_path,
+            'table_raw_path': table_raw_path,
             'table_data_path': table_data_path,
             'table_caption': (
                 row['table_caption'] if pd.notna(row['table_caption']) else None
@@ -306,19 +327,26 @@ def _load_activation_table_metadata(
             ),
         }
 
-        pmcid_to_tables.setdefault(pmcid, []).append(table_metadata)
+        id_to_tables.setdefault(identifier, []).append(table_metadata)
 
-    return pmcid_to_tables
+    return id_to_tables
 
 
 def load_activation_table_map(
     data_dir: Path,
-    pmcids_to_include: Optional[Set[str]] = None,
+    ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
+    identifier_key: str = "pmcid",
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Core function: Load and (optionally) filter activation tables.
-    Returns pmcid -> list of table metadata dicts.
+    Returns identifier -> list of table metadata dicts.
+    
+    Args:
+        data_dir: Directory containing tables.csv and coordinates.csv
+        ids_to_include: Optional set of identifiers to include
+        filter_by_coordinates: Whether to filter by coordinates
+        identifier_key: Column name to use as identifier (default: "pmcid")
     """
     tables_file = data_dir / "tables.csv"
     if not tables_file.exists():
@@ -333,14 +361,15 @@ def load_activation_table_map(
         if filter_by_coordinates and coords_file.exists():
             coords_df = pd.read_csv(coords_file)
             df = df[
-                df.set_index(["pmcid", "table_id"]).index
-                .isin(coords_df.set_index(["pmcid", "table_id"]).index)
+                df.set_index([identifier_key, "table_id"]).index
+                .isin(coords_df.set_index([identifier_key, "table_id"]).index)
             ]
 
         return _load_activation_table_metadata(
             df=df,
             root_path=data_dir,
-            pmcids_to_include=pmcids_to_include,
+            ids_to_include=ids_to_include,
+            identifier_key=identifier_key,
         )
 
     except Exception as e:
@@ -349,47 +378,58 @@ def load_activation_table_map(
 
 
 
-def _map_pmcids_to_activation_tables(
+def _map_ids_to_activation_tables(
     full_text_config: Dict[str, Any],
-    pmcids_to_include: Optional[Set[str]] = None,
+    ids_to_include: Optional[Set[str]] = None,
+    identifier_key: str = "pmcid",
 ) -> Dict[str, List[Dict[str, Any]]]:
-    processed_data = full_text_config.get("processed_data")
-    if not processed_data:
+    processed_data_path = full_text_config.get("processed_data_path")
+    if not processed_data_path:
         return {}
 
-    data_dir = Path(processed_data)
+    data_dir = Path(processed_data_path)
     return load_activation_table_map(
         data_dir=data_dir,
-        pmcids_to_include=pmcids_to_include,
-        filter_by_coordinates=False,  # 🚫 No coords in this flow
+        ids_to_include=ids_to_include,
+        filter_by_coordinates=False,
+        identifier_key=identifier_key,
     )
 
 
 def _apply_activation_tables_to_studies(
     studies: List["Study"],
-    pmcid_to_tables: Dict[str, List[Dict[str, Any]]],
+    id_to_tables: Dict[str, List[Dict[str, Any]]],
+    identifier_key: str,
     clear_existing: bool = True,
 ) -> None:
     """
-    Attach activation tables to studies based on PMCID mappings.
+    Attach activation tables to studies based on identifier mappings.
+    
+    Args:
+        studies: List of studies to attach tables to
+        id_to_tables: Mapping of identifiers to table metadata
+        clear_existing: Whether to clear existing activation tables
+        identifier_key: Which study attribute to use as identifier
     """
     for study in studies:
-        if not study.pmcid:
+        # Get the identifier value from the study based on the identifier_key
+        identifier_value = getattr(study, identifier_key, None)
+        if not identifier_value:
             continue
 
-        if study.pmcid not in pmcid_to_tables:
+        if identifier_value not in id_to_tables:
             continue
 
         if clear_existing:
             study.activation_tables.clear()
 
-        for t in pmcid_to_tables[study.pmcid]:
+        for t in id_to_tables[identifier_value]:
             study.activation_tables.append(
                 ActivationTable(
                     table_id=t['table_id'],
                     table_label=t['table_label'],
-                    table_path=t['table_path'],
-                    table_data_path=t.get('table_data_path'),
+                    table_data_path=t.get('table_data_path', None),
+                    table_raw_path=t.get('table_raw_path', None),
                     table_caption=t['table_caption'],
                     table_foot=t['table_foot'],
                 )

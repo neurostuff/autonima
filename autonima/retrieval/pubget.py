@@ -371,12 +371,14 @@ class PubGetRetriever(BaseRetriever):
         pmcid_to_tables = load_activation_table_map(
             data_dir=data_dir,
             filter_by_coordinates=True,
+            identifier_key="pmcid",
         )
 
         _apply_activation_tables_to_studies(
             studies=studies,
-            pmcid_to_tables=pmcid_to_tables,
+            id_to_tables=pmcid_to_tables,
             clear_existing=False,
+            identifier_key="pmcid",
         )
         
         # Check which studies have full-text files

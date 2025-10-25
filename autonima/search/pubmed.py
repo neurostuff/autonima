@@ -47,18 +47,22 @@ class PubMedSearch(SearchEngine):
         Execute PubMed search and return list of studies.
 
         Args:
-            query: PubMed search query
+            query: PubMed search query (ignored if pmids_file or pmids_list is provided)
 
         Returns:
             List of Study objects
         """
         try:
-            # Build complete query
-            full_query = self.build_query(query)
-
-            # Execute search
-            pmids = await self._execute_search(full_query)
-            logger.info(f"Found {len(pmids)} potential studies")
+            # Check if we are using PMIDs list or file
+            if self.config.pmids_file or self.config.pmids_list:
+                # Use PMIDs from file or list
+                pmids = self._load_pmids()
+                logger.info(f"Using {len(pmids)} PMIDs from config")
+            else:
+                # Build complete query
+                full_query = self.build_query(query)
+                pmids = await self._execute_search(full_query)
+                logger.info(f"Found {len(pmids)} potential studies from search")
 
             if not pmids:
                 return []
@@ -85,6 +89,22 @@ class PubMedSearch(SearchEngine):
         except Exception as e:
             log_error_with_debug(logger, f"Error during PubMed search: {e}")
             raise
+
+    def _load_pmids(self) -> List[str]:
+        """Load PMIDs from file or list in config."""
+        if self.config.pmids_list:
+            return self.config.pmids_list
+        
+        if self.config.pmids_file:
+            try:
+                with open(self.config.pmids_file, 'r') as f:
+                    pmids = [line.strip() for line in f if line.strip()]
+                return pmids
+            except Exception as e:
+                logger.error(f"Failed to read PMIDs file: {e}")
+                raise
+        
+        return []
 
     def _load_cached_search_results(self) -> List[Study]:
         """
@@ -421,7 +441,9 @@ class PubMedSearch(SearchEngine):
             "max_results": self.config.max_results,
             "date_from": self.config.date_from,
             "date_to": self.config.date_to,
-            "email": self.config.email
+            "email": self.config.email,
+            "pmids_file": self.config.pmids_file,
+            "pmids_list": self.config.pmids_list
         }
 
     async def _make_request_with_retry(
@@ -544,3 +566,23 @@ class PubMedSearch(SearchEngine):
         }
 
         return pmid_to_pmcid
+
+    async def _load_pmids(self) -> List[str]:
+        """
+        Load PMIDs from either file or list in config.
+
+        Returns:
+            List of PMID strings
+        """
+        if self.config.pmids_list:
+            return self.config.pmids_list
+        
+        if self.config.pmids_file:
+            try:
+                with open(self.config.pmids_file, 'r') as f:
+                    return [line.strip() for line in f if line.strip()]
+            except Exception as e:
+                logger.error(f"Failed to read PMIDs file: {e}")
+                raise
+        
+        return []

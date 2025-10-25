@@ -134,8 +134,14 @@ class ConfigManager:
             ConfigurationError: If configuration is invalid
         """
         # Validate search configuration
-        if not config.search.query.strip():
-            raise ConfigurationError("Search query cannot be empty")
+        if config.search.pmids_file or config.search.pmids_list:
+            # PMID-based search
+            if config.search.query.strip():
+                raise ConfigurationError("Cannot specify both search query and PMIDs list/file")
+        else:
+            # Query-based search
+            if not config.search.query.strip():
+                raise ConfigurationError("Search query cannot be empty when not using PMIDs list/file")
 
         if config.search.max_results <= 0:
             raise ConfigurationError("max_results must be positive")

@@ -6,22 +6,23 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
+import concurrent.futures
+from tqdm import tqdm
 
 from .config import ConfigManager
 from .models.types import (
     PipelineConfig,
     PipelineResult,
-    StudyStatus,
-    ActivationTable
+    StudyStatus
 )
 from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .retrieval.utils import (
-        _map_pmcids_to_activation_tables, _apply_activation_tables_to_studies
+        _apply_activation_tables_to_studies,
+        _map_pmids_to_text
     )
 from .utils import log_error_with_debug
-from .coordinates.nimads_models import convert_to_nimads_studyset
 from .annotation.processor import AnnotationProcessor
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ class AutonimaPipeline:
         if not self._search_engine:
             raise RuntimeError("Search engine not initialized")
 
-        # Execute search
+        # Execute search or load PMIDs
         studies = await self._search_engine.search(self.config.search.query)
 
         # Add studies to results
@@ -151,7 +152,9 @@ class AutonimaPipeline:
             "search_completed": datetime.now().isoformat(),
             "studies_found": len(studies),
             "search_engine": self.config.search.database,
-            "search_query": self.config.search.query
+            "search_query": self.config.search.query,
+            "pmids_file": self.config.search.pmids_file,
+            "pmids_list": self.config.search.pmids_list
         })
 
         # Save intermediary results
@@ -228,107 +231,76 @@ class AutonimaPipeline:
         # Get included studies that need full-text retrieval
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and
-            s.status not in [StudyStatus.FULLTEXT_RETRIEVED,
-                             StudyStatus.FULLTEXT_CACHED]
+            if s.status == StudyStatus.INCLUDED
         ]
 
+        pmids_set = set(
+            [int(s.pmid) for s in included_studies if s.pmid.isdigit()]
+        )
+        
         if not included_studies:
             logger.info("No studies require full-text retrieval")
             return
 
-        if not self._retriever:
-            raise RuntimeError("Retriever not initialized")
-
         # Check for existing full texts from user-provided sources
-        studies_from_user_source = []
-        studies_for_pubget = included_studies
+        studies_from_user_sources = []
+        studies_from_source = []
+        studies_to_retrieve = included_studies
+
+        full_text_sources = getattr(
+            self.config.retrieval, 'full_text_sources', []
+            )
         
-        # If full_text_sources are configured, try to map PMIDs to existing texts
-        if (hasattr(self.config.retrieval, 'full_text_sources') and
-                self.config.retrieval.full_text_sources):
+        try:
+            for i, full_text_config in enumerate(full_text_sources):
+                logger.info(f"Processing full text source {i+1}/{len(full_text_sources)}")
+
+                # Map PMIDs to text files in source
+                text_paths, tables = _map_pmids_to_text(
+                    **full_text_config,
+                    pmids_to_include=pmids_set
+                    )
+
+                # Update studies with their full text paths
+                for study in studies_to_retrieve[:]:
+                    if int(study.pmid) in text_paths:
+                        study.full_text_path = str(text_paths[int(study.pmid)])
+                        study.status = StudyStatus.FULLTEXT_CACHED
+                        studies_from_source.append(study)
+                        studies_to_retrieve.remove(study)
+
+                if tables:
+                    # Apply activation tables to studies
+                    _apply_activation_tables_to_studies(
+                        studies=studies_from_source,
+                        id_to_tables=tables,
+                        identifier_key="pmid",
+                    )
+
+                studies_from_user_sources += studies_from_source
             
-            try:
-                from .retrieval.utils import _map_pmids_to_text
-                
-                # Extract PMIDs from included studies
-                pmids = [int(s.pmid) for s in included_studies if s.pmid.isdigit()]
-                pmids_set = set(pmids)
-                
-                # Process each full text source
-                for i, full_text_config in enumerate(self.config.retrieval.full_text_sources):
-                    if not full_text_config:
-                        continue
-                        
-                    logger.info(f"Processing full text source {i+1}/{len(self.config.retrieval.full_text_sources)}")
-                    
-                    # Map PMIDs to text files
-                    pmid_to_text_path = _map_pmids_to_text(
-                        root_path=full_text_config['root_path'],
-                        pmid_source=full_text_config['pmid_source'],
-                        text_path_templates=full_text_config.get('text_path_templates'),
-                        pmids_to_include=pmids_set,
-                        json_filename=full_text_config.get('json_filename', 'identifiers.json'),
-                        json_pmid_key=full_text_config.get('json_pmid_key', 'pmid'),
-                        allowed_extensions=full_text_config.get('allowed_extensions')
-                    )
-                    
-                    # Update studies with their full text paths
-                    for study in studies_for_pubget[:]:  # Use a copy to safely modify during iteration
-                        if int(study.pmid) in pmid_to_text_path:
-                            study.full_text_path = str(pmid_to_text_path[int(study.pmid)])
-                            study.status = StudyStatus.FULLTEXT_CACHED
-                            studies_from_user_source.append(study)
-                            studies_for_pubget.remove(study)  # Remove from studies_for_pubget
-                
-                logger.info(
-                    f"Found {len(studies_from_user_source)} studies in user-provided "
-                    "full text sources"
-                )
-                
-                # Load activation tables from table_source CSV files if specified
-                try:
-                    # Extract PMCIDs from included studies
-                    pmcids = [s.pmcid for s in included_studies if s.pmcid]
-                    pmcids_set = set(pmcids)
-                    
-                    # Process each full text source for table data
-                    for full_text_config in self.config.retrieval.full_text_sources:
-                        if not full_text_config:
-                            continue
-
-                        pmcid_to_tables = _map_pmcids_to_activation_tables(
-                            full_text_config, pmcids_set
-                        )
-
-                        _apply_activation_tables_to_studies(
-                            studies=self.results.studies,
-                            pmcid_to_tables=pmcid_to_tables,
-                            clear_existing=True,
-                        )
-
-                                    
-                except Exception as table_error:
-                    logger.warning(
-                        f"Failed to load activation tables from user-provided sources: {table_error}"
-                    )
-                
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load from user-provided full text sources: {e}"
-                )
+            logger.info(
+                f"Found {len(studies_from_user_sources)} studies in user-provided "
+                "full text sources"
+            )
+             
+        except Exception as e:
+            logger.warning(
+                f"Failed to load from user-provided full text sources: {e}"
+            )
 
         # Fetch PMCIDs for studies that will use PubGet (those without full_text_path)
         studies_needing_pmcid = [
-            s for s in studies_for_pubget if not s.pmcid
+            s for s in studies_to_retrieve if not s.pmcid
         ]
         
         if studies_needing_pmcid:
             logger.info(
                 f"Fetching PMCIDs for {len(studies_needing_pmcid)} studies"
             )
-            pmids = [s.pmid for s in studies_needing_pmcid]
-            pmid_to_pmcid = await self._search_engine.fetch_pmcids(pmids)
+            pmid_to_pmcid = await self._search_engine.fetch_pmcids(
+                [s.pmid for s in studies_needing_pmcid]
+            )
             
             # Update studies with their PMCIDs
             not_found = []
@@ -338,28 +310,25 @@ class AutonimaPipeline:
                 else:
                     not_found.append(study.pmid)
 
-        # Use PubGet for actual retrieval (only for studies not found in user source)
-        if studies_for_pubget:
+        # Use PubGet for retrieval
+        if studies_to_retrieve:
             output_dir = Path(self.config.output.directory)
             retrieval_dir = output_dir / "retrieval"
 
             # Retrieve full-text articles
             try:
-                api_key = getattr(self.config.retrieval, 'api_key', None)
-                n_docs = getattr(self.config.retrieval, 'max_docs', None)
-
                 _ = self._retriever.retrieve(
-                    studies=studies_for_pubget,
+                    studies=studies_to_retrieve,
                     output_dir=retrieval_dir,
-                    api_key=api_key,
-                    n_docs=n_docs
+                    api_key=getattr(self.config.retrieval, 'api_key', None),
+                    n_docs=getattr(self.config.retrieval, 'max_docs', None)
                 )
                     
             except Exception as e:
                 log_error_with_debug(logger, f"Full-text retrieval failed: {e}")
 
             # Validate retrieval
-            self._retriever.validate_retrieval(studies_for_pubget, retrieval_dir)
+            self._retriever.validate_retrieval(studies_to_retrieve, retrieval_dir)
 
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
@@ -387,7 +356,6 @@ class AutonimaPipeline:
             "timestamp": datetime.now().isoformat()
         }
         with open(retrieval_results_file, 'w') as f:
-            import json
             json.dump(retrieval_data, f, indent=2)
 
         retrieved_count = len([
@@ -487,7 +455,7 @@ class AutonimaPipeline:
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED and s.activation_tables and not s.analyses
         ]
- 
+
         if not studies_with_tables:
             logger.info("No studies with activation tables require coordinate parsing")
             return
@@ -532,9 +500,7 @@ class AutonimaPipeline:
         else:
             # Parallel processing over all tables
             logger.info(f"Using {self.num_workers} workers for parallel coordinate parsing of {len(table_jobs)} tables")
-            import concurrent.futures
-            from tqdm import tqdm
-            
+
             def process_single_table_job(job):
                 study, table, table_index = job
                 try:

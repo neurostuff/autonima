@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import List
 
 from .openai_client import CoordinateParsingClient
-from .schema import Analysis
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,8 @@ logger = logging.getLogger(__name__)
 class CoordinateProcessor:
     """Processor for parsing coordinates from activation tables."""
     
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(self, model: str = "gpt-4o-mini", 
+                 path_preference: List[str] = ['table_raw_path', 'table_data_path']):
         """
         Initialize the coordinate processor.
         
@@ -22,58 +22,9 @@ class CoordinateProcessor:
             model: The model to use for parsing
         """
         self.model = model
+        self.path_preference = path_preference
         self.client = CoordinateParsingClient()
-    
-    def process_study(self, study):
-        """
-        Process all activation tables for a study and extract analyses.
-        
-        Args:
-            study: The study to process
-            
-        Returns:
-            List of analyses extracted from the study's tables
-        """
-        # Import locally to avoid circular imports
-        from autonima.models.types import Study, ActivationTable
-        
-        if not study.activation_tables:
-            return []
-        
-        all_analyses = []
-        
-        for table in study.activation_tables:
-            try:
-                # Load the table data
-                table_path = Path(table.table_path)
-                if not table_path.exists():
-                    logger.warning(f"Table file not found: {table_path}")
-                    continue
-                
-                # Read the table as text
-                with open(table_path, "r", encoding="utf-8") as f:
-                    reader = csv.reader(f)
-                    rows = list(reader)
-                    table_text = "\n".join([",".join(r) for r in rows])
-                
-                # Create a prompt for the table
-                prompt = self._create_table_prompt(
-                    table_text,
-                    table_caption=table.table_caption or "",
-                    table_foot=table.table_foot or ""
-                )
-                
-                # Parse the table
-                result = self.client.parse_analyses(prompt, model=self.model)
-                
-                # Add the analyses to our list
-                all_analyses.extend(result.analyses)
-                
-            except Exception as e:
-                logger.warning(f"Error processing table {table.table_path}: {e}")
-                continue
-        
-        return all_analyses
+
     
     def process_single_table(self, table):
         """
@@ -87,7 +38,15 @@ class CoordinateProcessor:
         """
         try:
             # Load the table data
-            table_path = Path(table.table_path)
+            for path_attr in self.path_preference:
+                table_path_value = getattr(table, path_attr, None)
+                if table_path_value:
+                    table_path = Path(table_path_value)
+                    break
+            else:
+                logger.warning(f"No valid table path found for table: {table.table_id}")
+                return []
+            table_path = Path(table_path)
             if not table_path.exists():
                 logger.warning(f"Table file not found: {table_path}")
                 return []
@@ -107,7 +66,6 @@ class CoordinateProcessor:
             
             # Parse the table
             result = self.client.parse_analyses(prompt, model=self.model)
-            
             return result.analyses
             
         except Exception as e:
