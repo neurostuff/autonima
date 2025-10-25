@@ -566,23 +566,3 @@ class PubMedSearch(SearchEngine):
         }
 
         return pmid_to_pmcid
-
-    async def _load_pmids(self) -> List[str]:
-        """
-        Load PMIDs from either file or list in config.
-
-        Returns:
-            List of PMID strings
-        """
-        if self.config.pmids_list:
-            return self.config.pmids_list
-        
-        if self.config.pmids_file:
-            try:
-                with open(self.config.pmids_file, 'r') as f:
-                    return [line.strip() for line in f if line.strip()]
-            except Exception as e:
-                logger.error(f"Failed to read PMIDs file: {e}")
-                raise
-        
-        return []
