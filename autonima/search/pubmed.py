@@ -53,16 +53,20 @@ class PubMedSearch(SearchEngine):
             List of Study objects
         """
         try:
+            # Build complete query
+            pmids = []
+            if query:
+                full_query = self.build_query(query)
+                pmids += await self._execute_search(full_query)
+                logger.info(f"Found {len(pmids)} potential studies from search")
+
             # Check if we are using PMIDs list or file
             if self.config.pmids_file or self.config.pmids_list:
                 # Use PMIDs from file or list
-                pmids = self._load_pmids()
+                pmids += self._load_pmids()
                 logger.info(f"Using {len(pmids)} PMIDs from config")
-            else:
-                # Build complete query
-                full_query = self.build_query(query)
-                pmids = await self._execute_search(full_query)
-                logger.info(f"Found {len(pmids)} potential studies from search")
+
+            logger.info(f"Total PMIDs to process: {len(pmids)}")
 
             if not pmids:
                 return []
