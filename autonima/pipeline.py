@@ -88,6 +88,9 @@ class AutonimaPipeline:
         n_jobs = getattr(self.config.retrieval, 'n_jobs', 1)
         self._retriever = PubGetRetriever(n_jobs=n_jobs)
 
+        # Save criteria mapping early in pipeline
+        from .utils.criteria import save_criteria_mapping
+        save_criteria_mapping(self.config, self.config.output.directory)
     async def run(self) -> PipelineResult:
         """
         Execute the complete systematic review pipeline.

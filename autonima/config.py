@@ -12,6 +12,7 @@ from .models.types import (
     ParsingConfig,
     OutputConfig
 )
+from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
 
 
 class ConfigurationError(Exception):
@@ -115,6 +116,21 @@ class ConfigManager:
                 parsing=ParsingConfig(**config_dict.get('parsing', {})),
                 annotation=self._load_annotation_config(config_dict.get('annotation', {}))
             )
+
+            # Assign IDs to criteria
+            id_assigner = CriteriaIDAssigner()
+            
+            # Assign IDs to abstract screening criteria
+            abstract_inclusion = config.screening.abstract.get('inclusion_criteria', [])
+            abstract_exclusion = config.screening.abstract.get('exclusion_criteria', [])
+            abstract_mapping = id_assigner.assign_ids(abstract_inclusion, abstract_exclusion)
+            config.screening.abstract['criteria_mapping'] = abstract_mapping
+            
+            # Assign IDs to fulltext screening criteria
+            fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria', [])
+            fulltext_exclusion = config.screening.fulltext.get('exclusion_criteria', [])
+            fulltext_mapping = id_assigner.assign_ids(fulltext_inclusion, fulltext_exclusion)
+            config.screening.fulltext['criteria_mapping'] = fulltext_mapping
 
             self._validate_config(config)
             self._config = config

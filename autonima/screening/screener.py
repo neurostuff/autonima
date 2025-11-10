@@ -208,7 +208,7 @@ class LLMScreener(ScreeningEngine):
             Dictionary mapping study IDs to their screening results
         """
         filename = f"{screening_type}_screening_results.json"
-        results_file = self.result_dir / "outputs"/ filename
+        results_file = self.result_dir / "outputs" / filename
         if not results_file.exists():
             return {}
             
@@ -257,7 +257,6 @@ class LLMScreener(ScreeningEngine):
         self,
         response,
         config,
-        screening_type: str,
         confidence_reporting: bool = False
     ):
         """Process the LLM response and apply threshold logic."""
@@ -319,6 +318,9 @@ class LLMScreener(ScreeningEngine):
             exclusion_criteria = config.get("exclusion_criteria") or []
             additional_instructions = config.get("additional_instructions")
             
+            # Get criteria mapping from config
+            criteria_mapping = config.get('criteria_mapping')
+            
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
@@ -328,6 +330,7 @@ class LLMScreener(ScreeningEngine):
                 study=study,
                 inclusion_criteria=inclusion_criteria,
                 exclusion_criteria=exclusion_criteria,
+                criteria_mapping=criteria_mapping,
                 objective=objective,
                 confidence_reporting=confidence_reporting,
                 additional_instructions=additional_instructions,
@@ -353,8 +356,21 @@ class LLMScreener(ScreeningEngine):
                 
             # Process response
             decision, reason = self._process_screening_response(
-                response, config, screening_type, confidence_reporting
+                response, config, confidence_reporting
             )
+            
+            # Extract criteria IDs from response and store on study object
+            if screening_type == "abstract":
+                study.abstract_inclusion_criteria_applied = getattr(
+                    response, 'inclusion_criteria_applied', [])
+                study.abstract_exclusion_criteria_applied = getattr(
+                    response, 'exclusion_criteria_applied', [])
+            else:  # fulltext
+                study.fulltext_inclusion_criteria_applied = getattr(
+                    response, 'inclusion_criteria_applied', [])
+                study.fulltext_exclusion_criteria_applied = getattr(
+                    response, 'exclusion_criteria_applied', [])
+            
             result = self._create_screening_result(
                 study, decision, reason, response.confidence,
                 model,
@@ -504,11 +520,11 @@ class LLMScreener(ScreeningEngine):
     ) -> List[ScreeningResult]:
         """
         Screen study abstracts for inclusion/exclusion.
-
+        
         Args:
             studies: List of studies to screen
             num_workers: Number of parallel workers (default: 1 for serial)
-
+            
         Returns:
             List of screening results
         """
@@ -521,11 +537,11 @@ class LLMScreener(ScreeningEngine):
     ) -> List[ScreeningResult]:
         """
         Screen full-text articles for inclusion/exclusion.
-
+        
         Args:
             studies: List of studies with full text to screen
             num_workers: Number of parallel workers (default: 1 for serial)
-
+            
         Returns:
             List of screening results
         """

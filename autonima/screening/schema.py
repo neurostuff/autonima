@@ -1,7 +1,7 @@
 """Pydantic models for screening output schema."""
 
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, List
 
 
 class AbstractScreeningOutput(BaseModel):
@@ -9,6 +9,8 @@ class AbstractScreeningOutput(BaseModel):
     decision: Literal["INCLUDED", "EXCLUDED"]
     confidence: float
     reason: str
+    inclusion_criteria_applied: List[str] = []
+    exclusion_criteria_applied: List[str] = []
 
 
 class FullTextScreeningOutput(BaseModel):
@@ -16,3 +18,5 @@ class FullTextScreeningOutput(BaseModel):
     decision: Literal["INCLUDED", "EXCLUDED"]
     confidence: float
     reason: str
+    inclusion_criteria_applied: List[str] = []
+    exclusion_criteria_applied: List[str] = []

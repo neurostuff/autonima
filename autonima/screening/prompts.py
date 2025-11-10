@@ -2,6 +2,7 @@
 
 from typing import List
 from ..models.types import Study, StudyStatus
+from ..utils.criteria import CriteriaMapping
 
 
 class PromptLibrary:
@@ -29,6 +30,7 @@ IMPORTANT GUIDELINES:
         study: Study,
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
+        criteria_mapping: CriteriaMapping = None,
         objective: str = None,
         confidence_reporting: bool = False,
         additional_instructions: str = None
@@ -37,6 +39,20 @@ IMPORTANT GUIDELINES:
         base_prompt = PromptLibrary.get_base_prompt()
         
         content = study.abstract or "No abstract available"
+        
+        # Format criteria with IDs if mapping is provided
+        if criteria_mapping:
+            inclusion_text = "\n".join([
+                f"{id}: {text}" 
+                for id, text in criteria_mapping.inclusion.items()
+            ])
+            exclusion_text = "\n".join([
+                f"{id}: {text}" 
+                for id, text in criteria_mapping.exclusion.items()
+            ])
+        else:
+            inclusion_text = "\n".join(f"- {criterion}" for criterion in inclusion_criteria)
+            exclusion_text = "\n".join(f"- {criterion}" for criterion in exclusion_criteria)
         
         # Check if confidence reporting is enabled
         if confidence_reporting:
@@ -70,6 +86,11 @@ INSTRUCTIONS FOR ABSTRACT SCREENING:
 5. Only EXCLUDE if you are highly confident based on the abstract alone
 {confidence_instruction}{reason_instruction}
 {additional_instructions_text}
+
+IMPORTANT: In your response, you must specify which specific criteria IDs apply to this study.
+- For included studies: List the inclusion criteria IDs that are satisfied (e.g., ["I1", "I2"])
+- For excluded studies: List the exclusion criteria IDs that apply (e.g., ["E1"])
+Respond with the exact JSON format specified, including the inclusion_criteria_applied and exclusion_criteria_applied fields.
 """.strip()
 
         prompt = f"""
@@ -87,10 +108,10 @@ META-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in inclusion_criteria)}
+{inclusion_text}
 
 EXCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in exclusion_criteria)}
+{exclusion_text}
 
 {instructions}
 """.strip()
@@ -103,6 +124,7 @@ EXCLUSION CRITERIA:
         inclusion_criteria: List[str],
         exclusion_criteria: List[str],
         output_dir: str,
+        criteria_mapping: CriteriaMapping = None,
         objective: str = None,
         confidence_reporting: bool = False,
         additional_instructions: str = None
@@ -124,6 +146,20 @@ EXCLUSION CRITERIA:
                 )
         else:
             content = "No full text available"
+        
+        # Format criteria with IDs if mapping is provided
+        if criteria_mapping:
+            inclusion_text = "\n".join([
+                f"{id}: {text}" 
+                for id, text in criteria_mapping.inclusion.items()
+            ])
+            exclusion_text = "\n".join([
+                f"{id}: {text}" 
+                for id, text in criteria_mapping.exclusion.items()
+            ])
+        else:
+            inclusion_text = "\n".join(f"- {criterion}" for criterion in inclusion_criteria)
+            exclusion_text = "\n".join(f"- {criterion}" for criterion in exclusion_criteria)
         
         # Check if confidence reporting is enabled
         if confidence_reporting:
@@ -158,6 +194,11 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 7. If ANY criterion is not met, EXCLUDE it
 {confidence_instruction}{reason_instruction}
 {additional_instructions_text}
+
+IMPORTANT: In your response, you must specify which specific criteria IDs apply to this study.
+- For included studies: List the inclusion criteria IDs that are satisfied (e.g., ["I1", "I2"])
+- For excluded studies: List the exclusion criteria IDs that apply (e.g., ["E1"])
+Respond with the exact JSON format specified, including the inclusion_criteria_applied and exclusion_criteria_applied fields.
 """.strip()
 
         prompt = f"""
@@ -175,10 +216,10 @@ META-ANALYSIS OBJECTIVE:
 {objective or 'Not provided'}
 
 INCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in inclusion_criteria)}
+{inclusion_text}
 
 EXCLUSION CRITERIA:
-{chr(10).join(f"- {criterion}" for criterion in exclusion_criteria)}
+{exclusion_text}
 
 {instructions}
 """.strip()

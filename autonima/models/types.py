@@ -55,6 +55,12 @@ class Study:
     coordinate_space: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
+    
+    # NEW FIELDS for criteria tracking
+    abstract_inclusion_criteria_applied: List[str] = field(default_factory=list)
+    abstract_exclusion_criteria_applied: List[str] = field(default_factory=list)
+    fulltext_inclusion_criteria_applied: List[str] = field(default_factory=list)
+    fulltext_exclusion_criteria_applied: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -112,7 +118,12 @@ class Study:
                     ]
                 }
                 for analysis in self.analyses
-            ]
+            ],
+            # NEW FIELDS for criteria tracking
+            "abstract_inclusion_criteria_applied": self.abstract_inclusion_criteria_applied,
+            "abstract_exclusion_criteria_applied": self.abstract_exclusion_criteria_applied,
+            "fulltext_inclusion_criteria_applied": self.fulltext_inclusion_criteria_applied,
+            "fulltext_exclusion_criteria_applied": self.fulltext_exclusion_criteria_applied
         }
     
     def load_full_text(self, output_dir: str) -> str:
