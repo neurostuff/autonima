@@ -289,7 +289,9 @@ class LLMScreener(ScreeningEngine):
         reason: str,
         confidence: float,
         model: str,
-        screening_type: str
+        screening_type: str,
+        inclusion_criteria_applied: List[str] = None,
+        exclusion_criteria_applied: List[str] = None
     ) -> ScreeningResult:
         """Create a ScreeningResult object."""
         return ScreeningResult(
@@ -298,7 +300,9 @@ class LLMScreener(ScreeningEngine):
             reason=reason,
             confidence=confidence,
             model_used=model,
-            screening_type=screening_type
+            screening_type=screening_type,
+            inclusion_criteria_applied=inclusion_criteria_applied or [],
+            exclusion_criteria_applied=exclusion_criteria_applied or []
         )
 
     def _screen_single_study(
@@ -371,10 +375,18 @@ class LLMScreener(ScreeningEngine):
                 study.fulltext_exclusion_criteria_applied = getattr(
                     response, 'exclusion_criteria_applied', [])
             
+            # Get criteria applied from response
+            inclusion_criteria_applied = getattr(
+                response, 'inclusion_criteria_applied', [])
+            exclusion_criteria_applied = getattr(
+                response, 'exclusion_criteria_applied', [])
+            
             result = self._create_screening_result(
                 study, decision, reason, response.confidence,
                 model,
-                screening_type
+                screening_type,
+                inclusion_criteria_applied,
+                exclusion_criteria_applied
             )
                 
             # Save result to file after each screening operation
@@ -486,7 +498,9 @@ class LLMScreener(ScreeningEngine):
                     existing_result["reason"],
                     existing_result["confidence"],
                     existing_result["model_used"],
-                    screening_type
+                    screening_type,
+                    existing_result.get("inclusion_criteria_applied", []),
+                    existing_result.get("exclusion_criteria_applied", [])
                 ))
             else:
                 studies_to_screen.append(study)

@@ -301,6 +301,8 @@ class ScreeningResult:
     model_used: str
     screening_type: str  # "abstract" or "fulltext"
     timestamp: datetime = field(default_factory=datetime.now)
+    inclusion_criteria_applied: List[str] = field(default_factory=list)
+    exclusion_criteria_applied: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert screening result to dictionary."""
@@ -312,6 +314,8 @@ class ScreeningResult:
             "model_used": self.model_used,
             "screening_type": self.screening_type,
             "timestamp": self.timestamp.isoformat(),
+            "inclusion_criteria_applied": self.inclusion_criteria_applied,
+            "exclusion_criteria_applied": self.exclusion_criteria_applied,
         }
 
 
