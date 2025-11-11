@@ -56,7 +56,6 @@ class Study:
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
     
-    # NEW FIELDS for criteria tracking
     abstract_inclusion_criteria_applied: List[str] = field(default_factory=list)
     abstract_exclusion_criteria_applied: List[str] = field(default_factory=list)
     fulltext_inclusion_criteria_applied: List[str] = field(default_factory=list)

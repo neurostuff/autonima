@@ -39,6 +39,10 @@ class ScreeningLLMClient(GenericLLMClient):
             if "enum" in field_info:
                 properties[field_name]["enum"] = field_info["enum"]
             
+            # Handle array items
+            if field_info["type"] == "array" and "items" in field_info:
+                properties[field_name]["items"] = field_info["items"]
+            
             # Handle numeric constraints
             if field_info["type"] == "number":
                 if "minimum" in field_info:
