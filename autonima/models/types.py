@@ -226,6 +226,19 @@ class PipelineConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
+        from ..utils.criteria import CriteriaMapping
+        
+        # Helper function to serialize screening config dicts
+        def serialize_screening_dict(screening_dict: Dict[str, Any]) -> Dict[str, Any]:
+            """Serialize a screening dict, handling CriteriaMapping objects."""
+            result = {}
+            for key, value in screening_dict.items():
+                if isinstance(value, CriteriaMapping):
+                    result[key] = value.to_dict()
+                else:
+                    result[key] = value
+            return result
+        
         return {
             "search": {
                 "database": self.search.database,
@@ -238,8 +251,8 @@ class PipelineConfig:
                 "pmids_list": self.search.pmids_list,
             },
             "screening": {
-                "abstract": self.screening.abstract,
-                "fulltext": self.screening.fulltext,
+                "abstract": serialize_screening_dict(self.screening.abstract),
+                "fulltext": serialize_screening_dict(self.screening.fulltext),
             },
             "retrieval": {
                 "sources": self.retrieval.sources,

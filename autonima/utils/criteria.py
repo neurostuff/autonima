@@ -13,6 +13,13 @@ class CriteriaMapping:
         default_factory=dict)  # ID -> criterion text
     exclusion: Dict[str, str] = field(
         default_factory=dict)  # ID -> criterion text
+    
+    def to_dict(self) -> Dict[str, Dict[str, str]]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "inclusion": self.inclusion,
+            "exclusion": self.exclusion
+        }
 
 
 class CriteriaIDAssigner:
@@ -93,18 +100,32 @@ def save_criteria_mapping(config, output_dir: str) -> None:
     # Add abstract screening criteria
     abstract_mapping = config.screening.abstract.get('criteria_mapping')
     if abstract_mapping:
-        mapping_data["screening"]["abstract"]["inclusion"] = (
-            abstract_mapping.inclusion)
-        mapping_data["screening"]["abstract"]["exclusion"] = (
-            abstract_mapping.exclusion)
+        if isinstance(abstract_mapping, CriteriaMapping):
+            mapping_dict = abstract_mapping.to_dict()
+            mapping_data["screening"]["abstract"]["inclusion"] = (
+                mapping_dict["inclusion"])
+            mapping_data["screening"]["abstract"]["exclusion"] = (
+                mapping_dict["exclusion"])
+        else:
+            mapping_data["screening"]["abstract"]["inclusion"] = (
+                abstract_mapping.get("inclusion", {}))
+            mapping_data["screening"]["abstract"]["exclusion"] = (
+                abstract_mapping.get("exclusion", {}))
     
     # Add fulltext screening criteria
     fulltext_mapping = config.screening.fulltext.get('criteria_mapping')
     if fulltext_mapping:
-        mapping_data["screening"]["fulltext"]["inclusion"] = (
-            fulltext_mapping.inclusion)
-        mapping_data["screening"]["fulltext"]["exclusion"] = (
-            fulltext_mapping.exclusion)
+        if isinstance(fulltext_mapping, CriteriaMapping):
+            mapping_dict = fulltext_mapping.to_dict()
+            mapping_data["screening"]["fulltext"]["inclusion"] = (
+                mapping_dict["inclusion"])
+            mapping_data["screening"]["fulltext"]["exclusion"] = (
+                mapping_dict["exclusion"])
+        else:
+            mapping_data["screening"]["fulltext"]["inclusion"] = (
+                fulltext_mapping.get("inclusion", {}))
+            mapping_data["screening"]["fulltext"]["exclusion"] = (
+                fulltext_mapping.get("exclusion", {}))
     
     # Add annotation criteria if present
     if hasattr(config, 'annotation'):
@@ -124,10 +145,11 @@ def save_criteria_mapping(config, output_dir: str) -> None:
                 config.annotation.inclusion_criteria,
                 config.annotation.exclusion_criteria
             )
+            mapping_dict = annotation_mapping.to_dict()
             mapping_data["annotation"]["global"]["inclusion"] = (
-                annotation_mapping.inclusion)
+                mapping_dict["inclusion"])
             mapping_data["annotation"]["global"]["exclusion"] = (
-                annotation_mapping.exclusion)
+                mapping_dict["exclusion"])
         
         # Per-annotation criteria
         for annotation in config.annotation.annotations:
@@ -137,9 +159,10 @@ def save_criteria_mapping(config, output_dir: str) -> None:
                     annotation.inclusion_criteria,
                     annotation.exclusion_criteria
                 )
+                mapping_dict = annotation_mapping.to_dict()
                 mapping_data["annotation"]["annotations"][annotation.name] = {
-                    "inclusion": annotation_mapping.inclusion,
-                    "exclusion": annotation_mapping.exclusion
+                    "inclusion": mapping_dict["inclusion"],
+                    "exclusion": mapping_dict["exclusion"]
                 }
     
     # Save to file
