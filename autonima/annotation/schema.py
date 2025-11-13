@@ -20,7 +20,10 @@ class AnnotationCriteriaConfig(BaseModel):
 class AnnotationConfig(BaseModel):
     """Configuration for the annotation phase."""
     model: str = "gpt-4o-mini"
-    include_all_analyses: bool = True
+    # Create "all_analyses" annotation with all analyses from INCLUDED studies
+    create_all_included_annotation: bool = True
+    # Create "all_studies" annotation from INCLUDED and EXCLUDED studies
+    create_all_from_search_annotation: bool = False
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
     metadata_fields: List[str] = [

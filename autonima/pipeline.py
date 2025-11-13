@@ -263,7 +263,7 @@ class AutonimaPipeline:
                     **full_text_config,
                     pmids_to_include=pmids_set
                     )
-
+                
                 # Update studies with their full text paths
                 for study in studies_to_retrieve[:]:
                     if int(study.pmid) in text_paths:
@@ -278,6 +278,7 @@ class AutonimaPipeline:
                         studies=studies_from_source,
                         id_to_tables=tables,
                         identifier_key="pmid",
+                        identifier_type="str"
                     )
 
                 studies_from_user_sources += studies_from_source
@@ -545,13 +546,23 @@ class AutonimaPipeline:
             logger.info("Annotation phase is disabled")
             return
         
-        # Get studies with parsed analyses
-        studies_with_analyses = [
+        # Get INCLUDED studies with analyses for standard annotations
+        included_studies = [
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED and s.analyses
         ]
         
-        if not studies_with_analyses:
+        # Get ALL studies if create_all_from_search_annotation is enabled
+        all_studies = None
+        if getattr(
+            self.config.annotation, 'create_all_from_search_annotation', False
+        ):
+            all_studies = [
+                s for s in self.results.studies
+                if s.analyses
+            ]
+        
+        if not included_studies and not all_studies:
             logger.info("No studies with parsed analyses found for annotation")
             return
         
@@ -560,12 +571,14 @@ class AutonimaPipeline:
         
         # Process studies
         annotation_results = processor.process_studies(
-            studies_with_analyses,
-            self.config.output.directory
+            included_studies=included_studies,
+            all_studies=all_studies,
+            output_dir=self.config.output.directory
         )
         
         logger.info(
-            f"Annotation phase completed: {len(annotation_results)} annotation decisions made"
+            f"Annotation phase completed: {len(annotation_results)} "
+            "annotation decisions made"
         )
             
  
@@ -730,13 +743,33 @@ class AutonimaPipeline:
 
     async def _generate_nimads_output(self):
         """Generate NiMADS output for studies with parsed analyses."""
-        # Get included studies that have parsed analyses
-        included_studies_with_analyses = [
-            s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and s.analyses
-        ]
+        # Determine which studies to export based on export_excluded_studies
+        export_excluded = getattr(
+            self.config.output, 'export_excluded_studies', False
+        )
         
-        if not included_studies_with_analyses:
+        if export_excluded:
+            # Export ALL studies with analyses (INCLUDED and EXCLUDED)
+            studies_with_analyses = [
+                s for s in self.results.studies
+                if s.analyses
+            ]
+            logger.info(
+                f"Exporting {len(studies_with_analyses)} studies "
+                "(INCLUDED and EXCLUDED) to NiMADS"
+            )
+        else:
+            # Export only INCLUDED studies with analyses
+            studies_with_analyses = [
+                s for s in self.results.studies
+                if s.status == StudyStatus.INCLUDED and s.analyses
+            ]
+            logger.info(
+                f"Exporting {len(studies_with_analyses)} INCLUDED studies "
+                "to NiMADS"
+            )
+        
+        if not studies_with_analyses:
             logger.info("No studies with parsed analyses found for NiMADS output")
             return
         
@@ -748,11 +781,11 @@ class AutonimaPipeline:
                 create_annotations_from_results
             )
             
-            # Create a studyset from the included studies
+            # Create a studyset from the studies
             studyset_id = f"autonima_studyset_{self.results.started_at.strftime('%Y%m%d_%H%M%S')}"
             studyset = convert_to_nimads_studyset(
                 studyset_id,
-                included_studies_with_analyses,
+                studies_with_analyses,
                 name="Autonima Generated Studyset"
             )
             
@@ -800,8 +833,8 @@ class AutonimaPipeline:
                     json.dump([annotation.to_dict()], f, indent=2)
             
             logger.info(
-                f"NiMADS output generated: {len(included_studies_with_analyses)} studies "
-                f"with {sum(len(s.analyses) for s in included_studies_with_analyses)} analyses"
+                f"NiMADS output generated: {len(studies_with_analyses)} studies "
+                f"with {sum(len(s.analyses) for s in studies_with_analyses)} analyses"
             )
             
         except Exception as e:

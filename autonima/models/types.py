@@ -211,6 +211,7 @@ class OutputConfig:
     prisma_diagram: bool = True
     formats: List[str] = field(default_factory=lambda: ["csv", "json"])
     nimads: bool = False
+    export_excluded_studies: bool = False
 
 
 @dataclass
@@ -269,7 +270,12 @@ class PipelineConfig:
             },
             "annotation": {
                 "model": self.annotation.model,
-                "include_all_analyses": self.annotation.include_all_analyses,
+                "create_all_included_annotation": (
+                    self.annotation.create_all_included_annotation
+                ),
+                "create_all_from_search_annotation": (
+                    self.annotation.create_all_from_search_annotation
+                ),
                 "annotations": [
                     {
                         "name": criteria.name,
@@ -287,6 +293,7 @@ class PipelineConfig:
                 "prisma_diagram": self.output.prisma_diagram,
                 "formats": self.output.formats,
                 "nimads": self.output.nimads,
+                "export_excluded_studies": self.output.export_excluded_studies,
             },
         }
 

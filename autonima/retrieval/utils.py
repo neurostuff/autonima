@@ -377,30 +377,12 @@ def load_activation_table_map(
         return {}
 
 
-
-def _map_ids_to_activation_tables(
-    full_text_config: Dict[str, Any],
-    ids_to_include: Optional[Set[str]] = None,
-    identifier_key: str = "pmcid",
-) -> Dict[str, List[Dict[str, Any]]]:
-    processed_data_path = full_text_config.get("processed_data_path")
-    if not processed_data_path:
-        return {}
-
-    data_dir = Path(processed_data_path)
-    return load_activation_table_map(
-        data_dir=data_dir,
-        ids_to_include=ids_to_include,
-        filter_by_coordinates=False,
-        identifier_key=identifier_key,
-    )
-
-
 def _apply_activation_tables_to_studies(
     studies: List["Study"],
     id_to_tables: Dict[str, List[Dict[str, Any]]],
     identifier_key: str,
     clear_existing: bool = True,
+    identifier_type: str = None
 ) -> None:
     """
     Attach activation tables to studies based on identifier mappings.
@@ -411,6 +393,16 @@ def _apply_activation_tables_to_studies(
         clear_existing: Whether to clear existing activation tables
         identifier_key: Which study attribute to use as identifier
     """
+    # If identifier_type is provided, convert keys of id_to_tables accordingly
+    if identifier_type == "int":
+        id_to_tables = {
+            int(k): v for k, v in id_to_tables.items()
+        }
+    elif identifier_type == "str":
+        id_to_tables = {
+            str(k): v for k, v in id_to_tables.items()
+        }
+        
     for study in studies:
         # Get the identifier value from the study based on the identifier_key
         identifier_value = getattr(study, identifier_key, None)
