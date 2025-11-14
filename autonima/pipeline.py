@@ -20,6 +20,7 @@ from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .retrieval.utils import (
         _apply_activation_tables_to_studies,
+        _apply_analyses_to_studies,
         _map_pmids_to_text
     )
 from .utils import log_error_with_debug
@@ -231,24 +232,45 @@ class AutonimaPipeline:
     async def _execute_retrieval_phase(self):
         """Execute full-text retrieval phase."""
 
-        # Get included studies that need full-text retrieval
-        included_studies = [
-            s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED
-        ]
+        # Determine which studies to retrieve based on load_excluded setting
+        load_excluded = getattr(self.config.retrieval, 'load_excluded', False)
+        
+        if load_excluded:
+            # Get ALL studies (both included and excluded from abstract screening)
+            studies_to_process = [
+                s for s in self.results.studies
+                if s.status in [
+                    StudyStatus.INCLUDED_ABSTRACT,
+                    StudyStatus.EXCLUDED_ABSTRACT
+                ]
+            ]
+            logger.info(
+                f"load_excluded=True: Processing {len(studies_to_process)} "
+                "studies (included + excluded)"
+            )
+        else:
+            # Get only included studies that need full-text retrieval
+            studies_to_process = [
+                s for s in self.results.studies
+                if s.status == StudyStatus.INCLUDED_ABSTRACT
+            ]
+            logger.info(
+                f"load_excluded=False: Processing {len(studies_to_process)} "
+                "included studies only"
+            )
 
         pmids_set = set(
-            [int(s.pmid) for s in included_studies if s.pmid.isdigit()]
+            [int(s.pmid) for s in studies_to_process if s.pmid.isdigit()]
         )
         
-        if not included_studies:
+        if not studies_to_process:
             logger.info("No studies require full-text retrieval")
             return
 
         # Check for existing full texts from user-provided sources
         studies_from_user_sources = []
         studies_from_source = []
-        studies_to_retrieve = included_studies
+        studies_to_retrieve = studies_to_process
 
         full_text_sources = getattr(
             self.config.retrieval, 'full_text_sources', []
@@ -259,7 +281,7 @@ class AutonimaPipeline:
                 logger.info(f"Processing full text source {i+1}/{len(full_text_sources)}")
 
                 # Map PMIDs to text files in source
-                text_paths, tables = _map_pmids_to_text(
+                text_paths, analyses, tables = _map_pmids_to_text(
                     **full_text_config,
                     pmids_to_include=pmids_set
                     )
@@ -268,12 +290,21 @@ class AutonimaPipeline:
                 for study in studies_to_retrieve[:]:
                     if int(study.pmid) in text_paths:
                         study.full_text_path = str(text_paths[int(study.pmid)])
-                        study.status = StudyStatus.FULLTEXT_CACHED
+                        study.fulltext_available = True
                         studies_from_source.append(study)
                         studies_to_retrieve.remove(study)
 
+                # Apply analyses from coordinates to studies
+                if analyses:
+                    _apply_analyses_to_studies(
+                        studies=studies_from_source,
+                        id_to_analyses=analyses,
+                        identifier_key="pmid",
+                        identifier_type="str"
+                    )
+
+                # Apply activation tables to studies
                 if tables:
-                    # Apply activation tables to studies
                     _apply_activation_tables_to_studies(
                         studies=studies_from_source,
                         id_to_tables=tables,
@@ -289,7 +320,7 @@ class AutonimaPipeline:
             )
              
         except Exception as e:
-            logger.warning(
+            log_error_with_debug(logger, 
                 f"Failed to load from user-provided full text sources: {e}"
             )
 
@@ -325,7 +356,8 @@ class AutonimaPipeline:
                     studies=studies_to_retrieve,
                     output_dir=retrieval_dir,
                     api_key=getattr(self.config.retrieval, 'api_key', None),
-                    n_docs=getattr(self.config.retrieval, 'max_docs', None)
+                    n_docs=getattr(self.config.retrieval, 'max_docs', None),
+                    load_excluded=load_excluded
                 )
                     
             except Exception as e:
@@ -348,14 +380,11 @@ class AutonimaPipeline:
                         if study.retrieved_at else None
                     ),
                     "status": study.status.value,
-                    "full_text_path": study.full_text_path
+                    "full_text_path": study.full_text_path,
+                    "fulltext_available": study.fulltext_available
                 }
                 for study in self.results.studies
-                if (study.status in [
-                        StudyStatus.FULLTEXT_RETRIEVED,
-                        StudyStatus.FULLTEXT_UNAVAILABLE,
-                        StudyStatus.FULLTEXT_CACHED
-                    ])
+                if study.fulltext_available or study.pmcid
             ],
             "timestamp": datetime.now().isoformat()
         }
@@ -364,19 +393,18 @@ class AutonimaPipeline:
 
         retrieved_count = len([
             s for s in self.results.studies
-            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
-                            StudyStatus.FULLTEXT_CACHED]
+            if s.fulltext_available
         ])
         unavailable_count = len([
             s for s in self.results.studies
-            if s.status == StudyStatus.FULLTEXT_UNAVAILABLE
+            if s.pmcid and not s.fulltext_available
         ])
 
         # Save .txt file with pmids of unavailable full texts
         unavailable_pmids_file = output_dir / "outputs" / "unavailable_fulltexts.txt"
         with open(unavailable_pmids_file, 'w') as f:
             for study in self.results.studies:
-                if study.status == StudyStatus.FULLTEXT_UNAVAILABLE:
+                if not study.fulltext_available:
                     f.write(f"{study.pmid}\n")
 
         logger.info(
@@ -390,8 +418,7 @@ class AutonimaPipeline:
         # Get studies with full text that need screening
         screenable_studies = [
             s for s in self.results.studies
-            if s.status in [StudyStatus.FULLTEXT_RETRIEVED,
-                            StudyStatus.FULLTEXT_CACHED]
+            if s.fulltext_available and s.status == StudyStatus.INCLUDED_ABSTRACT
         ]
 
         if not screenable_studies:
@@ -438,7 +465,7 @@ class AutonimaPipeline:
 
         final_count = len([
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED
+            if s.status == StudyStatus.INCLUDED_FULLTEXT
         ])
         logger.info(
             f"Full-text screening completed: {final_count} studies included"
@@ -450,14 +477,14 @@ class AutonimaPipeline:
         if not getattr(self.config.parsing, 'parse_coordinates', False):
             logger.info("Coordinate parsing is disabled")
             return
- 
+    
         # Load cached coordinate parsing results
         await self._load_cached_coordinate_results()
  
-        # Get studies with activation tables that were retrieved and don't already have analyses
+        # Get studies with activation tables that were retrieved and don't already have parsed analyses
         studies_with_tables = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and s.activation_tables and not s.analyses
+            if s.status == StudyStatus.INCLUDED_FULLTEXT and s.activation_tables and not any([a.parsed for a in s.analyses])
         ]
 
         if not studies_with_tables:
@@ -479,6 +506,10 @@ class AutonimaPipeline:
         for study in studies_with_tables:
             for i, table in enumerate(study.activation_tables):
                 table_jobs.append((study, table, i))
+
+        # For all studies_with_tables, clear existing analyses
+        for study in studies_with_tables:
+            study.analyses = []
  
         if not table_jobs:
             logger.info("No tables to process")
@@ -549,7 +580,7 @@ class AutonimaPipeline:
         # Get INCLUDED studies with analyses for standard annotations
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED and s.analyses
+            if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
         ]
         
         # Get ALL studies if create_all_from_search_annotation is enabled
@@ -601,7 +632,8 @@ class AutonimaPipeline:
             loaded_count = 0
             
             for study in self.results.studies:
-                if study.pmid in cached_studies and not study.analyses:
+                if study.pmid in cached_studies and not any(a.parsed for a in study.analyses):
+                    study.analyses = []
                     cached_study = cached_studies[study.pmid]
                     # Load analyses from cached data
                     if 'analyses' in cached_study:
@@ -623,7 +655,8 @@ class AutonimaPipeline:
                             study.analyses.append(Analysis(
                                 name=analysis_data.get('name'),
                                 description=analysis_data.get('description'),
-                                points=points
+                                points=points,
+                                parsed=analysis_data.get('parsed', True)
                             ))
                         loaded_count += 1
             
@@ -638,7 +671,7 @@ class AutonimaPipeline:
             # Get studies with parsed analyses
             studies_with_analyses = [
                 s for s in self.results.studies
-                if s.status == StudyStatus.INCLUDED and s.analyses
+                if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
             ]
             
             if not studies_with_analyses:
@@ -709,12 +742,17 @@ class AutonimaPipeline:
         total_studies = len(self.results.studies)
         included_studies = [
             s for s in self.results.studies
-            if s.status == StudyStatus.INCLUDED
+            if s.status == StudyStatus.INCLUDED_FULLTEXT
         ]
-        excluded_studies = [
+        excluded_abstract = [
             s for s in self.results.studies
-            if s.status == StudyStatus.EXCLUDED
+            if s.status == StudyStatus.EXCLUDED_ABSTRACT
         ]
+        excluded_fulltext = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.EXCLUDED_FULLTEXT
+        ]
+        excluded_studies = excluded_abstract + excluded_fulltext
 
         prisma_stats = {
             "total_identified": total_studies,
@@ -762,7 +800,7 @@ class AutonimaPipeline:
             # Export only INCLUDED studies with analyses
             studies_with_analyses = [
                 s for s in self.results.studies
-                if s.status == StudyStatus.INCLUDED and s.analyses
+                if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
             ]
             logger.info(
                 f"Exporting {len(studies_with_analyses)} INCLUDED studies "
@@ -859,11 +897,14 @@ class AutonimaPipeline:
                 "total_studies": len(self.results.studies),
                 "included_studies": len([
                     s for s in self.results.studies
-                    if s.status == StudyStatus.INCLUDED
+                    if s.status == StudyStatus.INCLUDED_FULLTEXT
                 ]),
                 "excluded_studies": len([
                     s for s in self.results.studies
-                    if s.status == StudyStatus.EXCLUDED
+                    if s.status in [
+                        StudyStatus.EXCLUDED_ABSTRACT,
+                        StudyStatus.EXCLUDED_FULLTEXT
+                    ]
                 ]),
                 "abstract_screening_results": len(
                     self.results.abstract_screening_results),

@@ -237,12 +237,13 @@ class LLMScreener(ScreeningEngine):
         if screening_type == "abstract":
             return [s for s in studies if s.abstract and s.abstract.strip()]
         else:  # fulltext
+            # Only screen studies that:
+            # 1. Have full text available
+            # 2. Passed abstract screening (INCLUDED_ABSTRACT status)
             return [
                 s for s in studies
-                if s.status in [
-                    StudyStatus.FULLTEXT_RETRIEVED,
-                    StudyStatus.FULLTEXT_CACHED
-                ]
+                if (s.fulltext_available and
+                    s.status == StudyStatus.INCLUDED_ABSTRACT)
             ]
 
     def _get_screening_config(self, screening_type: str):
@@ -253,13 +254,37 @@ class LLMScreener(ScreeningEngine):
             else self.config.fulltext
         )
 
+    def _get_status_for_decision(
+        self,
+        screening_type: str,
+        decision: str
+    ) -> StudyStatus:
+        """Map screening type and decision to appropriate StudyStatus."""
+        if screening_type == "abstract":
+            return (
+                StudyStatus.INCLUDED_ABSTRACT
+                if decision == "INCLUDED"
+                else StudyStatus.EXCLUDED_ABSTRACT
+            )
+        else:  # fulltext
+            return (
+                StudyStatus.INCLUDED_FULLTEXT
+                if decision == "INCLUDED"
+                else StudyStatus.EXCLUDED_FULLTEXT
+            )
+    
     def _process_screening_response(
         self,
         response,
         config,
-        confidence_reporting: bool = False
+        confidence_reporting: bool = False,
+        screening_type: str = "abstract"
     ):
-        """Process the LLM response and apply threshold logic."""
+        """Process the LLM response and apply threshold logic.
+        
+        Returns:
+            Tuple of (decision_string, reason)
+        """
         # Check if threshold should be applied
         threshold = config.get("threshold")
         threshold_enabled = (
@@ -269,15 +294,11 @@ class LLMScreener(ScreeningEngine):
         )
         
         if threshold_enabled and response.confidence < threshold:
-            decision = StudyStatus.EXCLUDED
+            decision = "EXCLUDED"
             reason = (f"Confidence {response.confidence:.2f} below "
                       f"threshold {threshold}. {response.reason}")
         else:
-            decision = (
-                StudyStatus.INCLUDED
-                if response.decision == "INCLUDED"
-                else StudyStatus.EXCLUDED
-            )
+            decision = response.decision  # "INCLUDED" or "EXCLUDED"
             reason = response.reason
                 
         return decision, reason
@@ -358,9 +379,14 @@ class LLMScreener(ScreeningEngine):
             )
             response = screen_method(prompt, model)
                 
-            # Process response
-            decision, reason = self._process_screening_response(
-                response, config, confidence_reporting
+            # Process response to get decision string
+            decision_str, reason = self._process_screening_response(
+                response, config, confidence_reporting, screening_type
+            )
+            
+            # Convert decision string to stage-appropriate status
+            decision = self._get_status_for_decision(
+                screening_type, decision_str
             )
             
             # Extract criteria IDs from response and store on study object
@@ -492,9 +518,39 @@ class LLMScreener(ScreeningEngine):
         for study in screenable_studies:
             if study.pmid in existing_results_dict:
                 existing_result = existing_results_dict[study.pmid]
+                
+                # Map old status values to new stage-specific statuses
+                old_decision = existing_result["decision"]
+                if old_decision == "included":
+                    # Map to stage-specific included status
+                    new_decision = (
+                        StudyStatus.INCLUDED_ABSTRACT
+                        if screening_type == "abstract"
+                        else StudyStatus.INCLUDED_FULLTEXT
+                    )
+                elif old_decision == "excluded":
+                    # Map to stage-specific excluded status
+                    new_decision = (
+                        StudyStatus.EXCLUDED_ABSTRACT
+                        if screening_type == "abstract"
+                        else StudyStatus.EXCLUDED_FULLTEXT
+                    )
+                else:
+                    # Try to use the value directly (for new status values)
+                    try:
+                        new_decision = StudyStatus(old_decision)
+                    except ValueError:
+                        # If invalid, skip this cached result
+                        logger.warning(
+                            f"Invalid cached status '{old_decision}' for "
+                            f"study {study.pmid}, will re-screen"
+                        )
+                        studies_to_screen.append(study)
+                        continue
+                
                 existing_results.append(self._create_screening_result(
                     study,
-                    StudyStatus(existing_result["decision"]),
+                    new_decision,
                     existing_result["reason"],
                     existing_result["confidence"],
                     existing_result["model_used"],

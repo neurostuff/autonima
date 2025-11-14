@@ -19,6 +19,7 @@ search:
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
 
 retrieval:
+  load_excluded: false  # Whether to load full texts for excluded studies from abstract stage
   sources:
     - pubget
   # full_text_sources:

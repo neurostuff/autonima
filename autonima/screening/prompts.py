@@ -133,13 +133,9 @@ EXCLUSION CRITERIA:
         base_prompt = PromptLibrary.get_base_prompt()
         
         # For full-text screening, we load the full text content
-        if study.status in (
-            [StudyStatus.FULLTEXT_RETRIEVED, StudyStatus.FULLTEXT_CACHED]
-        ):
+        if study.fulltext_available:
             try:
-                
                 content = study.load_full_text(output_dir=output_dir)
-
             except Exception:
                 raise RuntimeError(
                     f"Failed to load full text for study {study.pmid}"

@@ -11,13 +11,12 @@ from ..annotation.schema import AnnotationConfig
 class StudyStatus(Enum):
     """Status of a study in the systematic review pipeline."""
     PENDING = "pending"
-    INCLUDED = "included"
-    EXCLUDED = "excluded"
+    INCLUDED_ABSTRACT = "included_abstract"
+    EXCLUDED_ABSTRACT = "excluded_abstract"
+    INCLUDED_FULLTEXT = "included_fulltext"
+    EXCLUDED_FULLTEXT = "excluded_fulltext"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
-    FULLTEXT_RETRIEVED = "fulltext_retrieved"
-    FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
-    FULLTEXT_CACHED = "fulltext_cached"
 
 
 @dataclass
@@ -52,6 +51,7 @@ class Study:
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
+    fulltext_available: bool = False  # Whether full text is available
     coordinate_space: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
@@ -86,6 +86,7 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
             "full_text_path": self.full_text_path,
+            "fulltext_available": self.fulltext_available,
             "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {
@@ -190,6 +191,7 @@ class RetrievalConfig:
     max_retries: int = 3
     download_directory: str = "downloads"
     n_jobs: int = 1
+    load_excluded: bool = False  # Whether to load full texts for excluded studies
     # Optional full text source configurations
     full_text_sources: List[Dict[str, Any]] = field(default_factory=list)
     # Coordinate parsing configuration
@@ -260,6 +262,7 @@ class PipelineConfig:
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
                 "n_jobs": self.retrieval.n_jobs,
+                "load_excluded": self.retrieval.load_excluded,
                 "full_text_sources": self.retrieval.full_text_sources,
                 "parse_coordinates": self.retrieval.parse_coordinates,
                 "coordinate_model": self.retrieval.coordinate_model,
@@ -345,14 +348,14 @@ class PipelineResult:
         
         Args:
             final_studies_only: If True, only include studies with status
-            INCLUDED
+            INCLUDED_FULLTEXT
         """
         # Filter studies if requested
         studies_to_include = self.studies
         if final_studies_only:
             studies_to_include = [
                 study for study in self.studies
-                if study.status == StudyStatus.INCLUDED
+                if study.status == StudyStatus.INCLUDED_FULLTEXT
             ]
         
         return {
