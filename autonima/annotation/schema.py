@@ -2,7 +2,6 @@
 
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
-from typing_extensions import Literal
 from datetime import datetime
 
 
@@ -13,13 +12,18 @@ class AnnotationCriteriaConfig(BaseModel):
     inclusion_criteria: List[str] = []
     exclusion_criteria: List[str] = []
     metadata_fields: List[str] = []
-
+    
+    # NEW: Store criteria mappings
+    criteria_mapping: Optional[Dict[str, Dict[str, str]]] = None
 
 
 class AnnotationConfig(BaseModel):
     """Configuration for the annotation phase."""
     model: str = "gpt-4o-mini"
-    include_all_analyses: bool = True
+    # Create "all_analyses" annotation with all analyses from INCLUDED studies
+    create_all_included_annotation: bool = True
+    # Create "all_studies" annotation from INCLUDED and EXCLUDED studies
+    create_all_from_search_annotation: bool = False
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
     metadata_fields: List[str] = [
@@ -42,6 +46,10 @@ class AnnotationDecision(BaseModel):
     confidence: Optional[float] = None
     model_used: str
     timestamp: datetime = datetime.now()
+    
+    # NEW: Track which criteria were applied
+    inclusion_criteria_applied: List[str] = []
+    exclusion_criteria_applied: List[str] = []
 
 
 class AnalysisMetadata(BaseModel):
@@ -60,10 +68,14 @@ class AnalysisMetadata(BaseModel):
     # Add any other fields as needed
     custom_fields: Dict[str, Any] = {}
     
-    @field_validator('analysis_name', 'analysis_description', 'table_caption', 'table_footer', 'study_title', 'study_abstract', 'study_journal', 'study_publication_date', mode='before')
+    @field_validator('analysis_name', 'analysis_description', 'table_caption', 
+                     'table_footer', 'study_title', 'study_abstract', 
+                     'study_journal', 'study_publication_date', mode='before')
     @classmethod
     def validate_string_fields(cls, v):
-        """Validate that string fields are properly formatted and handle nan values."""
+        """
+        Validate string fields and handle nan values.
+        """
         if v is None:
             return None
         # Handle nan values (both float nan and string 'nan')

@@ -12,6 +12,7 @@ from .models.types import (
     ParsingConfig,
     OutputConfig
 )
+from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
 
 
 class ConfigurationError(Exception):
@@ -115,6 +116,21 @@ class ConfigManager:
                 parsing=ParsingConfig(**config_dict.get('parsing', {})),
                 annotation=self._load_annotation_config(config_dict.get('annotation', {}))
             )
+
+            # Assign IDs to criteria
+            id_assigner = CriteriaIDAssigner()
+            
+            # Assign IDs to abstract screening criteria
+            abstract_inclusion = config.screening.abstract.get('inclusion_criteria', [])
+            abstract_exclusion = config.screening.abstract.get('exclusion_criteria', [])
+            abstract_mapping = id_assigner.assign_ids(abstract_inclusion, abstract_exclusion)
+            config.screening.abstract['criteria_mapping'] = abstract_mapping
+            
+            # Assign IDs to fulltext screening criteria
+            fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria', [])
+            fulltext_exclusion = config.screening.fulltext.get('exclusion_criteria', [])
+            fulltext_mapping = id_assigner.assign_ids(fulltext_inclusion, fulltext_exclusion)
+            config.screening.fulltext['criteria_mapping'] = fulltext_mapping
 
             self._validate_config(config)
             self._config = config
@@ -259,7 +275,8 @@ class ConfigManager:
             ),
             annotation=self._load_annotation_config({
                 "model": "gpt-4o-mini",
-                "include_all_analyses": True,
+                "create_all_included_annotation": True,
+                "create_all_from_search_annotation": False,
                 "annotations": []
             })
         )
@@ -308,7 +325,9 @@ class ConfigManager:
                     "objective is specified"
                 )
 
-    def _load_annotation_config(self, annotation_dict: Dict[str, Any]) -> 'AnnotationConfig':
+    def _load_annotation_config(
+        self, annotation_dict: Dict[str, Any]
+    ) -> 'AnnotationConfig':
         """
         Load annotation configuration from dictionary.
         
@@ -323,7 +342,10 @@ class ConfigManager:
             return AnnotationConfig()
         
         try:
-            from .annotation.schema import AnnotationConfig, AnnotationCriteriaConfig
+            from .annotation.schema import (
+                AnnotationConfig,
+                AnnotationCriteriaConfig
+            )
             
             # Extract annotations
             annotations = []
@@ -332,10 +354,20 @@ class ConfigManager:
                     criteria = AnnotationCriteriaConfig(**criteria_dict)
                     annotations.append(criteria)
             
+            # Get annotation configuration values
+            create_all_included = annotation_dict.get(
+                'create_all_included_annotation', True
+            )
+            
+            create_all_from_search = annotation_dict.get(
+                'create_all_from_search_annotation', False
+            )
+            
             # Create annotation config
             annotation_config = AnnotationConfig(
                 model=annotation_dict.get('model', 'gpt-4o-mini'),
-                include_all_analyses=annotation_dict.get('include_all_analyses', True),
+                create_all_included_annotation=create_all_included,
+                create_all_from_search_annotation=create_all_from_search,
                 annotations=annotations,
                 enabled=annotation_dict.get('enabled', True),
                 metadata_fields=annotation_dict.get('metadata_fields', [
@@ -344,13 +376,19 @@ class ConfigManager:
                     "table_caption",
                     "study_title"
                 ]),
-                inclusion_criteria=annotation_dict.get('inclusion_criteria', []),
-                exclusion_criteria=annotation_dict.get('exclusion_criteria', [])
+                inclusion_criteria=annotation_dict.get(
+                    'inclusion_criteria', []
+                ),
+                exclusion_criteria=annotation_dict.get(
+                    'exclusion_criteria', []
+                )
             )
             
             return annotation_config
         except Exception as e:
-            raise ConfigurationError(f"Error loading annotation configuration: {e}")
+            raise ConfigurationError(
+                f"Error loading annotation configuration: {e}"
+            )
 
 
 def load_config(config_path: Union[str, Path]) -> PipelineConfig:

@@ -208,7 +208,7 @@ class LLMScreener(ScreeningEngine):
             Dictionary mapping study IDs to their screening results
         """
         filename = f"{screening_type}_screening_results.json"
-        results_file = self.result_dir / "outputs"/ filename
+        results_file = self.result_dir / "outputs" / filename
         if not results_file.exists():
             return {}
             
@@ -237,12 +237,13 @@ class LLMScreener(ScreeningEngine):
         if screening_type == "abstract":
             return [s for s in studies if s.abstract and s.abstract.strip()]
         else:  # fulltext
+            # Only screen studies that:
+            # 1. Have full text available
+            # 2. Passed abstract screening (INCLUDED_ABSTRACT status)
             return [
                 s for s in studies
-                if s.status in [
-                    StudyStatus.FULLTEXT_RETRIEVED,
-                    StudyStatus.FULLTEXT_CACHED
-                ]
+                if (s.fulltext_available and
+                    s.status == StudyStatus.INCLUDED_ABSTRACT)
             ]
 
     def _get_screening_config(self, screening_type: str):
@@ -253,14 +254,37 @@ class LLMScreener(ScreeningEngine):
             else self.config.fulltext
         )
 
+    def _get_status_for_decision(
+        self,
+        screening_type: str,
+        decision: str
+    ) -> StudyStatus:
+        """Map screening type and decision to appropriate StudyStatus."""
+        if screening_type == "abstract":
+            return (
+                StudyStatus.INCLUDED_ABSTRACT
+                if decision == "INCLUDED"
+                else StudyStatus.EXCLUDED_ABSTRACT
+            )
+        else:  # fulltext
+            return (
+                StudyStatus.INCLUDED_FULLTEXT
+                if decision == "INCLUDED"
+                else StudyStatus.EXCLUDED_FULLTEXT
+            )
+    
     def _process_screening_response(
         self,
         response,
         config,
-        screening_type: str,
-        confidence_reporting: bool = False
+        confidence_reporting: bool = False,
+        screening_type: str = "abstract"
     ):
-        """Process the LLM response and apply threshold logic."""
+        """Process the LLM response and apply threshold logic.
+        
+        Returns:
+            Tuple of (decision_string, reason)
+        """
         # Check if threshold should be applied
         threshold = config.get("threshold")
         threshold_enabled = (
@@ -270,15 +294,11 @@ class LLMScreener(ScreeningEngine):
         )
         
         if threshold_enabled and response.confidence < threshold:
-            decision = StudyStatus.EXCLUDED
+            decision = "EXCLUDED"
             reason = (f"Confidence {response.confidence:.2f} below "
                       f"threshold {threshold}. {response.reason}")
         else:
-            decision = (
-                StudyStatus.INCLUDED
-                if response.decision == "INCLUDED"
-                else StudyStatus.EXCLUDED
-            )
+            decision = response.decision  # "INCLUDED" or "EXCLUDED"
             reason = response.reason
                 
         return decision, reason
@@ -290,7 +310,9 @@ class LLMScreener(ScreeningEngine):
         reason: str,
         confidence: float,
         model: str,
-        screening_type: str
+        screening_type: str,
+        inclusion_criteria_applied: List[str] = None,
+        exclusion_criteria_applied: List[str] = None
     ) -> ScreeningResult:
         """Create a ScreeningResult object."""
         return ScreeningResult(
@@ -299,7 +321,9 @@ class LLMScreener(ScreeningEngine):
             reason=reason,
             confidence=confidence,
             model_used=model,
-            screening_type=screening_type
+            screening_type=screening_type,
+            inclusion_criteria_applied=inclusion_criteria_applied or [],
+            exclusion_criteria_applied=exclusion_criteria_applied or []
         )
 
     def _screen_single_study(
@@ -319,6 +343,9 @@ class LLMScreener(ScreeningEngine):
             exclusion_criteria = config.get("exclusion_criteria") or []
             additional_instructions = config.get("additional_instructions")
             
+            # Get criteria mapping from config
+            criteria_mapping = config.get('criteria_mapping')
+            
             # Build prompt with inclusion/exclusion criteria from config
             prompt = (
                 PromptLibrary.get_abstract_screening_prompt
@@ -328,6 +355,7 @@ class LLMScreener(ScreeningEngine):
                 study=study,
                 inclusion_criteria=inclusion_criteria,
                 exclusion_criteria=exclusion_criteria,
+                criteria_mapping=criteria_mapping,
                 objective=objective,
                 confidence_reporting=confidence_reporting,
                 additional_instructions=additional_instructions,
@@ -351,14 +379,40 @@ class LLMScreener(ScreeningEngine):
             )
             response = screen_method(prompt, model)
                 
-            # Process response
-            decision, reason = self._process_screening_response(
-                response, config, screening_type, confidence_reporting
+            # Process response to get decision string
+            decision_str, reason = self._process_screening_response(
+                response, config, confidence_reporting, screening_type
             )
+            
+            # Convert decision string to stage-appropriate status
+            decision = self._get_status_for_decision(
+                screening_type, decision_str
+            )
+            
+            # Extract criteria IDs from response and store on study object
+            if screening_type == "abstract":
+                study.abstract_inclusion_criteria_applied = getattr(
+                    response, 'inclusion_criteria_applied', [])
+                study.abstract_exclusion_criteria_applied = getattr(
+                    response, 'exclusion_criteria_applied', [])
+            else:  # fulltext
+                study.fulltext_inclusion_criteria_applied = getattr(
+                    response, 'inclusion_criteria_applied', [])
+                study.fulltext_exclusion_criteria_applied = getattr(
+                    response, 'exclusion_criteria_applied', [])
+            
+            # Get criteria applied from response
+            inclusion_criteria_applied = getattr(
+                response, 'inclusion_criteria_applied', [])
+            exclusion_criteria_applied = getattr(
+                response, 'exclusion_criteria_applied', [])
+            
             result = self._create_screening_result(
                 study, decision, reason, response.confidence,
                 model,
-                screening_type
+                screening_type,
+                inclusion_criteria_applied,
+                exclusion_criteria_applied
             )
                 
             # Save result to file after each screening operation
@@ -464,13 +518,45 @@ class LLMScreener(ScreeningEngine):
         for study in screenable_studies:
             if study.pmid in existing_results_dict:
                 existing_result = existing_results_dict[study.pmid]
+                
+                # Map old status values to new stage-specific statuses
+                old_decision = existing_result["decision"]
+                if old_decision == "included":
+                    # Map to stage-specific included status
+                    new_decision = (
+                        StudyStatus.INCLUDED_ABSTRACT
+                        if screening_type == "abstract"
+                        else StudyStatus.INCLUDED_FULLTEXT
+                    )
+                elif old_decision == "excluded":
+                    # Map to stage-specific excluded status
+                    new_decision = (
+                        StudyStatus.EXCLUDED_ABSTRACT
+                        if screening_type == "abstract"
+                        else StudyStatus.EXCLUDED_FULLTEXT
+                    )
+                else:
+                    # Try to use the value directly (for new status values)
+                    try:
+                        new_decision = StudyStatus(old_decision)
+                    except ValueError:
+                        # If invalid, skip this cached result
+                        logger.warning(
+                            f"Invalid cached status '{old_decision}' for "
+                            f"study {study.pmid}, will re-screen"
+                        )
+                        studies_to_screen.append(study)
+                        continue
+                
                 existing_results.append(self._create_screening_result(
                     study,
-                    StudyStatus(existing_result["decision"]),
+                    new_decision,
                     existing_result["reason"],
                     existing_result["confidence"],
                     existing_result["model_used"],
-                    screening_type
+                    screening_type,
+                    existing_result.get("inclusion_criteria_applied", []),
+                    existing_result.get("exclusion_criteria_applied", [])
                 ))
             else:
                 studies_to_screen.append(study)
@@ -504,11 +590,11 @@ class LLMScreener(ScreeningEngine):
     ) -> List[ScreeningResult]:
         """
         Screen study abstracts for inclusion/exclusion.
-
+        
         Args:
             studies: List of studies to screen
             num_workers: Number of parallel workers (default: 1 for serial)
-
+            
         Returns:
             List of screening results
         """
@@ -521,11 +607,11 @@ class LLMScreener(ScreeningEngine):
     ) -> List[ScreeningResult]:
         """
         Screen full-text articles for inclusion/exclusion.
-
+        
         Args:
             studies: List of studies with full text to screen
             num_workers: Number of parallel workers (default: 1 for serial)
-
+            
         Returns:
             List of screening results
         """

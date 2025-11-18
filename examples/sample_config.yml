@@ -19,6 +19,7 @@ search:
   email: "your.email@example.com"  # Optional but recommended for NCBI API access
 
 retrieval:
+  load_excluded: false  # Whether to load full texts for excluded studies from abstract stage
   sources:
     - pubget
   # full_text_sources:
@@ -92,12 +93,17 @@ output:
   directory: "results"
   formats: ["csv", "json"]
   nimads: false  # Output in NiMADS format (default: false)
+  export_excluded_studies: false  # Export excluded studies to NiMADS (default: false)
 
 # Annotation configuration for categorizing analyses
 annotation:
   enabled: true
   model: "gpt-4o-mini"
-  include_all_analyses: true  # Create annotation with all analyses included
+  # Create an "all_analyses" annotation with all analyses from INCLUDED studies
+  create_all_included_annotation: true
+  # Create an "all_studies" annotation with ALL analyses from original search
+  # (INCLUDED + EXCLUDED studies - useful when export_excluded_studies is true)
+  create_all_from_search_annotation: false
   # Define metadata fields to include in prompts
   # metadata_fields:
   #   - "analysis_name"

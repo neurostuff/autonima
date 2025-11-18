@@ -1,6 +1,6 @@
 """Prompt templates for annotation decisions."""
 
-from typing import List, Optional
+from typing import List
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig
 
 
@@ -10,12 +10,15 @@ def create_annotation_prompt(
     metadata_fields: List[str] = None
 ) -> str:
     """
-    Create a prompt for the LLM to decide if an analysis should be included in an annotation.
+    Create a prompt for the LLM to decide if an analysis should be included 
+    in an annotation.
     
     Args:
         metadata: Analysis metadata to include in the prompt
         criteria: Annotation criteria configuration
+        metadata_fields: List of metadata fields to include
         
+    Returns:
         Formatted prompt string
     """
     # Use the provided metadata_fields or fall back to criteria.metadata_fields
@@ -48,31 +51,50 @@ def create_annotation_prompt(
         metadata_lines.append(f"- Study Abstract: {metadata.study_abstract}")
         
     if "study_authors" in fields_to_use and metadata.study_authors:
-        metadata_lines.append(f"- Study Authors: {', '.join(metadata.study_authors)}")
+        authors = ', '.join(metadata.study_authors)
+        metadata_lines.append(f"- Study Authors: {authors}")
         
     if "study_journal" in fields_to_use and metadata.study_journal:
         metadata_lines.append(f"- Study Journal: {metadata.study_journal}")
         
-    if "study_publication_date" in fields_to_use and metadata.study_publication_date:
-        metadata_lines.append(f"- Study Publication Date: {metadata.study_publication_date}")
+    if ("study_publication_date" in fields_to_use and 
+            metadata.study_publication_date):
+        date_str = metadata.study_publication_date
+        metadata_lines.append(f"- Study Publication Date: {date_str}")
     
     # Add any custom fields
     for field_name, field_value in metadata.custom_fields.items():
         if field_name in fields_to_use and field_value:
-            metadata_lines.append(f"- {field_name.replace('_', ' ').title()}: {field_value}")
+            formatted_name = field_name.replace('_', ' ').title()
+            metadata_lines.append(f"- {formatted_name}: {field_value}")
     
-    # Format inclusion and exclusion criteria
-    inclusion_criteria_text = "\n".join([f"  - {c}" for c in criteria.inclusion_criteria])
-    exclusion_criteria_text = "\n".join([f"  - {c}" for c in criteria.exclusion_criteria])
+    # Format criteria with IDs if mapping is provided
+    if criteria.criteria_mapping:
+        inclusion_items = criteria.criteria_mapping.get('inclusion', {}).items()
+        inclusion_list = [f"{id}: {text}" for id, text in inclusion_items]
+        inclusion_text = "\n".join(inclusion_list)
+        
+        exclusion_items = criteria.criteria_mapping.get('exclusion', {}).items()
+        exclusion_list = [f"{id}: {text}" for id, text in exclusion_items]
+        exclusion_text = "\n".join(exclusion_list)
+    else:
+        inclusion_list = [f"  - {c}" for c in criteria.inclusion_criteria]
+        inclusion_text = "\n".join(inclusion_list)
+        exclusion_list = [f"  - {c}" for c in criteria.exclusion_criteria]
+        exclusion_text = "\n".join(exclusion_list)
     
     # Create the prompt
     prompt = f"""
-You are a neuroimaging meta-analysis expert evaluating whether an analysis meets specific inclusion criteria.
+You are a neuroimaging meta-analysis expert evaluating whether an analysis meets 
+specific inclusion criteria.
 
-The following analysis has been extracted from within a table of a published fMRI/neuroimaging article.
-You will be provided with metadata about the analysis, the table it was extracted from, and the study it belongs to.
-Note that since each table may have contained multiple analyses, the table caption may describe multiple analyses that are not relevant to this specific analysis.
-As such, while taking into account the table caption, please focus primarily on the analysis name and description for your decision.
+The following analysis has been extracted from within a table of a published 
+fMRI/neuroimaging article. You will be provided with metadata about the 
+analysis, the table it was extracted from, and the study it belongs to. Note 
+that since each table may have contained multiple analyses, the table caption 
+may describe multiple analyses that are not relevant to this specific analysis.
+As such, while taking into account the table caption, please focus primarily on
+the analysis name and description for your decision.
 
 STUDY CONTEXT:
 {chr(10).join(metadata_lines) if metadata_lines else "No metadata available"}
@@ -81,17 +103,25 @@ ANNOTATION CRITERIA: "{criteria.name}"
 Description: {criteria.description or "No description provided"}
 
 INCLUSION CRITERIA:
-{inclusion_criteria_text or "No inclusion criteria specified"}
+{inclusion_text or "No inclusion criteria specified"}
 
 EXCLUSION CRITERIA:
-{exclusion_criteria_text or "No exclusion criteria specified"}
+{exclusion_text or "No exclusion criteria specified"}
 
-Based on the provided information, should this analysis be included in the "{criteria.name}" annotation?
+Based on the provided information, should this analysis be included in the 
+"{criteria.name}" annotation?
+
+IMPORTANT: In your response, you must specify which specific criteria IDs apply
+to this analysis.
+- For included analyses: List the inclusion criteria IDs that are satisfied
+- For excluded analyses: List the exclusion criteria IDs that apply
 
 Respond with JSON:
 {{
   "include": true/false,
-  "reasoning": "Brief explanation of decision"
+  "reasoning": "Brief explanation of decision",
+  "inclusion_criteria_applied": ["I1", "I2"],
+  "exclusion_criteria_applied": []
 }}
 """
     

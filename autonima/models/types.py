@@ -11,13 +11,12 @@ from ..annotation.schema import AnnotationConfig
 class StudyStatus(Enum):
     """Status of a study in the systematic review pipeline."""
     PENDING = "pending"
-    INCLUDED = "included"
-    EXCLUDED = "excluded"
+    INCLUDED_ABSTRACT = "included_abstract"
+    EXCLUDED_ABSTRACT = "excluded_abstract"
+    INCLUDED_FULLTEXT = "included_fulltext"
+    EXCLUDED_FULLTEXT = "excluded_fulltext"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
-    FULLTEXT_RETRIEVED = "fulltext_retrieved"
-    FULLTEXT_UNAVAILABLE = "fulltext_unavailable"
-    FULLTEXT_CACHED = "fulltext_cached"
 
 
 @dataclass
@@ -52,9 +51,15 @@ class Study:
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
+    fulltext_available: bool = False  # Whether full text is available
     coordinate_space: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
+    
+    abstract_inclusion_criteria_applied: List[str] = field(default_factory=list)
+    abstract_exclusion_criteria_applied: List[str] = field(default_factory=list)
+    fulltext_inclusion_criteria_applied: List[str] = field(default_factory=list)
+    fulltext_exclusion_criteria_applied: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -81,6 +86,7 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
             "full_text_path": self.full_text_path,
+            "fulltext_available": self.fulltext_available,
             "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {
@@ -112,7 +118,12 @@ class Study:
                     ]
                 }
                 for analysis in self.analyses
-            ]
+            ],
+            # NEW FIELDS for criteria tracking
+            "abstract_inclusion_criteria_applied": self.abstract_inclusion_criteria_applied,
+            "abstract_exclusion_criteria_applied": self.abstract_exclusion_criteria_applied,
+            "fulltext_inclusion_criteria_applied": self.fulltext_inclusion_criteria_applied,
+            "fulltext_exclusion_criteria_applied": self.fulltext_exclusion_criteria_applied
         }
     
     def load_full_text(self, output_dir: str) -> str:
@@ -180,6 +191,7 @@ class RetrievalConfig:
     max_retries: int = 3
     download_directory: str = "downloads"
     n_jobs: int = 1
+    load_excluded: bool = False  # Whether to load full texts for excluded studies
     # Optional full text source configurations
     full_text_sources: List[Dict[str, Any]] = field(default_factory=list)
     # Coordinate parsing configuration
@@ -201,6 +213,7 @@ class OutputConfig:
     prisma_diagram: bool = True
     formats: List[str] = field(default_factory=lambda: ["csv", "json"])
     nimads: bool = False
+    export_excluded_studies: bool = False
 
 
 @dataclass
@@ -215,6 +228,19 @@ class PipelineConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
+        from ..utils.criteria import CriteriaMapping
+        
+        # Helper function to serialize screening config dicts
+        def serialize_screening_dict(screening_dict: Dict[str, Any]) -> Dict[str, Any]:
+            """Serialize a screening dict, handling CriteriaMapping objects."""
+            result = {}
+            for key, value in screening_dict.items():
+                if isinstance(value, CriteriaMapping):
+                    result[key] = value.to_dict()
+                else:
+                    result[key] = value
+            return result
+        
         return {
             "search": {
                 "database": self.search.database,
@@ -227,8 +253,8 @@ class PipelineConfig:
                 "pmids_list": self.search.pmids_list,
             },
             "screening": {
-                "abstract": self.screening.abstract,
-                "fulltext": self.screening.fulltext,
+                "abstract": serialize_screening_dict(self.screening.abstract),
+                "fulltext": serialize_screening_dict(self.screening.fulltext),
             },
             "retrieval": {
                 "sources": self.retrieval.sources,
@@ -236,6 +262,7 @@ class PipelineConfig:
                 "max_retries": self.retrieval.max_retries,
                 "download_directory": self.retrieval.download_directory,
                 "n_jobs": self.retrieval.n_jobs,
+                "load_excluded": self.retrieval.load_excluded,
                 "full_text_sources": self.retrieval.full_text_sources,
                 "parse_coordinates": self.retrieval.parse_coordinates,
                 "coordinate_model": self.retrieval.coordinate_model,
@@ -246,7 +273,12 @@ class PipelineConfig:
             },
             "annotation": {
                 "model": self.annotation.model,
-                "include_all_analyses": self.annotation.include_all_analyses,
+                "create_all_included_annotation": (
+                    self.annotation.create_all_included_annotation
+                ),
+                "create_all_from_search_annotation": (
+                    self.annotation.create_all_from_search_annotation
+                ),
                 "annotations": [
                     {
                         "name": criteria.name,
@@ -264,6 +296,7 @@ class PipelineConfig:
                 "prisma_diagram": self.output.prisma_diagram,
                 "formats": self.output.formats,
                 "nimads": self.output.nimads,
+                "export_excluded_studies": self.output.export_excluded_studies,
             },
         }
 
@@ -278,6 +311,8 @@ class ScreeningResult:
     model_used: str
     screening_type: str  # "abstract" or "fulltext"
     timestamp: datetime = field(default_factory=datetime.now)
+    inclusion_criteria_applied: List[str] = field(default_factory=list)
+    exclusion_criteria_applied: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert screening result to dictionary."""
@@ -289,6 +324,8 @@ class ScreeningResult:
             "model_used": self.model_used,
             "screening_type": self.screening_type,
             "timestamp": self.timestamp.isoformat(),
+            "inclusion_criteria_applied": self.inclusion_criteria_applied,
+            "exclusion_criteria_applied": self.exclusion_criteria_applied,
         }
 
 
@@ -311,14 +348,14 @@ class PipelineResult:
         
         Args:
             final_studies_only: If True, only include studies with status
-            INCLUDED
+            INCLUDED_FULLTEXT
         """
         # Filter studies if requested
         studies_to_include = self.studies
         if final_studies_only:
             studies_to_include = [
                 study for study in self.studies
-                if study.status == StudyStatus.INCLUDED
+                if study.status == StudyStatus.INCLUDED_FULLTEXT
             ]
         
         return {

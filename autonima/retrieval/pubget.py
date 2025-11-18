@@ -11,7 +11,9 @@ from ..models.types import Study, StudyStatus
 from .base import BaseRetriever
 from ..utils import log_error_with_debug
 from .utils import (
-    load_activation_table_map, _apply_activation_tables_to_studies
+    load_activation_table_map,
+    _apply_activation_tables_to_studies,
+    _apply_analyses_to_studies
 )
 from pubget import download_pmcids, extract_articles, extract_data_to_csv
 
@@ -43,16 +45,29 @@ class PubGetRetriever(BaseRetriever):
         Args:
             studies: List of studies that passed screening
             output_dir: Directory to store retrieved articles
-            **kwargs: Additional parameters (api_key, n_docs, etc.)
+            **kwargs: Additional parameters (api_key, n_docs, load_excluded, etc.)
             
         Returns:
             List of studies with updated full_text_path attributes
         """
-        # Filter studies that have PMCID (needed for PubGet)
-        studies_with_pmcid = [
-            study for study in studies
-            if study.pmcid and study.status == StudyStatus.INCLUDED
-        ]
+        # Determine which studies to retrieve based on load_excluded setting
+        load_excluded = kwargs.get('load_excluded', False)
+        
+        if load_excluded:
+            # Filter studies with PMCID (both included and excluded from abstract)
+            studies_with_pmcid = [
+                study for study in studies
+                if study.pmcid and study.status in [
+                    StudyStatus.INCLUDED_ABSTRACT,
+                    StudyStatus.EXCLUDED_ABSTRACT
+                ]
+            ]
+        else:
+            # Filter studies that have PMCID and are included only
+            studies_with_pmcid = [
+                study for study in studies
+                if study.pmcid and study.status == StudyStatus.INCLUDED_ABSTRACT
+            ]
         
         if not studies_with_pmcid:
             logger.info("No studies with PMCID found for retrieval")
@@ -83,7 +98,8 @@ class PubGetRetriever(BaseRetriever):
         for study in studies_with_pmcid:
             if study.pmcid and study.pmcid in existing_pmcids:
                 cached_studies.append(study)
-                study.status = StudyStatus.FULLTEXT_CACHED
+                # Don't change status - just mark as available
+                study.fulltext_available = True
             else:
                 studies_to_download.append(study)
                 
@@ -368,27 +384,35 @@ class PubGetRetriever(BaseRetriever):
         df = pd.read_csv(all_texts)
         retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
         
-        pmcid_to_tables = load_activation_table_map(
+        pmcid_to_analyses, pmcid_to_tables = load_activation_table_map(
             data_dir=data_dir,
             filter_by_coordinates=True,
             identifier_key="pmcid",
         )
 
-        _apply_activation_tables_to_studies(
-            studies=studies,
-            id_to_tables=pmcid_to_tables,
-            clear_existing=False,
-            identifier_key="pmcid",
-        )
+        # Apply analyses from coordinates to studies
+        if pmcid_to_analyses:
+            _apply_analyses_to_studies(
+                studies=studies,
+                id_to_analyses=pmcid_to_analyses,
+                clear_existing=False,
+                identifier_key="pmcid",
+            )
+
+        # Apply activation tables to studies
+        if pmcid_to_tables:
+            _apply_activation_tables_to_studies(
+                studies=studies,
+                id_to_tables=pmcid_to_tables,
+                clear_existing=False,
+                identifier_key="pmcid",
+            )
         
         # Check which studies have full-text files
         for study in studies:
-            if study.status == StudyStatus.FULLTEXT_CACHED:
-                continue
-            elif study.pmcid in retrieved_pmcid:
-                study.status = StudyStatus.FULLTEXT_RETRIEVED
+            if study.pmcid in retrieved_pmcid:
+                study.fulltext_available = True
                 study.retrieved_at = datetime.now()
-            else:
-                study.status = StudyStatus.FULLTEXT_UNAVAILABLE
+            # If not retrieved, fulltext_available remains False (default)
         
         return studies

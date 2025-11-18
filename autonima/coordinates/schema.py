@@ -48,6 +48,7 @@ class Analysis(BaseModel):
     name: Optional[str] = None  # Name of the contrast being performed
     description: Optional[str] = None  # Long form description of how the contrast was performed
     points: List[CoordinatePoint]  # Coordinates of significance associated with the contrast
+    parsed: Optional[bool] = False  # Whether the analysis was parsed from tables or ingested directly
 
 
 class ParseAnalysesOutput(BaseModel):

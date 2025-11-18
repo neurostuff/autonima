@@ -184,18 +184,19 @@ def _map_pmids_to_text(
                 index[pmid] = text_file_path
 
     if processed_data_path:
-        # Load activation tables from source
+        # Load activation tables and analyses from source
         processed_data_path = Path(processed_data_path)
-        tables = load_activation_table_map(
+        analyses, tables = load_activation_table_map(
             data_dir=processed_data_path,
             ids_to_include=pmids_to_include,
             filter_by_coordinates=True,
             identifier_key='pmid',
         )
     else:
+        analyses = None
         tables = None
 
-    return index, tables
+    return index, analyses, tables
 
 
 def _safe_clean_html(html: str) -> str:
@@ -332,68 +333,131 @@ def _load_activation_table_metadata(
     return id_to_tables
 
 
+def _load_analyses_from_coordinates_df(
+    coords_df: pd.DataFrame,
+    ids_to_include: Optional[Set[str]] = None,
+    identifier_key: str = "pmcid",
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Load analyses from a coordinates dataframe.
+    
+    Args:
+        coords_df: DataFrame containing coordinate data
+        ids_to_include: Optional set of identifiers to include
+        identifier_key: Column name to use as identifier (default: "pmcid")
+        
+    Returns:
+        Mapping of identifier -> list of analysis metadata dicts
+    """
+    required_columns = [
+        identifier_key,
+        'table_id',
+        'table_label',
+        'x',
+        'y',
+        'z'
+    ]
+    missing = [c for c in required_columns if c not in coords_df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns in coordinates dataframe: {missing}")
+
+    id_to_analyses: Dict[str, List[Dict[str, Any]]] = {}
+
+    # Group by table_id
+    grouped = coords_df.groupby([identifier_key, 'table_id'])
+    for (identifier, table_id), group in grouped:
+        first_row = group.iloc[0]
+
+        if ids_to_include is not None and identifier not in ids_to_include:
+            continue
+
+        # Build list of coordinate points
+        points = []
+        for _, row in group.iterrows():
+            # Build coordinate dict with x, y, z
+            coordinates = [float(row['x']), float(row['y']), float(row['z'])]
+
+            # Create point dict matching CoordinatePoint schema
+            point = {
+                'coordinates': coordinates,
+                'space': None,  # Space not provided in coordinates.csv
+            }
+            points.append(point)
+
+        # Create analysis metadata matching Analysis schema
+        analysis_metadata = {
+            'name': str(table_id),
+            'description': str(first_row['table_label']) if pd.notna(first_row['table_label']) else None,
+            'points': points,
+            'parsed': False  # IMPORTANT: Set to False as requested
+        }
+
+        id_to_analyses.setdefault(identifier, []).append(analysis_metadata)
+
+    return id_to_analyses
+
+
 def load_activation_table_map(
     data_dir: Path,
     ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
     identifier_key: str = "pmcid",
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> tuple[Optional[Dict[str, List[Dict[str, Any]]]], Dict[str, List[Dict[str, Any]]]]:
     """
     Core function: Load and (optionally) filter activation tables.
-    Returns identifier -> list of table metadata dicts.
+    Returns (analyses, tables) tuple where:
+    - analyses: identifier -> list of analysis metadata dicts from coordinates
+    - tables: identifier -> list of table metadata dicts from tables.csv
     
     Args:
         data_dir: Directory containing tables.csv and coordinates.csv
         ids_to_include: Optional set of identifiers to include
         filter_by_coordinates: Whether to filter by coordinates
         identifier_key: Column name to use as identifier (default: "pmcid")
+        
+    Returns:
+        Tuple of (analyses_dict, tables_dict)
     """
+    coords_file = data_dir / "coordinates.csv"
+    coords_df = pd.read_csv(coords_file) if coords_file.exists() else None
+
+    # Load Analyses from coordinates
+    if coords_df is not None:
+        analyses = _load_analyses_from_coordinates_df(
+            coords_df=coords_df,
+            ids_to_include=ids_to_include,
+            identifier_key=identifier_key,
+        )
+    else:
+        analyses = None
+
     tables_file = data_dir / "tables.csv"
+
     if not tables_file.exists():
         logging.info(f"No tables.csv in {data_dir}, skipping...")
-        return {}
+        return analyses, {}
 
     try:
         df = pd.read_csv(tables_file)
 
         # Optional coordinate filtering
-        coords_file = data_dir / "coordinates.csv"
-        if filter_by_coordinates and coords_file.exists():
-            coords_df = pd.read_csv(coords_file)
+        if filter_by_coordinates and coords_df is not None:
             df = df[
                 df.set_index([identifier_key, "table_id"]).index
                 .isin(coords_df.set_index([identifier_key, "table_id"]).index)
             ]
 
-        return _load_activation_table_metadata(
+        tables = _load_activation_table_metadata(
             df=df,
             root_path=data_dir,
             ids_to_include=ids_to_include,
             identifier_key=identifier_key,
         )
+        return analyses, tables
 
     except Exception as e:
         logging.warning(f"Failed to load activation tables: {e}")
-        return {}
-
-
-
-def _map_ids_to_activation_tables(
-    full_text_config: Dict[str, Any],
-    ids_to_include: Optional[Set[str]] = None,
-    identifier_key: str = "pmcid",
-) -> Dict[str, List[Dict[str, Any]]]:
-    processed_data_path = full_text_config.get("processed_data_path")
-    if not processed_data_path:
-        return {}
-
-    data_dir = Path(processed_data_path)
-    return load_activation_table_map(
-        data_dir=data_dir,
-        ids_to_include=ids_to_include,
-        filter_by_coordinates=False,
-        identifier_key=identifier_key,
-    )
+        return analyses, {}
 
 
 def _apply_activation_tables_to_studies(
@@ -401,6 +465,7 @@ def _apply_activation_tables_to_studies(
     id_to_tables: Dict[str, List[Dict[str, Any]]],
     identifier_key: str,
     clear_existing: bool = True,
+    identifier_type: str = None
 ) -> None:
     """
     Attach activation tables to studies based on identifier mappings.
@@ -411,6 +476,16 @@ def _apply_activation_tables_to_studies(
         clear_existing: Whether to clear existing activation tables
         identifier_key: Which study attribute to use as identifier
     """
+    # If identifier_type is provided, convert keys of id_to_tables accordingly
+    if identifier_type == "int":
+        id_to_tables = {
+            int(k): v for k, v in id_to_tables.items()
+        }
+    elif identifier_type == "str":
+        id_to_tables = {
+            str(k): v for k, v in id_to_tables.items()
+        }
+        
     for study in studies:
         # Get the identifier value from the study based on the identifier_key
         identifier_value = getattr(study, identifier_key, None)
@@ -434,3 +509,75 @@ def _apply_activation_tables_to_studies(
                     table_foot=t['table_foot'],
                 )
             )
+
+
+def _apply_analyses_to_studies(
+    studies: List["Study"],
+    id_to_analyses: Dict[str, List[Dict[str, Any]]],
+    identifier_key: str,
+    clear_existing: bool = False,
+    identifier_type: str = None
+) -> None:
+    """
+    Attach analyses (from coordinates) to studies based on identifier mappings.
+    
+    Args:
+        studies: List of studies to attach analyses to
+        id_to_analyses: Mapping of identifiers to analysis metadata
+        identifier_key: Which study attribute to use as identifier
+        clear_existing: Whether to clear existing analyses
+        identifier_type: Type conversion for identifier ('int' or 'str')
+    """
+    from ..coordinates.schema import Analysis, CoordinatePoint, PointsValue
+    
+    # If identifier_type is provided, convert keys accordingly
+    if identifier_type == "int":
+        id_to_analyses = {
+            int(k): v for k, v in id_to_analyses.items()
+        }
+    elif identifier_type == "str":
+        id_to_analyses = {
+            str(k): v for k, v in id_to_analyses.items()
+        }
+        
+    for study in studies:
+        # Get the identifier value from the study
+        identifier_value = getattr(study, identifier_key, None)
+        if not identifier_value:
+            continue
+
+        if identifier_value not in id_to_analyses:
+            continue
+
+        if clear_existing:
+            study.analyses.clear()
+
+        # Convert analysis metadata dicts to Analysis objects
+        for analysis_data in id_to_analyses[identifier_value]:
+            # Convert points
+            points = []
+            for point_data in analysis_data.get('points', []):
+                # Convert values if present
+                values = None
+                if point_data.get('values'):
+                    values = [
+                        PointsValue(
+                            value=v.get('value'),
+                            kind=v.get('kind')
+                        )
+                        for v in point_data['values']
+                    ]
+                
+                points.append(CoordinatePoint(
+                    coordinates=point_data['coordinates'],
+                    space=point_data.get('space'),
+                    values=values
+                ))
+            
+            # Create Analysis object
+            study.analyses.append(Analysis(
+                name=analysis_data.get('name'),
+                description=analysis_data.get('description'),
+                points=points,
+                parsed=analysis_data.get('parsed', False)
+            ))

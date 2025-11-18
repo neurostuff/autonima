@@ -28,12 +28,19 @@ class AnnotationProcessor:
         self.client = AnnotationClient()
         self.annotation_results: List[AnnotationDecision] = []
     
-    def process_studies(self, studies: List[Study], output_dir: str) -> List[AnnotationDecision]:
+    def process_studies(
+        self,
+        included_studies: List[Study],
+        all_studies: List[Study] = None,
+        output_dir: str = None
+    ) -> List[AnnotationDecision]:
         """
-        Process all studies and annotate their analyses.
+        Process studies and annotate their analyses.
         
         Args:
-            studies: List of studies with parsed analyses
+            included_studies: List of INCLUDED studies with parsed analyses
+            all_studies: Optional list of ALL studies (INCLUDED + EXCLUDED)
+                        with parsed analyses for the all_studies annotation
             output_dir: Output directory for caching results
             
         Returns:
@@ -44,33 +51,53 @@ class AnnotationProcessor:
         if cached_results:
             # Check if cached results are still valid
             if self._are_cached_results_valid(cached_results):
-                logger.info(f"Loaded {len(cached_results)} cached annotation results")
+                logger.info(
+                    f"Loaded {len(cached_results)} cached annotation "
+                    "results"
+                )
                 self.annotation_results = cached_results
                 return cached_results
             else:
-                logger.info("Cached results are outdated, processing fresh annotations")
-        
-        # Filter studies to only those that are included and have analyses
-        included_studies = [
-            study for study in studies
-            if study.status == StudyStatus.INCLUDED and study.analyses
-        ]
+                logger.info(
+                    "Cached results are outdated, processing fresh "
+                    "annotations"
+                )
         
         if not included_studies:
-            logger.info("No studies with analyses found for annotation")
+            logger.info(
+                "No INCLUDED studies with analyses found for annotation"
+            )
             return []
         
-        logger.info(f"Processing {len(included_studies)} studies with analyses for annotation")
+        logger.info(
+            f"Processing {len(included_studies)} INCLUDED studies with "
+            "analyses for annotation"
+        )
         
         # Process all analysis-annotation combinations
         all_decisions = []
         
-        # Process the "all_analyses" annotation if enabled
-        if self.config.include_all_analyses:
-            all_analyses_decisions = self._create_all_analyses_annotations(included_studies)
+        # Process the "all_analyses" annotation for INCLUDED studies
+        if self.config.create_all_included_annotation:
+            all_analyses_decisions = self._create_all_analyses_annotations(
+                included_studies,
+                annotation_name="all_analyses"
+            )
             all_decisions.extend(all_analyses_decisions)
         
-        # Process custom annotations if any are defined
+        # Process the "all_studies" annotation for ALL studies if enabled
+        if self.config.create_all_from_search_annotation and all_studies:
+            logger.info(
+                f"Creating 'all_studies' annotation for "
+                f"{len(all_studies)} studies (INCLUDED + EXCLUDED)"
+            )
+            all_studies_decisions = self._create_all_analyses_annotations(
+                all_studies,
+                annotation_name="all_studies"
+            )
+            all_decisions.extend(all_studies_decisions)
+        
+        # Process custom annotations on INCLUDED studies only
         if self.config.annotations:
             custom_decisions = self._process_custom_annotations(
                 included_studies,
@@ -84,12 +111,17 @@ class AnnotationProcessor:
         
         return all_decisions
     
-    def _create_all_analyses_annotations(self, studies: List[Study]) -> List[AnnotationDecision]:
+    def _create_all_analyses_annotations(
+        self,
+        studies: List[Study],
+        annotation_name: str = "all_analyses"
+    ) -> List[AnnotationDecision]:
         """
-        Create annotation decisions for the "all_analyses" annotation.
+        Create annotation decisions for a default annotation.
         
         Args:
-            studies: List of included studies with analyses
+            studies: List of studies with analyses
+            annotation_name: Name of the annotation to create
             
         Returns:
             List of annotation decisions (all marked as included)
@@ -101,18 +133,21 @@ class AnnotationProcessor:
                 # Create a unique analysis ID
                 analysis_id = f"{study.pmid}_analysis_{i}"
                 
-                # Create decision for all_analyses annotation
+                # Create decision for the annotation
                 decision = AnnotationDecision(
-                    annotation_name="all_analyses",
+                    annotation_name=annotation_name,
                     analysis_id=analysis_id,
                     study_id=study.pmid,
                     include=True,
-                    reasoning="All analyses included by default",
+                    reasoning=f"All analyses included in '{annotation_name}'",
                     model_used="none"
                 )
                 decisions.append(decision)
         
-        logger.info(f"Created {len(decisions)} decisions for 'all_analyses' annotation")
+        logger.info(
+            f"Created {len(decisions)} decisions for '{annotation_name}' "
+            "annotation"
+        )
         return decisions
     
     def _process_custom_annotations(self, studies: List[Study], model: str) -> List[AnnotationDecision]:
@@ -307,15 +342,24 @@ class AnnotationProcessor:
             # Check if we have the right number of annotations
             # (all_analyses + custom annotations)
             expected_annotation_count = 0
-            if self.config.include_all_analyses:
+            if self.config.create_all_included_annotation:
+                expected_annotation_count += 1
+            if self.config.create_all_from_search_annotation:
                 expected_annotation_count += 1
             expected_annotation_count += len(self.config.annotations)
             
             # Get unique annotation names from cached results
-            cached_annotation_names = set(result.annotation_name for result in cached_results)
+            cached_annotation_names = set(
+                result.annotation_name for result in cached_results
+            )
             
             # Check if we have the expected annotations
-            if self.config.include_all_analyses and "all_analyses" not in cached_annotation_names:
+            if (self.config.create_all_included_annotation and
+                    "all_analyses" not in cached_annotation_names):
+                return False
+            
+            if (self.config.create_all_from_search_annotation and
+                    "all_studies" not in cached_annotation_names):
                 return False
             
             # Check if we have all custom annotations
