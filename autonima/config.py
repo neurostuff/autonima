@@ -150,11 +150,7 @@ class ConfigManager:
             ConfigurationError: If configuration is invalid
         """
         # Validate search configuration
-        if config.search.pmids_file or config.search.pmids_list:
-            # PMID-based search
-            if config.search.query.strip():
-                raise ConfigurationError("Cannot specify both search query and PMIDs list/file")
-        else:
+        if not (config.search.pmids_file or config.search.pmids_list):
             # Query-based search
             if not config.search.query.strip():
                 raise ConfigurationError("Search query cannot be empty when not using PMIDs list/file")
@@ -205,6 +201,13 @@ class ConfigManager:
         # Validate output directory
         if not config.output.directory.strip():
             raise ConfigurationError("Output directory cannot be empty")
+        
+        # config.retrieval.coordinates_path_templates is mutually exclusive with processed_data_path for each source
+        for source in config.retrieval.sources:
+            if source.coordinates_path_templates and source.processed_data_path:
+                raise ConfigurationError(
+                    "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
+                )
 
     def get_config(self) -> PipelineConfig:
         """Get the currently loaded configuration."""

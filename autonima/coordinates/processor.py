@@ -1,8 +1,6 @@
 """Coordinate parsing processor for the pipeline."""
 
 import logging
-import csv
-from pathlib import Path
 from typing import List
 
 from .openai_client import CoordinateParsingClient
@@ -37,25 +35,16 @@ class CoordinateProcessor:
             List of analyses extracted from the table
         """
         try:
-            # Load the table data
-            for path_attr in self.path_preference:
-                table_path_value = getattr(table, path_attr, None)
-                if table_path_value:
-                    table_path = Path(table_path_value)
-                    break
-            else:
+            # Load the raw table content using the table's method
+            table.load_raw_table()
+            
+            # If we couldn't load the raw table content, return empty list
+            if table.raw_table is None:
                 logger.warning(f"No valid table path found for table: {table.table_id}")
                 return []
-            table_path = Path(table_path)
-            if not table_path.exists():
-                logger.warning(f"Table file not found: {table_path}")
-                return []
             
-            # Read the table as text
-            with open(table_path, "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-                table_text = "\n".join([",".join(r) for r in rows])
+            # Use the raw_table content directly
+            table_text = table.raw_table
             
             # Create a prompt for the table
             prompt = self._create_table_prompt(
@@ -69,7 +58,7 @@ class CoordinateProcessor:
             return result.analyses
             
         except Exception as e:
-            logger.warning(f"Error processing table {table.table_path}: {e}")
+            logger.warning(f"Error processing table {table.table_id}: {e}")
             return []
     
     def _create_table_prompt(self, table_text: str, table_caption: str = "", table_foot: str = "") -> str:
