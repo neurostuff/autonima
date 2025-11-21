@@ -25,7 +25,7 @@ def temp_dir():
 
 def test_load_full_text(temp_dir):
     """Test the _load_full_text function."""
-    # Create a test CSV file
+    # Create a test CSV file in the standard location
     test_data = {
         'pmcid': ['123456', '789012'],
         'body': ['This is the full text for study 1.',
@@ -33,7 +33,10 @@ def test_load_full_text(temp_dir):
     }
     
     df = pd.DataFrame(test_data)
-    test_file = temp_dir / 'test_text.csv'
+    # Create standard directory structure
+    test_dir = temp_dir / 'retrieval' / 'pubget_data'
+    test_dir.mkdir(parents=True, exist_ok=True)
+    test_file = test_dir / 'text.csv'
     df.to_csv(test_file, index=False)
     
     # Create a test study
@@ -47,8 +50,8 @@ def test_load_full_text(temp_dir):
         pmcid="123456"
     )
     
-    # Test loading full text
-    result = _load_full_text(study, text_path=str(test_file))
+    # Test loading full text with output_dir parameter
+    result = _load_full_text(study, output_dir=str(temp_dir))
     
     # Verify the result
     expected = 'This is the full text for study 1.'

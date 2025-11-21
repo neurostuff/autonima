@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_single_table(
-    file_name: str,
+    table_id: str,
     table_caption: str,
     table_foot: str,
     table_text: str,
@@ -37,9 +37,7 @@ def parse_single_table(
         
     Returns:
         Dictionary containing the parsed results
-    """
-    logger.info(f"Processing: {file_name}")
-    
+    """    
     # Create detailed prompt
     detailed_prompt = f"""
     You are a neuroimaging data curation assistant.
@@ -150,7 +148,7 @@ def parse_single_table(
     parsed_json = response.model_dump()
     
     return {
-        "file_name": file_name,
+        "table_id": table_id,
         "parsed_json": parsed_json
     }
 
@@ -215,6 +213,18 @@ def parse_tables(
     
     logger.info(f"Found {len(csv_files)} CSV files to process")
     
+    # Create table metadata mapping
+    table_meta_map = {}
+    for file_path in csv_files:
+        rel_path = os.path.relpath(file_path, input_folder)
+        if rel_path in tables_info:
+            info = tables_info[rel_path]
+            table_id = os.path.splitext(rel_path)[0]
+            table_meta_map[table_id] = {
+                "caption": info.get("table_caption", ""),
+                "footer": info.get("table_foot", "")
+            }
+    
     # Process files with or without parallelization
     if num_workers <= 1 or len(csv_files) <= 1:
         # Serial processing
@@ -227,21 +237,18 @@ def parse_tables(
                 rows = list(reader)
                 table_text = "\n".join([",".join(r) for r in rows])
             
-            # Get table caption and foot if available
-            relative_file_path = os.path.relpath(file_path, input_folder)
-            table_caption = ""
-            table_foot = ""
-            if relative_file_path in tables_info:
-                table_info = tables_info[relative_file_path]
-                table_caption = table_info.get("table_caption", "")
-                table_foot = table_info.get("table_foot", "")
+            # Get table_id and metadata
+            rel_path = os.path.relpath(file_path, input_folder)
+            table_id = os.path.splitext(rel_path)[0]
+            meta = table_meta_map.get(table_id, {})
             
-            # Get file name
-            file_name = os.path.basename(file_path)
-            
-            # Parse the table
             result = parse_single_table(
-                file_name, table_caption, table_foot, table_text, client, model
+                table_id,
+                meta.get("caption", ""),
+                meta.get("footer", ""),
+                table_text,
+                client,
+                model
             )
             parsed_results.append(result)
     else:
@@ -255,21 +262,18 @@ def parse_tables(
                 rows = list(reader)
                 table_text = "\n".join([",".join(r) for r in rows])
             
-            # Get table caption and foot if available
-            relative_file_path = os.path.relpath(file_path, input_folder)
-            table_caption = ""
-            table_foot = ""
-            if relative_file_path in tables_info:
-                table_info = tables_info[relative_file_path]
-                table_caption = table_info.get("table_caption", "")
-                table_foot = table_info.get("table_foot", "")
+            # Get table_id and metadata
+            rel_path = os.path.relpath(file_path, input_folder)
+            table_id = os.path.splitext(rel_path)[0]
+            meta = table_meta_map.get(table_id, {})
             
-            # Get file name
-            file_name = os.path.basename(file_path)
-            
-            # Parse the table
             return parse_single_table(
-                file_name, table_caption, table_foot, table_text, client, model
+                table_id,
+                meta.get("caption", ""),
+                meta.get("footer", ""),
+                table_text,
+                client,
+                model
             )
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -284,14 +288,17 @@ def parse_tables(
     
     # Process results
     for result in parsed_results:
-        file_name = result["file_name"]
+        table_id = result["table_id"]
         parsed_json = result["parsed_json"]
         
         # Store results
-        results[file_name] = parsed_json
+        results[table_id] = parsed_json
         
-        # Save one JSON file per CSV
-        output_path = os.path.join(output_folder, file_name.replace(".csv", ".json"))
+        # Save one JSON file per table
+        output_path = os.path.join(
+            output_folder,
+            f"{table_id}.json"
+        )
         with open(output_path, "w", encoding="utf-8") as out_f:
             json.dump(parsed_json, out_f, indent=2)
     

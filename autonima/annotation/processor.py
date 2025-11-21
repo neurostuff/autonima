@@ -387,65 +387,6 @@ class AnnotationProcessor:
         
         return annotations_with_complete_results
     
-    def _process_parallel(self, pairs: List[tuple], model: str, max_workers: int = 4) -> List[AnnotationDecision]:
-        """
-        Process annotation decisions in parallel.
-        
-        Args:
-            pairs: List of (metadata, criteria) tuples
-            model: LLM model to use
-            max_workers: Maximum number of parallel workers
-            
-        Returns:
-            List of annotation decisions
-        """
-        decisions = []
-        
-        # Update each criteria with the top-level metadata_fields if not already set
-        updated_pairs = []
-        for metadata, criteria in pairs:
-            # If criteria doesn't have metadata_fields set, use the top-level ones
-            if not criteria.metadata_fields and self.config.metadata_fields:
-                # Create a copy of the criteria with the top-level metadata_fields
-                updated_criteria = AnnotationCriteriaConfig(
-                    name=criteria.name,
-                    description=criteria.description,
-                    inclusion_criteria=(self.config.inclusion_criteria + criteria.inclusion_criteria),
-                    exclusion_criteria=(self.config.exclusion_criteria + criteria.exclusion_criteria),
-                    metadata_fields=self.config.metadata_fields
-                )
-                updated_pairs.append((metadata, updated_criteria))
-            else:
-                updated_pairs.append((metadata, criteria))
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            future_to_pair = {
-                executor.submit(self._process_single_decision, metadata, criteria, model): (metadata, criteria)
-                for metadata, criteria in updated_pairs
-            }
-            
-            # Collect results
-            for future in tqdm(as_completed(future_to_pair), total=len(updated_pairs), desc="Processing annotations"):
-                try:
-                    decision = future.result()
-                    decisions.append(decision)
-                except Exception as e:
-                    metadata, criteria = future_to_pair[future]
-                    logger.error(f"Error processing annotation for {criteria.name}: {e}")
-                    # Create a default decision (exclude) in case of error
-                    decision = AnnotationDecision(
-                        annotation_name=criteria.name,
-                        analysis_id=metadata.analysis_id,
-                        study_id=metadata.study_id,
-                        include=False,
-                        reasoning=f"Error in processing: {str(e)}",
-                        model_used=model
-                    )
-                    decisions.append(decision)
-        
-        return decisions
-    
     def _process_single_decision(self, metadata: AnalysisMetadata, criteria: AnnotationCriteriaConfig, model: str) -> AnnotationDecision:
         """
         Process a single annotation decision.

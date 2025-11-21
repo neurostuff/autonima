@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any
 from pydantic import BaseModel
 from ..llm.client import GenericLLMClient
-from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision
+from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,27 @@ class MultiAnnotationDecisionOutput(BaseModel):
 class MultiAnnotationDecisionOutputList(BaseModel):
     """Output schema for list of multiple annotation decisions."""
     decisions: List[MultiAnnotationDecisionOutput]
+
+
+class AnalysisAnnotations(BaseModel):
+    """Annotations for a single analysis in study-level response."""
+    annotation_name: str
+    include: bool
+    reasoning: str
+    inclusion_criteria_applied: List[str] = []
+    exclusion_criteria_applied: List[str] = []
+
+
+class StudyAnalysisDecision(BaseModel):
+    """Decision for a single analysis in study-level response."""
+    analysis_id: str
+    annotations: List[AnalysisAnnotations]
+
+
+class StudyMultiAnnotationOutput(BaseModel):
+    """Output schema for study-level multi-annotation decisions."""
+    study_id: str
+    decisions: List[StudyAnalysisDecision]
 
 
 class AnnotationClient:
@@ -96,105 +117,23 @@ class AnnotationClient:
             }
         }
     
-    def make_decision(
-        self,
-        metadata: AnalysisMetadata,
-        criteria: AnnotationCriteriaConfig,
-        model: str = "gpt-4o-mini"
-    ) -> AnnotationDecision:
-        """
-        Make a decision about whether an analysis should be included in an annotation.
-        
-        Args:
-            metadata: Analysis metadata
-            criteria: Annotation criteria configuration
-            model: LLM model to use
-            
-        Returns:
-            Annotation decision with inclusion boolean and reasoning
-        """
-        try:
-            # Create the prompt
-            from .prompts import create_annotation_prompt
-            # Get metadata_fields from the criteria or use default
-            metadata_fields = getattr(criteria, 'metadata_fields', None)
-            prompt = create_annotation_prompt(metadata, criteria, metadata_fields)
-            
-            # Generate function schema from Pydantic model
-            func_name = "make_annotation_decision"
-            function_schema = self._generate_function_schema(
-                AnnotationDecisionOutput,
-                func_name
-            )
-            
-            # Call the LLM API with function calling
-            response = self._client.client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a neuroimaging meta-analysis expert. "
-                            "Respond using the make_annotation_decision function."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                functions=[function_schema],
-                function_call={"name": func_name}
-            )
-            
-            # Extract the function call result
-            function_call = response.choices[0].message.function_call
-            if not function_call:
-                raise ValueError("No function call returned from API")
-            
-            # Parse the result
-            result_dict = json.loads(function_call.arguments)
-            decision_output = AnnotationDecisionOutput(**result_dict)
-            
-            # Create the annotation decision
-            decision = AnnotationDecision(
-                annotation_name=criteria.name,
-                analysis_id=metadata.analysis_id,
-                study_id=metadata.study_id,
-                include=decision_output.include,
-                reasoning=decision_output.reasoning,
-                model_used=model,
-                inclusion_criteria_applied=decision_output.inclusion_criteria_applied,
-                exclusion_criteria_applied=decision_output.exclusion_criteria_applied
-            )
-            
-            return decision
-            
-        except Exception as e:
-            logger.error(f"Error making annotation decision: {e}")
-            # Return a default decision (exclude) in case of error
-            return AnnotationDecision(
-                annotation_name=criteria.name,
-                analysis_id=metadata.analysis_id,
-                study_id=metadata.study_id,
-                include=False,
-                reasoning=f"Error in decision making: {str(e)}",
-                model_used=model
-            )
-    
     def make_multi_decision(
         self,
         metadata: AnalysisMetadata,
         criteria_list: List[AnnotationCriteriaConfig],
-        model: str = "gpt-4o-mini"
+        model: str = "gpt-4o-mini",
+        prompt_type: str = "multi_analysis_table",
+        study_group: StudyAnalysisGroup = None
     ) -> List[AnnotationDecision]:
         """
         Make decisions about whether an analysis should be included in multiple annotations.
         
         Args:
-            metadata: Analysis metadata
+            metadata: Analysis metadata (used for multi_analysis_table)
             criteria_list: List of annotation criteria configurations
             model: LLM model to use
+            prompt_type: Type of prompt ("single_analysis" or "multi_analysis")
+            study_group: Study analysis group (required for multi_analysis)
             
         Returns:
             List of annotation decisions
@@ -203,11 +142,27 @@ class AnnotationClient:
             return []
         
         try:
-            # Create the prompt for all annotations at once
-            from .prompts import create_multi_annotation_prompt
-            # Get metadata_fields from the first criteria or use default
-            metadata_fields = getattr(criteria_list[0], 'metadata_fields', None)
-            prompt = create_multi_annotation_prompt(metadata, criteria_list, metadata_fields)
+            # Select the appropriate prompt based on prompt_type
+            if prompt_type == "multi_analysis":
+                if study_group is None:
+                    raise ValueError(
+                        "study_group is required for multi_analysis prompt type"
+                    )
+                from .prompts import create_study_multi_annotation_prompt
+                metadata_fields = getattr(
+                    criteria_list[0], 'metadata_fields', None
+                )
+                prompt = create_study_multi_annotation_prompt(
+                    study_group, criteria_list, metadata_fields
+                )
+            else:  # Default to single_analysis
+                from .prompts import create_multi_annotation_prompt
+                metadata_fields = getattr(
+                    criteria_list[0], 'metadata_fields', None
+                )
+                prompt = create_multi_annotation_prompt(
+                    metadata, criteria_list, metadata_fields
+                )
             
             # Generate function schema from Pydantic model
             func_name = "make_multi_annotation_decisions"
@@ -243,38 +198,62 @@ class AnnotationClient:
             
             # Parse the result
             result_dict = json.loads(function_call.arguments)
-            decision_list_output = MultiAnnotationDecisionOutputList(**result_dict)
-            decision_outputs = decision_list_output.decisions
-
-            # Create the annotation decisions
-            decisions = []
-            for i, decision_output in enumerate(decision_outputs):
-                if i < len(criteria_list):
-                    criteria = criteria_list[i]
-                    decision = AnnotationDecision(
-                        annotation_name=decision_output.annotation_name or criteria.name,
-                        analysis_id=metadata.analysis_id,
-                        study_id=metadata.study_id,
-                        include=decision_output.include,
-                        reasoning=decision_output.reasoning,
-                        model_used=model,
-                        inclusion_criteria_applied=decision_output.inclusion_criteria_applied,
-                        exclusion_criteria_applied=decision_output.exclusion_criteria_applied
-                    )
-                    decisions.append(decision)
             
-            # If we didn't get enough responses, fill in with individual decisions
-            while len(decisions) < len(criteria_list):
-                criteria = criteria_list[len(decisions)]
-                decision = self.make_decision(metadata, criteria, model)
-                decisions.append(decision)
+            # Handle different response formats
+            decisions = []
+            if prompt_type == "multi_analysis":
+                # Parse study-level response
+                study_output = StudyMultiAnnotationOutput(**result_dict)
+                for analysis_decision in study_output.decisions:
+                    for annotation_output in analysis_decision.annotations:
+                        decision = AnnotationDecision(
+                            annotation_name=annotation_output.annotation_name,
+                            analysis_id=analysis_decision.analysis_id,
+                            study_id=study_output.study_id,
+                            include=annotation_output.include,
+                            reasoning=annotation_output.reasoning,
+                            model_used=model,
+                            inclusion_criteria_applied=annotation_output.inclusion_criteria_applied,
+                            exclusion_criteria_applied=annotation_output.exclusion_criteria_applied
+                        )
+                        decisions.append(decision)
+            else:
+                # Parse table-level response
+                decision_list_output = MultiAnnotationDecisionOutputList(
+                    **result_dict
+                )
+                decision_outputs = decision_list_output.decisions
+
+                for i, decision_output in enumerate(decision_outputs):
+                    if i < len(criteria_list):
+                        criteria = criteria_list[i]
+                        decision = AnnotationDecision(
+                            annotation_name=decision_output.annotation_name or criteria.name,
+                            analysis_id=metadata.analysis_id,
+                            study_id=metadata.study_id,
+                            include=decision_output.include,
+                            reasoning=decision_output.reasoning,
+                            model_used=model,
+                            inclusion_criteria_applied=decision_output.inclusion_criteria_applied,
+                            exclusion_criteria_applied=decision_output.exclusion_criteria_applied
+                        )
+                        decisions.append(decision)
+                
+                # If we didn't get enough responses, fill in with fallback
+                while len(decisions) < len(criteria_list):
+                    criteria = criteria_list[len(decisions)]
+                    decision = self.make_decision(metadata, criteria, model)
+                    decisions.append(decision)
             
             return decisions
             
         except Exception as e:
             logger.error(f"Error making multi annotation decisions: {e}")
             # Return individual decisions as fallback
-            return [self.make_decision(metadata, criteria, model) for criteria in criteria_list]
+            return [
+                self.make_decision(metadata, criteria, model)
+                for criteria in criteria_list
+            ]
     
     def chat_completion(self, messages, model, response_format=None):
         """
