@@ -1,5 +1,6 @@
 """Type definitions and data models for Autonima."""
 
+import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
@@ -28,6 +29,39 @@ class ActivationTable:
     table_foot: Optional[str] = None  # Footer of the table
     table_data_path: Optional[str] = None  # Path to processed table data file
     table_raw_path: Optional[str] = None  # Path to raw table data file
+    raw_table: Optional[str] = None  # Raw table XML content
+    
+    def load_raw_table(self) -> None:
+        """
+        Load the raw table content from the preferred path.
+        
+        This method populates the raw_table attribute with the content
+        of the raw table file. If the raw_table attribute is already
+        populated, it doesn't need to do anything. It keeps the
+        preference hierarchy for which path to use for populating it.
+        """
+        # If raw_table is already populated, no need to do anything
+        if self.raw_table is not None:
+            return
+        
+        # Define the path preference hierarchy
+        path_preference = ['table_raw_path', 'table_data_path']
+        
+        # Try to load the raw table content from the preferred paths
+        for path_attr in path_preference:
+            table_path_value = getattr(self, path_attr, None)
+            if table_path_value:
+                try:
+                    with open(table_path_value, 'r', encoding='utf-8') as f:
+                        self.raw_table = f.read()
+                    return
+                except Exception as e:
+                    logging.warning(
+                        f"Failed to load raw table from {table_path_value}: {e}"
+                    )
+                    continue
+        
+        logging.warning(f"No valid table path found for table: {self.table_id}")
 
 
 @dataclass

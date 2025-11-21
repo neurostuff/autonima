@@ -83,6 +83,7 @@ def _map_pmids_to_text(
     root_path: Union[str, Path],
     pmid_source: str,
     text_path_templates: Optional[List[str]] = None,
+    coordinates_path_templates: Optional[List[str]] = None,
     pmids_to_include: Optional[Set[int]] = None,
     json_filename: str = 'identifiers.json',
     json_pmid_key: str = 'pmid',
@@ -102,6 +103,10 @@ def _map_pmids_to_text(
                                                    text file, in order of preference. Required for 'json'
                                                    and 'folder_name' sources.
                                                    Example: ['processed/pubget/text.txt', 'text.txt']
+        coordinates_path_templates (Optional[List[str]]): A list of relative path templates to search for
+                                                          coordinate files, in order of preference.
+                                                          Typically used to locate files like 'coordinates.json', 
+                                                          and instead of processed data path.
         pmids_to_include (Optional[Set[int]]): An optional set of PMIDs to filter for.
                                                If provided, only these PMIDs will be included.
         json_filename (str): The name of the JSON file to read when pmid_source is 'json'.
@@ -133,9 +138,18 @@ def _map_pmids_to_text(
     else:
         iterator = root.iterdir()
 
+    processed_coordinate_paths = {}
     for item in iterator:
         pmid = None
         text_file_path = None
+
+        def _find_template_file(item_path: Path, templates: List[str]) -> Optional[Path]:
+            """Find the best full text file using the provided templates."""
+            for template in templates:
+                candidate = item_path / template
+                if candidate.exists():
+                    return candidate
+            return None
 
         if pmid_source == 'json' and item.is_dir():
             id_file = item / json_filename
@@ -150,12 +164,7 @@ def _map_pmids_to_text(
                     continue  # Skip if JSON is invalid or PMID is not an integer
 
             if pmid:
-                # Find the best full text file using the templates
-                for template in text_path_templates:
-                    candidate = item / template
-                    if candidate.exists():
-                        text_file_path = candidate
-                        break # Found the preferred version
+                text_file_path = _find_template_file(item, text_path_templates) 
 
         elif pmid_source == 'folder_name' and item.is_dir():
             try:
@@ -163,12 +172,7 @@ def _map_pmids_to_text(
             except ValueError:
                 continue # Folder name is not a valid integer PMID
             
-            # Find the best full text file using the templates
-            for template in text_path_templates:
-                candidate = item / template
-                if candidate.exists():
-                    text_file_path = candidate
-                    break
+            text_file_path = _find_template_file(item, text_path_templates)
 
         elif pmid_source == 'file_name' and item.is_file():
             if item.suffix in allowed_extensions:
@@ -178,6 +182,11 @@ def _map_pmids_to_text(
                 except ValueError:
                     continue # File stem is not a valid integer PMID
 
+        if coordinates_path_templates:
+            coordinates_file_path = _find_template_file(item, coordinates_path_templates)
+            if coordinates_file_path and pmid is not None:
+                processed_coordinate_paths[pmid] = coordinates_file_path
+
         # If we have a valid PMID and its text file, add it to the index
         if pmid and text_file_path:
             if pmids_to_include is None or pmid in pmids_to_include:
@@ -186,15 +195,14 @@ def _map_pmids_to_text(
     if processed_data_path:
         # Load activation tables and analyses from source
         processed_data_path = Path(processed_data_path)
-        analyses, tables = load_activation_table_map(
-            data_dir=processed_data_path,
-            ids_to_include=pmids_to_include,
-            filter_by_coordinates=True,
-            identifier_key='pmid',
-        )
-    else:
-        analyses = None
-        tables = None
+
+    analyses, tables = load_activation_table_map(
+        data_dir=processed_data_path,
+        processed_coordinate_paths=processed_coordinate_paths,
+        ids_to_include=pmids_to_include,
+        filter_by_coordinates=True,
+        identifier_key='pmid',
+    )
 
     return index, analyses, tables
 
@@ -398,7 +406,8 @@ def _load_analyses_from_coordinates_df(
 
 
 def load_activation_table_map(
-    data_dir: Path,
+    processed_data_dir: Path,
+    processed_coordinate_paths: Optional[Dict[int, Path]] = None,
     ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
     identifier_key: str = "pmcid",
@@ -408,9 +417,12 @@ def load_activation_table_map(
     Returns (analyses, tables) tuple where:
     - analyses: identifier -> list of analysis metadata dicts from coordinates
     - tables: identifier -> list of table metadata dicts from tables.csv
+
+    Can provide either a processed data directory or a dict of pmids to coordinate file paths.
     
     Args:
-        data_dir: Directory containing tables.csv and coordinates.csv
+        processed_data_dir: Directory containing tables.csv and coordinates.csv
+        processed_coordinate_paths: Optional dict mapping PMIDs to coordinates.json file paths
         ids_to_include: Optional set of identifiers to include
         filter_by_coordinates: Whether to filter by coordinates
         identifier_key: Column name to use as identifier (default: "pmcid")
@@ -418,46 +430,114 @@ def load_activation_table_map(
     Returns:
         Tuple of (analyses_dict, tables_dict)
     """
-    coords_file = data_dir / "coordinates.csv"
-    coords_df = pd.read_csv(coords_file) if coords_file.exists() else None
+    if processed_data_dir is not None:
+        coords_file = processed_data_dir / "coordinates.csv"
+        coords_df = pd.read_csv(coords_file) if coords_file.exists() else None
 
-    # Load Analyses from coordinates
-    if coords_df is not None:
-        analyses = _load_analyses_from_coordinates_df(
-            coords_df=coords_df,
-            ids_to_include=ids_to_include,
-            identifier_key=identifier_key,
-        )
-    else:
-        analyses = None
+        # Load Analyses from coordinates
+        if coords_df is not None:
+            analyses = _load_analyses_from_coordinates_df(
+                coords_df=coords_df,
+                ids_to_include=ids_to_include,
+                identifier_key=identifier_key,
+            )
+        else:
+            analyses = None
 
-    tables_file = data_dir / "tables.csv"
+        tables_file = processed_data_dir / "tables.csv"
 
-    if not tables_file.exists():
-        logging.info(f"No tables.csv in {data_dir}, skipping...")
-        return analyses, {}
+        if not tables_file.exists():
+            logging.info(f"No tables.csv in {processed_data_dir}, skipping...")
+            return analyses, {}
 
-    try:
-        df = pd.read_csv(tables_file)
+        try:
+            df = pd.read_csv(tables_file)
 
-        # Optional coordinate filtering
-        if filter_by_coordinates and coords_df is not None:
-            df = df[
-                df.set_index([identifier_key, "table_id"]).index
-                .isin(coords_df.set_index([identifier_key, "table_id"]).index)
-            ]
+            # Optional coordinate filtering
+            if filter_by_coordinates and coords_df is not None:
+                df = df[
+                    df.set_index([identifier_key, "table_id"]).index
+                    .isin(coords_df.set_index([identifier_key, "table_id"]).index)
+                ]
 
-        tables = _load_activation_table_metadata(
-            df=df,
-            root_path=data_dir,
-            ids_to_include=ids_to_include,
-            identifier_key=identifier_key,
-        )
+            tables = _load_activation_table_metadata(
+                df=df,
+                root_path=processed_data_dir,
+                ids_to_include=ids_to_include,
+                identifier_key=identifier_key,
+            )
+            return analyses, tables
+
+        except Exception as e:
+            logging.warning(f"Failed to load activation tables: {e}")
+            return analyses, {}
+        
+    elif processed_coordinate_paths is not None:
+        # Handle loading from coordinates.json files
+        analyses = {}
+        tables = {}
+        
+        for pmid, coord_file_path in processed_coordinate_paths.items():
+            if ids_to_include is not None and pmid not in ids_to_include:
+                continue
+                
+            try:
+                with open(coord_file_path, 'r') as f:
+                    data = json.load(f)
+                
+                # Extract studies from the coordinates.json structure
+                studies = data.get('studyset', {}).get('studies', [])
+                
+                for study in studies:
+                    # Extract analyses from each study
+                    study_analyses = study.get('analyses', [])
+                    
+                    for analysis in study_analyses:
+                        # Convert points to the expected format
+                        points = []
+                        for point in analysis.get('points', []):
+                            points.append({
+                                'coordinates': point['coordinates'],
+                                'space': point.get('space')
+                            })
+                        
+                        # Create analysis metadata
+                        analysis_metadata = {
+                            'name': analysis.get('name', ''),
+                            'description': analysis.get('metadata', {}).get('table_label'),
+                            'points': points,
+                            'parsed': False
+                        }
+                        
+                        # Add to analyses dict
+                        if pmid not in analyses:
+                            analyses[pmid] = []
+                        analyses[pmid].append(analysis_metadata)
+                        
+                        # Create activation table metadata
+                        metadata = analysis.get('metadata', {})
+                        table_metadata = {
+                            'table_id': metadata.get('table_id', ''),
+                            'table_label': metadata.get('table_label', ''),
+                            'raw_table': metadata.get('raw_table_xml', ''),
+                            'table_caption': None,
+                            'table_foot': None,
+                            'table_data_path': None,
+                            'table_raw_path': None
+                        }
+                        
+                        # Add to tables dict
+                        if pmid not in tables:
+                            tables[pmid] = []
+                        tables[pmid].append(table_metadata)
+                        
+            except Exception as e:
+                logging.warning(f"Failed to load coordinates from {coord_file_path}: {e}")
+                continue
+        
         return analyses, tables
 
-    except Exception as e:
-        logging.warning(f"Failed to load activation tables: {e}")
-        return analyses, {}
+    return None, {}
 
 
 def _apply_activation_tables_to_studies(
