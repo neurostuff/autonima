@@ -92,6 +92,7 @@ class AutonimaPipeline:
         # Save criteria mapping early in pipeline
         from .utils.criteria import save_criteria_mapping
         save_criteria_mapping(self.config, self.config.output.directory)
+
     async def run(self) -> PipelineResult:
         """
         Execute the complete systematic review pipeline.
@@ -597,8 +598,46 @@ class AutonimaPipeline:
             logger.info("No studies with parsed analyses found for annotation")
             return
         
-        # Initialize the annotation processor
-        processor = AnnotationProcessor(self.config.annotation)
+        # Load criteria mapping and inject it into annotation config
+        from .utils.criteria import load_criteria_mapping
+        criteria_mapping = load_criteria_mapping(self.config.output.directory)
+        
+        # Create a copy of the annotation config with criteria mapping injected
+        from copy import deepcopy
+        annotation_config = deepcopy(self.config.annotation)
+        
+        # Inject criteria mapping into global annotation criteria
+        if criteria_mapping and "annotation" in criteria_mapping:
+            annotation_data = criteria_mapping["annotation"]
+            
+            # Inject global criteria mapping
+            if "global" in annotation_data:
+                global_mapping = annotation_data["global"]
+                # Update the annotation config's global criteria with mapping
+                has_inclusion = (
+                    hasattr(annotation_config, 'inclusion_criteria') and
+                    annotation_config.inclusion_criteria
+                )
+                if has_inclusion:
+                    # Create a criteria mapping for global criteria
+                    annotation_config.inclusion_criteria = list(
+                        global_mapping.get("inclusion", {}).values()
+                    )
+                    annotation_config.exclusion_criteria = list(
+                        global_mapping.get("exclusion", {}).values()
+                    )
+            
+            # Inject per-annotation criteria mapping
+            if "annotations" in annotation_data:
+                annotations_mapping = annotation_data["annotations"]
+                for annotation in annotation_config.annotations:
+                    if annotation.name in annotations_mapping:
+                        mapping = annotations_mapping[annotation.name]
+                        # Update the annotation's criteria mapping
+                        annotation.criteria_mapping = mapping
+        
+        # Initialize the annotation processor with updated config and num_workers
+        processor = AnnotationProcessor(annotation_config, num_workers=self.num_workers)
         
         # Process studies
         annotation_results = processor.process_studies(

@@ -385,7 +385,7 @@ class PubGetRetriever(BaseRetriever):
         retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
         
         pmcid_to_analyses, pmcid_to_tables = load_activation_table_map(
-            data_dir=data_dir,
+            processed_data_path=data_dir,
             filter_by_coordinates=True,
             identifier_key="pmcid",
         )

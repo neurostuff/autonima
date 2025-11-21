@@ -197,7 +197,7 @@ def _map_pmids_to_text(
         processed_data_path = Path(processed_data_path)
 
     analyses, tables = load_activation_table_map(
-        data_dir=processed_data_path,
+        processed_data_path=processed_data_path,
         processed_coordinate_paths=processed_coordinate_paths,
         ids_to_include=pmids_to_include,
         filter_by_coordinates=True,
@@ -406,7 +406,7 @@ def _load_analyses_from_coordinates_df(
 
 
 def load_activation_table_map(
-    processed_data_dir: Path,
+    processed_data_path: Path,
     processed_coordinate_paths: Optional[Dict[int, Path]] = None,
     ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
@@ -430,8 +430,8 @@ def load_activation_table_map(
     Returns:
         Tuple of (analyses_dict, tables_dict)
     """
-    if processed_data_dir is not None:
-        coords_file = processed_data_dir / "coordinates.csv"
+    if processed_data_path is not None:
+        coords_file = processed_data_path / "coordinates.csv"
         coords_df = pd.read_csv(coords_file) if coords_file.exists() else None
 
         # Load Analyses from coordinates
@@ -444,10 +444,10 @@ def load_activation_table_map(
         else:
             analyses = None
 
-        tables_file = processed_data_dir / "tables.csv"
+        tables_file = processed_data_path / "tables.csv"
 
         if not tables_file.exists():
-            logging.info(f"No tables.csv in {processed_data_dir}, skipping...")
+            logging.info(f"No tables.csv in {processed_data_path}, skipping...")
             return analyses, {}
 
         try:
@@ -462,7 +462,7 @@ def load_activation_table_map(
 
             tables = _load_activation_table_metadata(
                 df=df,
-                root_path=processed_data_dir,
+                root_path=processed_data_path,
                 ids_to_include=ids_to_include,
                 identifier_key=identifier_key,
             )
@@ -534,7 +534,6 @@ def load_activation_table_map(
             except Exception as e:
                 logging.warning(f"Failed to load coordinates from {coord_file_path}: {e}")
                 continue
-        
         return analyses, tables
 
     return None, {}
@@ -587,6 +586,7 @@ def _apply_activation_tables_to_studies(
                     table_raw_path=t.get('table_raw_path', None),
                     table_caption=t['table_caption'],
                     table_foot=t['table_foot'],
+                    raw_table=t.get('raw_table', None)
                 )
             )
 

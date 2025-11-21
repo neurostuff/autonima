@@ -203,11 +203,12 @@ class ConfigManager:
             raise ConfigurationError("Output directory cannot be empty")
         
         # config.retrieval.coordinates_path_templates is mutually exclusive with processed_data_path for each source
-        for source in config.retrieval.sources:
-            if source.coordinates_path_templates and source.processed_data_path:
-                raise ConfigurationError(
-                    "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
-                )
+        for source in config.retrieval.full_text_sources:
+            if hasattr(source, 'coordinates_path_templates') and hasattr(source, 'processed_data_path'):
+                if source.coordinates_path_templates and source.processed_data_path:
+                    raise ConfigurationError(
+                        "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
+                    )
 
     def get_config(self) -> PipelineConfig:
         """Get the currently loaded configuration."""
