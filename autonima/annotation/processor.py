@@ -463,12 +463,12 @@ class AnnotationProcessor:
     def _extract_analysis_metadata(self, study: Study, analysis: Analysis, analysis_id: str) -> AnalysisMetadata:
         """
         Extract metadata for an analysis from a study.
-        
+
         Args:
             study: Study containing the analysis
             analysis: Analysis to extract metadata for
             analysis_id: Unique ID for the analysis
-            
+
         Returns:
             Analysis metadata
         """
@@ -493,7 +493,8 @@ class AnnotationProcessor:
             study_abstract=study.abstract,
             study_authors=study.authors,
             study_journal=study.journal,
-            study_publication_date=study.publication_date
+            study_publication_date=study.publication_date,
+            study_fulltext=study.full_text  # Add full text
         )
         
         return metadata

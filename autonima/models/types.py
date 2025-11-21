@@ -57,11 +57,14 @@ class ActivationTable:
                     return
                 except Exception as e:
                     logging.warning(
-                        f"Failed to load raw table from {table_path_value}: {e}"
+                        f"Failed to load raw table from "
+                        f"{table_path_value}: {e}"
                     )
                     continue
         
-        logging.warning(f"No valid table path found for table: {self.table_id}")
+        logging.warning(
+            f"No valid table path found for table: {self.table_id}"
+        )
 
 
 @dataclass
@@ -90,10 +93,20 @@ class Study:
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
     
-    abstract_inclusion_criteria_applied: List[str] = field(default_factory=list)
-    abstract_exclusion_criteria_applied: List[str] = field(default_factory=list)
-    fulltext_inclusion_criteria_applied: List[str] = field(default_factory=list)
-    fulltext_exclusion_criteria_applied: List[str] = field(default_factory=list)
+    abstract_inclusion_criteria_applied: List[str] = field(
+        default_factory=list
+    )
+    abstract_exclusion_criteria_applied: List[str] = field(
+        default_factory=list
+    )
+    fulltext_inclusion_criteria_applied: List[str] = field(
+        default_factory=list
+    )
+    fulltext_exclusion_criteria_applied: List[str] = field(
+        default_factory=list
+    )
+    full_text_output_dir: Optional[str] = None  # Full text output dir
+    _full_text: Optional[str] = None  # Cached full text content
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -124,7 +137,7 @@ class Study:
             "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {
-                    "table_id": table.table_id,  # Added table_id
+                    "table_id": table.table_id,
                     "table_label": table.table_label,
                     "table_caption": table.table_caption,
                     "table_foot": table.table_foot,
@@ -153,32 +166,45 @@ class Study:
                 }
                 for analysis in self.analyses
             ],
-            # NEW FIELDS for criteria tracking
-            "abstract_inclusion_criteria_applied": self.abstract_inclusion_criteria_applied,
-            "abstract_exclusion_criteria_applied": self.abstract_exclusion_criteria_applied,
-            "fulltext_inclusion_criteria_applied": self.fulltext_inclusion_criteria_applied,
-            "fulltext_exclusion_criteria_applied": self.fulltext_exclusion_criteria_applied
+            # Criteria tracking fields
+            "abstract_inclusion_criteria_applied":
+                self.abstract_inclusion_criteria_applied,
+            "abstract_exclusion_criteria_applied":
+                self.abstract_exclusion_criteria_applied,
+            "fulltext_inclusion_criteria_applied":
+                self.fulltext_inclusion_criteria_applied,
+            "fulltext_exclusion_criteria_applied":
+                self.fulltext_exclusion_criteria_applied
         }
     
-    def load_full_text(self, output_dir: str) -> str:
-        """Load the full text content for this study.
+    @property
+    def full_text(self) -> str:
+        """Lazy-load and cache full text content.
         
-        Args:
-            output_dir: Output directory where pubget data is stored
-            
         Returns:
             The full text content as a string, or None if not found
             
         Raises:
-            ValueError: If output_dir is not provided
+            ValueError: If full_text_output_dir is not set
             FileNotFoundError: If the text file doesn't exist at the
             expected location
         """
+        if self._full_text is not None:
+            return self._full_text
+            
+        if not self.full_text_output_dir:
+            raise ValueError(
+                "full_text_output_dir must be set before accessing full_text"
+            )
+        
         # Import here to avoid circular imports
         from ..retrieval.utils import _load_full_text
         
-        # Use the _load_full_text function with the output directory
-        return _load_full_text(self, output_dir=output_dir)
+        # Load and cache the full text
+        self._full_text = _load_full_text(
+            self, output_dir=self.full_text_output_dir
+        )
+        return self._full_text
 
 
 @dataclass
@@ -225,7 +251,7 @@ class RetrievalConfig:
     max_retries: int = 3
     download_directory: str = "downloads"
     n_jobs: int = 1
-    load_excluded: bool = False  # Whether to load full texts for excluded studies
+    load_excluded: bool = False  # Load full texts for excluded studies?
     # Optional full text source configurations
     full_text_sources: List[Dict[str, Any]] = field(default_factory=list)
     # Coordinate parsing configuration
@@ -265,7 +291,9 @@ class PipelineConfig:
         from ..utils.criteria import CriteriaMapping
         
         # Helper function to serialize screening config dicts
-        def serialize_screening_dict(screening_dict: Dict[str, Any]) -> Dict[str, Any]:
+        def serialize_screening_dict(
+            screening_dict: Dict[str, Any]
+        ) -> Dict[str, Any]:
             """Serialize a screening dict, handling CriteriaMapping objects."""
             result = {}
             for key, value in screening_dict.items():

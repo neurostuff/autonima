@@ -111,6 +111,7 @@ annotation:
   #   - "table_caption"
   #   - "study_title"
   #   - "study_abstract"
+  #   - "study_fulltext"   # Add this to include full text in prompts
   # Define global inclusion/exclusion criteria (merged with annotation-specific criteria)
   # inclusion_criteria:
   #   - "Studies must be in English"

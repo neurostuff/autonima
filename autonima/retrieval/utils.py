@@ -18,13 +18,12 @@ except ImportError:
                      "Note: Node.js is also required for readabilipy to work.")
 
 
-def _load_full_text(study: Study, text_path: str = None, output_dir: str = None) -> Optional[str]:
+def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
     """
     Load the full text content for a study from a CSV file or a direct text file.
     
     Args:
         study: The study object containing the pmcid
-        text_path: Path to the text.csv file (deprecated, use output_dir instead)
         output_dir: Output directory where pubget data is stored
         
     Returns:
@@ -49,15 +48,13 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
                 else:
                     raise ValueError(f"Unsupported file format: {full_text_file.suffix}")
         
-        # Determine the text file path for CSV-based loading
-        if text_path:
-            text_file = Path(text_path)
-        elif output_dir:
-            # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
-            text_file = Path(output_dir) / "retrieval" / "pubget_data" / "text.csv"
-        else:
-            raise ValueError("Either text_path or output_dir must be provided")
-        
+        # If output_dir is not provided, cannot proceed
+        if not output_dir:
+            raise ValueError("output_dir must be provided if full_text_path is not set")
+
+        # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
+        text_file = Path(output_dir) / "retrieval" / "pubget_data" / "text.csv"
+
         # Check if the text file exists
         if not text_file.exists():
             raise FileNotFoundError(f"Text file not found at {text_file}")

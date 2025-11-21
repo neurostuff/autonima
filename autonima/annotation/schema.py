@@ -30,7 +30,8 @@ class AnnotationConfig(BaseModel):
         "analysis_name",
         "analysis_description",
         "table_caption",
-        "study_title"
+        "study_title",
+        "study_fulltext"
     ]
     inclusion_criteria: List[str] = []
     exclusion_criteria: List[str] = []
@@ -65,6 +66,7 @@ class AnalysisMetadata(BaseModel):
     study_authors: Optional[List[str]] = None
     study_journal: Optional[str] = None
     study_publication_date: Optional[str] = None
+    study_fulltext: Optional[str] = None
     # Add any other fields as needed
     custom_fields: Dict[str, Any] = {}
     
