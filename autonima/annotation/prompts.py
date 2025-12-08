@@ -182,7 +182,9 @@ Output JSON format:
         criteria_str=criteria_str,
         study_id=study_group.study_id
     ).strip()
-    
+
+    from pdb import set_trace; set_trace()
+
     return prompt
 
 

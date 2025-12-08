@@ -334,10 +334,6 @@ class LLMScreener(ScreeningEngine):
     ) -> ScreeningResult:
         """Screen a single study (synchronous for parallel execution)."""
         try:
-            if screening_type == "fulltext":
-                # Set the output directory for full text loading
-                study.full_text_output_dir = str(self.result_dir)
-                
             # Check if confidence reporting is enabled
             confidence_reporting = config.get("confidence_reporting", False)
             
