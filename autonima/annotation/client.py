@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any
 from pydantic import BaseModel
 from ..llm.client import GenericLLMClient
-from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup
+from .schema import AnalysisMetadata, AnnotationConfig, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +122,14 @@ class AnnotationClient:
         metadata: AnalysisMetadata,
         criteria_list: List[AnnotationCriteriaConfig],
         model: str = "gpt-4o-mini",
-        prompt_type: str = "multi_analysis_table",
+        prompt_type: str = "single_analysis",
         study_group: StudyAnalysisGroup = None
     ) -> List[AnnotationDecision]:
         """
         Make decisions about whether an analysis should be included in multiple annotations.
         
         Args:
-            metadata: Analysis metadata (used for multi_analysis_table)
+            metadata: Analysis metadata
             criteria_list: List of annotation criteria configurations
             model: LLM model to use
             prompt_type: Type of prompt ("single_analysis" or "multi_analysis")
@@ -142,6 +142,15 @@ class AnnotationClient:
             return []
         
         try:
+            # Extract metadata fields that are actually present in the metadata object
+            # (non-None values, excluding required fields)
+            metadata_fields = []
+            metadata_dict = metadata.model_dump()
+            for field_name, field_value in metadata_dict.items():
+                # Skip required fields and None values
+                if field_name not in ['analysis_id', 'study_id', 'table_id', 'custom_fields'] and field_value is not None:
+                    metadata_fields.append(field_name)
+            
             # Select the appropriate prompt based on prompt_type
             if prompt_type == "multi_analysis":
                 if study_group is None:
@@ -149,18 +158,12 @@ class AnnotationClient:
                         "study_group is required for multi_analysis prompt type"
                     )
                 from .prompts import create_study_multi_annotation_prompt
-                metadata_fields = getattr(
-                    criteria_list[0], 'metadata_fields', None
-                )
                 prompt = create_study_multi_annotation_prompt(
                     study_group, criteria_list, metadata_fields
                 )
             else:  # Default to single_analysis
-                from .prompts import create_multi_annotation_prompt
-                metadata_fields = getattr(
-                    criteria_list[0], 'metadata_fields', None
-                )
-                prompt = create_multi_annotation_prompt(
+                from .prompts import create_single_study_annotation_prompt
+                prompt = create_single_study_annotation_prompt(
                     metadata, criteria_list, metadata_fields
                 )
             
@@ -238,22 +241,12 @@ class AnnotationClient:
                             exclusion_criteria_applied=decision_output.exclusion_criteria_applied
                         )
                         decisions.append(decision)
-                
-                # If we didn't get enough responses, fill in with fallback
-                while len(decisions) < len(criteria_list):
-                    criteria = criteria_list[len(decisions)]
-                    decision = self.make_decision(metadata, criteria, model)
-                    decisions.append(decision)
             
             return decisions
             
         except Exception as e:
             logger.error(f"Error making multi annotation decisions: {e}")
-            # Return individual decisions as fallback
-            return [
-                self.make_decision(metadata, criteria, model)
-                for criteria in criteria_list
-            ]
+            raise
     
     def chat_completion(self, messages, model, response_format=None):
         """

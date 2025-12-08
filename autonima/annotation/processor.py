@@ -3,7 +3,7 @@
 import logging
 import json
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
@@ -252,7 +252,7 @@ class AnnotationProcessor:
             for study, annotations_to_process in tqdm(studies_to_process, desc="Processing studies"):
                 try:
                     study_decisions = self._process_single_study_annotations(
-                        study, annotations_to_process, model
+                        study, self.config.metadata_fields, annotations_to_process, model
                     )
                     decisions.extend(study_decisions)
                 except Exception as e:
@@ -263,7 +263,7 @@ class AnnotationProcessor:
             with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
                 # Submit all studies for processing
                 future_to_study = {
-                    executor.submit(self._process_single_study_annotations, study, annotations_to_process, model): (study, annotations_to_process)
+                    executor.submit(self._process_single_study_annotations, study, self.config.metadata_fields, annotations_to_process, model): (study, annotations_to_process)
                     for study, annotations_to_process in studies_to_process
                 }
                 
@@ -279,12 +279,13 @@ class AnnotationProcessor:
         
         return decisions
     
-    def _process_single_study_annotations(self, study: Study, annotations_to_process: List[AnnotationCriteriaConfig], model: str) -> List[AnnotationDecision]:
+    def _process_single_study_annotations(self, study: Study, metadata_fields: List[str], annotations_to_process: List[AnnotationCriteriaConfig], model: str) -> List[AnnotationDecision]:
         """
         Process annotations for a single study.
         
         Args:
             study: Study to process
+            metadata_fields: List of metadata fields to extract
             annotations_to_process: List of annotations to process
             model: LLM model to use
             
@@ -298,8 +299,8 @@ class AnnotationProcessor:
             # Create a unique analysis ID
             analysis_id = f"{study.pmid}_analysis_{i}"
             
-            # Extract metadata for this analysis
-            metadata = self._extract_analysis_metadata(study, analysis, analysis_id)
+            # Extract metadata for the analysis 
+            metadata = self._extract_analysis_metadata(study, analysis, analysis_id, metadata_fields)
             
             # Make multi-annotation decision for this analysis
             analysis_decisions = self.client.make_multi_decision(
@@ -401,7 +402,13 @@ class AnnotationProcessor:
         """
         return self.client.make_decision(metadata, criteria, model)
     
-    def _extract_analysis_metadata(self, study: Study, analysis: Analysis, analysis_id: str) -> AnalysisMetadata:
+    def _extract_analysis_metadata(
+        self,
+        study: Study,
+        analysis: Analysis,
+        analysis_id: str,
+        metadata_fields: Optional[List[str]] = None
+    ) -> AnalysisMetadata:
         """
         Extract metadata for an analysis from a study.
 
@@ -409,34 +416,58 @@ class AnnotationProcessor:
             study: Study containing the analysis
             analysis: Analysis to extract metadata for
             analysis_id: Unique ID for the analysis
+            metadata_fields: Optional list of fields to include. If None, includes all fields.
 
         Returns:
-            Analysis metadata
+            Analysis metadata with only the requested fields populated
         """
         # Extract table information if available
+        table_id = None
         table_caption = None
         table_footer = None
         if study.activation_tables:
             # Use the first table's information for now
             # In the future, we might want to associate analyses with specific tables
+            table_id = study.activation_tables[0].table_id
             table_caption = study.activation_tables[0].table_caption
             table_footer = study.activation_tables[0].table_foot
         
+        # If no activation tables exist, generate a default table_id
+        if table_id is None:
+            table_id = f"{study.pmid}_default_table"
+        
+        # Build kwargs with required fields
+        kwargs = {
+            "analysis_id": analysis_id,
+            "study_id": study.pmid,
+            "table_id": table_id,
+        }
+        
+        # Map of field names to their values
+        field_mapping = {
+            "analysis_name": analysis.name,
+            "analysis_description": analysis.description,
+            "table_caption": table_caption,
+            "table_footer": table_footer,
+            "study_title": study.title,
+            "study_abstract": study.abstract,
+            "study_authors": study.authors,
+            "study_journal": study.journal,
+            "study_publication_date": study.publication_date,
+            "study_fulltext": study.full_text,
+        }
+        
+        # If metadata_fields is None, include all fields
+        if metadata_fields is None:
+            kwargs.update(field_mapping)
+        else:
+            # Only include requested fields
+            for field in metadata_fields:
+                if field in field_mapping:
+                    kwargs[field] = field_mapping[field]
+        
         # Create the metadata object
-        metadata = AnalysisMetadata(
-            analysis_id=analysis_id,
-            study_id=study.pmid,
-            analysis_name=analysis.name,
-            analysis_description=analysis.description,
-            table_caption=table_caption,
-            table_footer=table_footer,
-            study_title=study.title,
-            study_abstract=study.abstract,
-            study_authors=study.authors,
-            study_journal=study.journal,
-            study_publication_date=study.publication_date,
-            study_fulltext=study.full_text  # Add full text
-        )
+        metadata = AnalysisMetadata(**kwargs)
         
         return metadata
 

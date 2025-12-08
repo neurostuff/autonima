@@ -8,7 +8,7 @@ from autonima.annotation.schema import (AnnotationConfig,
 
 def test_multi_annotation_prompt_creation():
     """Test that multi-annotation prompts are created correctly."""
-    from autonima.annotation.prompts import create_multi_annotation_prompt
+    from autonima.annotation.prompts import create_single_study_annotation_prompt
     from autonima.annotation.schema import AnalysisMetadata
     
     # Create mock metadata
@@ -37,7 +37,7 @@ def test_multi_annotation_prompt_creation():
     )
     
     # Create multi-annotation prompt
-    prompt = create_multi_annotation_prompt(metadata, [criteria1, criteria2])
+    prompt = create_single_study_annotation_prompt(metadata, [criteria1, criteria2])
     
     # Check that prompt contains information about both annotations
     assert "emotion" in prompt.lower()

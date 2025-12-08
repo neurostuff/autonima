@@ -11,9 +11,6 @@ class AnnotationCriteriaConfig(BaseModel):
     description: Optional[str] = None
     inclusion_criteria: List[str] = []
     exclusion_criteria: List[str] = []
-    metadata_fields: List[str] = []
-    
-    # NEW: Store criteria mappings
     criteria_mapping: Optional[Dict[str, Dict[str, str]]] = None
 
 
@@ -85,6 +82,8 @@ class AnalysisMetadata(BaseModel):
     table_id: str  # Reference to TableMetadata
     analysis_name: Optional[str] = None
     analysis_description: Optional[str] = None
+    table_caption: Optional[str] = None
+    table_footer: Optional[str] = None
     study_title: Optional[str] = None
     study_abstract: Optional[str] = None
     study_authors: Optional[List[str]] = None

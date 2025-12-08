@@ -6,7 +6,6 @@ autonima/cli.py
 autonima/config.py
 autonima/meta.py
 autonima/pipeline.py
-autonima/utils.py
 autonima.egg-info/PKG-INFO
 autonima.egg-info/SOURCES.txt
 autonima.egg-info/dependency_links.txt
@@ -29,7 +28,6 @@ autonima/llm/client.py
 autonima/models/__init__.py
 autonima/models/types.py
 autonima/retrieval/__init__.py
-autonima/retrieval/ace.py
 autonima/retrieval/base.py
 autonima/retrieval/pubget.py
 autonima/retrieval/utils.py
@@ -42,10 +40,16 @@ autonima/screening/screener.py
 autonima/search/__init__.py
 autonima/search/base.py
 autonima/search/pubmed.py
+autonima/utils/__init__.py
+autonima/utils/base.py
+autonima/utils/criteria.py
+tests/test_annotation_incremental_caching.py
 tests/test_basic.py
 tests/test_confidence_reporting.py
+tests/test_criteria_mapping.py
 tests/test_fulltext_loading.py
 tests/test_fulltext_screening.py
+tests/test_multi_annotation.py
 tests/test_objective_in_prompt.py
 tests/test_parallel_screening.py
 tests/test_pipeline_retrieval.py

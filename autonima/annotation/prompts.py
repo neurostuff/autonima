@@ -16,33 +16,27 @@ def create_study_multi_annotation_prompt(
     Args:
         study_group: The study group containing study metadata, tables, and analyses.
         criteria: Annotation criteria configuration.
-        metadata_fields: List of metadata fields to include.
+        metadata_fields: List of metadata fields to include (already filtered by config).
         
     Returns:
         Formatted prompt string.
     """
-    # Use the provided metadata_fields or fall back to first criteria's
-    fields_to_use = metadata_fields or (
-        getattr(criteria_list[0], 'metadata_fields', None)
-        if criteria_list else None
-    ) or [
-        "analysis_name",
-        "analysis_description",
-        "study_title"
-    ]
+    # Use metadata_fields directly - it's already filtered by the config
+    if metadata_fields is None:
+        metadata_fields = []
     
     # Format study-level metadata
     study_metadata = []
-    if "study_title" in fields_to_use and study_group.study_title:
+    if "study_title" in metadata_fields and study_group.study_title:
         study_metadata.append(f"Study Title: {study_group.study_title}")
-    if "study_abstract" in fields_to_use and study_group.study_abstract:
+    if "study_abstract" in metadata_fields and study_group.study_abstract:
         study_metadata.append(f"Study Abstract: {study_group.study_abstract}")
-    if "study_authors" in fields_to_use and study_group.study_authors:
+    if "study_authors" in metadata_fields and study_group.study_authors:
         authors = ', '.join(study_group.study_authors)
         study_metadata.append(f"Study Authors: {authors}")
-    if "study_journal" in fields_to_use and study_group.study_journal:
+    if "study_journal" in metadata_fields and study_group.study_journal:
         study_metadata.append(f"Study Journal: {study_group.study_journal}")
-    if "study_publication_date" in fields_to_use and study_group.study_publication_date:
+    if "study_publication_date" in metadata_fields and study_group.study_publication_date:
         study_metadata.append(
             f"Publication Date: {study_group.study_publication_date}"
         )
@@ -63,14 +57,14 @@ def create_study_multi_annotation_prompt(
         
         for i, analysis in enumerate(analyses):
             analysis_lines = [f"Analysis {i+1}:"]
-            if "analysis_name" in fields_to_use and analysis.analysis_name:
+            if "analysis_name" in metadata_fields and analysis.analysis_name:
                 analysis_lines.append(f"- Name: {analysis.analysis_name}")
-            if ("analysis_description" in fields_to_use and
+            if ("analysis_description" in metadata_fields and
                     analysis.analysis_description):
                 analysis_lines.append(
                     f"- Description: {analysis.analysis_description}"
                 )
-            if "study_title" in fields_to_use and analysis.study_title:
+            if "study_title" in metadata_fields and analysis.study_title:
                 analysis_lines.append(f"- Study Title: {analysis.study_title}")
             table_section.append("\n".join(analysis_lines))
         
@@ -183,76 +177,73 @@ Output JSON format:
         study_id=study_group.study_id
     ).strip()
 
-    from pdb import set_trace; set_trace()
-
     return prompt
 
 
-def create_multi_annotation_prompt(
+def create_single_study_annotation_prompt(
     metadata: AnalysisMetadata,
     criteria_list: List[AnnotationCriteriaConfig],
     metadata_fields: List[str] = None
 ) -> str:
     """
-    Create a prompt for the LLM to decide if an analysis should be included 
+    Create a prompt for the LLM to decide if an analysis should be included
     in multiple annotations at once.
     
     Args:
         metadata: Analysis metadata to include in the prompt
         criteria_list: List of annotation criteria configurations
-        metadata_fields: List of metadata fields to include
+        metadata_fields: List of metadata fields to include (already filtered by config)
         
     Returns:
         Formatted prompt string
     """
-    # Use the provided metadata_fields or fall back to first criteria's
-    fields_to_use = metadata_fields or (
-        getattr(criteria_list[0], 'metadata_fields', None)
-        if criteria_list else None
-    ) or [
-        "analysis_name",
-        "analysis_description",
-        "study_title"
-    ]
+    if metadata_fields is None:
+        metadata_fields = []
     
     # Build the metadata section based on configured fields
     metadata_lines = []
     
-    if "analysis_name" in fields_to_use and metadata.analysis_name:
+    if "analysis_name" in metadata_fields and metadata.analysis_name:
         metadata_lines.append(f"- Name: {metadata.analysis_name}")
         
-    if ("analysis_description" in fields_to_use and
+    if ("analysis_description" in metadata_fields and
             metadata.analysis_description):
         metadata_lines.append(
             f"- Description: {metadata.analysis_description}"
         )
+    
+    if "table_caption" in metadata_fields and metadata.table_caption:
+        metadata_lines.append(f"- Table Caption: {metadata.table_caption}")
+    
+    if "table_footer" in metadata_fields and metadata.table_footer:
+        metadata_lines.append(f"- Table Footer: {metadata.table_footer}")
         
-    if "study_title" in fields_to_use and metadata.study_title:
+    if "study_title" in metadata_fields and metadata.study_title:
         metadata_lines.append(f"- Study Title: {metadata.study_title}")
         
-    if "study_abstract" in fields_to_use and metadata.study_abstract:
+    if "study_abstract" in metadata_fields and metadata.study_abstract:
         metadata_lines.append(f"- Study Abstract: {metadata.study_abstract}")
         
-    if "study_authors" in fields_to_use and metadata.study_authors:
+    if "study_authors" in metadata_fields and metadata.study_authors:
         authors = ', '.join(metadata.study_authors)
         metadata_lines.append(f"- Study Authors: {authors}")
         
-    if "study_journal" in fields_to_use and metadata.study_journal:
+    if "study_journal" in metadata_fields and metadata.study_journal:
         metadata_lines.append(f"- Study Journal: {metadata.study_journal}")
         
-    if ("study_publication_date" in fields_to_use and
+    if ("study_publication_date" in metadata_fields and
             metadata.study_publication_date):
         date_str = metadata.study_publication_date
         metadata_lines.append(f"- Study Publication Date: {date_str}")
     
-    if "study_fulltext" in fields_to_use and metadata.study_fulltext:
+    if "study_fulltext" in metadata_fields and metadata.study_fulltext:
         metadata_lines.append(
             f"- Study Full Text: {metadata.study_fulltext}"
         )
     
     # Add any custom fields
     for field_name, field_value in metadata.custom_fields.items():
-        if field_name in fields_to_use and field_value:
+        if field_name in metadata_fields and field_value:
             formatted_name = field_name.replace('_', ' ').title()
             metadata_lines.append(f"- {formatted_name}: {field_value}")
     
@@ -333,6 +324,5 @@ Respond with JSON array, one object for each annotation in the same order:
     "exclusion_criteria_applied": []
   }}
 ]
-"""
-    
+"""    
     return prompt.strip()
