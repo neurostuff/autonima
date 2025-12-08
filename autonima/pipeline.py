@@ -312,13 +312,19 @@ class AutonimaPipeline:
                         identifier_key="pmid",
                         identifier_type="str"
                     )
-
-                studies_from_user_sources += studies_from_source
-            
-            logger.info(
-                f"Found {len(studies_from_user_sources)} studies in user-provided "
-                "full text sources"
-            )
+    
+                    studies_from_user_sources += studies_from_source
+                
+                # Set full_text_output_dir for studies from user-provided sources
+                # This must be set so they can load full text during screening
+                output_dir = Path(self.config.output.directory)
+                for study in studies_from_user_sources:
+                    study.full_text_output_dir = str(output_dir)
+                
+                logger.info(
+                    f"Found {len(studies_from_user_sources)} studies in user-provided "
+                    "full text sources"
+                )
              
         except Exception as e:
             log_error_with_debug(logger, 
