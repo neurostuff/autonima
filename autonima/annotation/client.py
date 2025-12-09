@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from pydantic import BaseModel
 from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationConfig, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup
+from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +246,7 @@ class AnnotationClient:
             return decisions
             
         except Exception as e:
-            logger.error(f"Error making multi annotation decisions: {e}")
+            log_error_with_debug(logger, f"Error making multi annotation decisions: {e}")
             raise
     
     def chat_completion(self, messages, model, response_format=None):
@@ -269,5 +270,5 @@ class AnnotationClient:
             )
             return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Error in chat completion: {e}")
+            log_error_with_debug(logger, f"Error in chat completion: {e}")
             raise

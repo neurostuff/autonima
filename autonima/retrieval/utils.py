@@ -53,7 +53,7 @@ def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
             raise ValueError("output_dir must be provided if full_text_path is not set")
 
         # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
-        text_file = Path(output_dir) / "retrieval" / "pubget_data" / "text.csv"
+        text_file = Path(output_dir) / "pubget_data" / "text.csv"
 
         # Check if the text file exists
         if not text_file.exists():

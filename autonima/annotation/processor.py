@@ -11,6 +11,7 @@ from .schema import AnnotationConfig, AnnotationDecision, AnalysisMetadata, Anno
 from .client import AnnotationClient
 from ..models.types import Study
 from ..coordinates.schema import Analysis
+from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,9 @@ class AnnotationProcessor:
                         decisions.extend(study_decisions)
                     except Exception as e:
                         study, annotations_to_process = future_to_study[future]
-                        logger.error(f"Error processing annotations for study {study.pmid}: {e}")
+                        log_error_with_debug(logger, 
+                            f"Error processing annotations for study {study.pmid}: {e}"
+                        )   
                         # Continue processing other studies
         
         return decisions

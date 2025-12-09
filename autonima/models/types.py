@@ -341,13 +341,13 @@ class PipelineConfig:
                 "create_all_from_search_annotation": (
                     self.annotation.create_all_from_search_annotation
                 ),
+                "metadata_fields": self.annotation.metadata_fields,
                 "annotations": [
                     {
                         "name": criteria.name,
                         "description": criteria.description,
                         "inclusion_criteria": criteria.inclusion_criteria,
-                        "exclusion_criteria": criteria.exclusion_criteria,
-                        "metadata_fields": criteria.metadata_fields,
+                        "exclusion_criteria": criteria.exclusion_criteria
                     }
                     for criteria in self.annotation.annotations
                 ],
