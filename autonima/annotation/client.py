@@ -3,7 +3,7 @@
 import json
 import logging
 from typing import List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationConfig, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup
 from ..utils import log_error_with_debug
@@ -13,19 +13,49 @@ logger = logging.getLogger(__name__)
 
 class AnnotationDecisionOutput(BaseModel):
     """Output schema for annotation decision."""
-    include: bool
-    reasoning: str
-    inclusion_criteria_applied: List[str] = []
-    exclusion_criteria_applied: List[str] = []
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
 
 
 class MultiAnnotationDecisionOutput(BaseModel):
     """Output schema for multiple annotation decisions."""
-    annotation_name: str
-    include: bool
-    reasoning: str
-    inclusion_criteria_applied: List[str] = []
-    exclusion_criteria_applied: List[str] = []
+    annotation_name: str = Field(..., description="Name of the annotation")
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
 
 
 class MultiAnnotationDecisionOutputList(BaseModel):
@@ -35,11 +65,26 @@ class MultiAnnotationDecisionOutputList(BaseModel):
 
 class AnalysisAnnotations(BaseModel):
     """Annotations for a single analysis in study-level response."""
-    annotation_name: str
-    include: bool
-    reasoning: str
-    inclusion_criteria_applied: List[str] = []
-    exclusion_criteria_applied: List[str] = []
+    annotation_name: str = Field(..., description="Name of the annotation")
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
 
 
 class StudyAnalysisDecision(BaseModel):
@@ -203,6 +248,9 @@ class AnnotationClient:
             # Parse the result
             result_dict = json.loads(function_call.arguments)
             
+            # Validate that all 'include' fields are present and boolean
+            self._validate_include_fields(result_dict, prompt_type)
+            
             # Handle different response formats
             decisions = []
             if prompt_type == "multi_analysis":
@@ -246,8 +294,43 @@ class AnnotationClient:
             return decisions
             
         except Exception as e:
-            log_error_with_debug(logger, f"Error making multi annotation decisions: {e}")
+            logger.error(f"Error making multi annotation decisions: {e}")
+            logger.error(f"Prompt used: {prompt[:500]}...")
+            if 'result_dict' in locals():
+                logger.error(f"Response received: {json.dumps(result_dict, indent=2)[:1000]}")
             raise
+    
+    def _validate_include_fields(self, result_dict: Dict[str, Any], prompt_type: str) -> None:
+        """
+        Validate that all 'include' fields in the response are present and boolean.
+        
+        Args:
+            result_dict: The parsed response dictionary
+            prompt_type: Type of prompt used
+            
+        Raises:
+            ValueError: If any 'include' field is None or invalid
+        """
+        if prompt_type == "multi_analysis":
+            # Validate study-level response
+            if 'decisions' in result_dict:
+                for i, analysis_decision in enumerate(result_dict['decisions']):
+                    if 'annotations' in analysis_decision:
+                        for j, annotation in enumerate(analysis_decision['annotations']):
+                            if 'include' not in annotation or annotation['include'] is None:
+                                raise ValueError(
+                                    f"Missing or None 'include' field in decisions[{i}].annotations[{j}]. "
+                                    f"The LLM must provide a boolean value (true/false) for every annotation."
+                                )
+        else:
+            # Validate single-analysis response
+            if 'decisions' in result_dict:
+                for i, decision in enumerate(result_dict['decisions']):
+                    if 'include' not in decision or decision['include'] is None:
+                        raise ValueError(
+                            f"Missing or None 'include' field in decisions[{i}]. "
+                            f"The LLM must provide a boolean value (true/false) for every annotation."
+                        )
     
     def chat_completion(self, messages, model, response_format=None):
         """

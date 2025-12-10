@@ -1,6 +1,6 @@
 """Pydantic models for annotation configuration and results."""
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
