@@ -204,12 +204,12 @@ def create_single_study_annotation_prompt(
     metadata_lines = []
     
     if "analysis_name" in metadata_fields and metadata.analysis_name:
-        metadata_lines.append(f"- Name: {metadata.analysis_name}")
+        metadata_lines.append(f"- Analysis Name: {metadata.analysis_name}")
         
     if ("analysis_description" in metadata_fields and
             metadata.analysis_description):
         metadata_lines.append(
-            f"- Description: {metadata.analysis_description}"
+            f"- Analysis Description: {metadata.analysis_description}"
         )
     
     if "table_caption" in metadata_fields and metadata.table_caption:
