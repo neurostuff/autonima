@@ -149,6 +149,7 @@ class Study:
                 {
                     "name": analysis.name,
                     "description": analysis.description,
+                    "table_id": analysis.table_id,
                     "points": [
                         {
                             "coordinates": point.coordinates,

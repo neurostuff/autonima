@@ -394,7 +394,8 @@ def _load_analyses_from_coordinates_df(
             'name': str(table_id),
             'description': str(first_row['table_label']) if pd.notna(first_row['table_label']) else None,
             'points': points,
-            'parsed': False  # IMPORTANT: Set to False as requested
+            'parsed': False,  # IMPORTANT: Set to False as requested
+            'table_id': str(table_id)
         }
 
         id_to_analyses.setdefault(identifier, []).append(analysis_metadata)
@@ -499,11 +500,13 @@ def load_activation_table_map(
                             })
                         
                         # Create analysis metadata
+                        metadata = analysis.get('metadata', {})
                         analysis_metadata = {
                             'name': analysis.get('name', ''),
-                            'description': analysis.get('metadata', {}).get('table_label'),
+                            'description': metadata.get('table_label'),
                             'points': points,
-                            'parsed': False
+                            'parsed': False,
+                            'table_id': metadata.get('table_id', '')
                         }
                         
                         # Add to analyses dict
@@ -656,5 +659,6 @@ def _apply_analyses_to_studies(
                 name=analysis_data.get('name'),
                 description=analysis_data.get('description'),
                 points=points,
-                parsed=analysis_data.get('parsed', False)
+                parsed=analysis_data.get('parsed', False),
+                table_id=analysis_data.get('table_id')
             ))

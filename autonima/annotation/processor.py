@@ -428,15 +428,32 @@ class AnnotationProcessor:
         table_id = None
         table_caption = None
         table_footer = None
-        if study.activation_tables:
-            # Use the first table's information for now
-            # In the future, we might want to associate analyses with specific tables
-            table_id = study.activation_tables[0].table_id
-            table_caption = study.activation_tables[0].table_caption
-            table_footer = study.activation_tables[0].table_foot
         
-        # If no activation tables exist, generate a default table_id
-        if table_id is None:
+        # Try to find the table associated with this analysis
+        if analysis.table_id:
+            if not study.activation_tables:
+                raise ValueError(
+                    f"Analysis {analysis_id} has table_id '{analysis.table_id}' but study "
+                    f"{study.pmid} has no activation_tables"
+                )
+            
+            # Find the table with matching table_id
+            matching_table = next(
+                (table for table in study.activation_tables if table.table_id == analysis.table_id),
+                None
+            )
+            if not matching_table:
+                available_tables = [t.table_id for t in study.activation_tables]
+                raise ValueError(
+                    f"Analysis {analysis_id} references table_id '{analysis.table_id}' which "
+                    f"was not found in study {study.pmid}. Available tables: {available_tables}"
+                )
+            
+            table_id = matching_table.table_id
+            table_caption = matching_table.table_caption
+            table_footer = matching_table.table_foot
+        else:
+            # If analysis has no table_id, generate a default
             table_id = f"{study.pmid}_default_table"
         
         # Build kwargs with required fields
@@ -446,28 +463,29 @@ class AnnotationProcessor:
             "table_id": table_id,
         }
         
-        # Map of field names to their values
-        field_mapping = {
-            "analysis_name": analysis.name,
-            "analysis_description": analysis.description,
-            "table_caption": table_caption,
-            "table_footer": table_footer,
-            "study_title": study.title,
-            "study_abstract": study.abstract,
-            "study_authors": study.authors,
-            "study_journal": study.journal,
-            "study_publication_date": study.publication_date,
-            "study_fulltext": study.full_text,
+        # Map of field names to their getter functions (lazy evaluation)
+        field_getters = {
+            "analysis_name": lambda: analysis.name,
+            "analysis_description": lambda: analysis.description,
+            "table_caption": lambda: table_caption,
+            "table_footer": lambda: table_footer,
+            "study_title": lambda: study.title,
+            "study_abstract": lambda: study.abstract,
+            "study_authors": lambda: study.authors,
+            "study_journal": lambda: study.journal,
+            "study_publication_date": lambda: study.publication_date,
+            "study_fulltext": lambda: study.full_text,
         }
         
         # If metadata_fields is None, include all fields
         if metadata_fields is None:
-            kwargs.update(field_mapping)
+            for field, getter in field_getters.items():
+                kwargs[field] = getter()
         else:
             # Only include requested fields
             for field in metadata_fields:
-                if field in field_mapping:
-                    kwargs[field] = field_mapping[field]
+                if field in field_getters:
+                    kwargs[field] = field_getters[field]()
         
         # Create the metadata object
         metadata = AnalysisMetadata(**kwargs)

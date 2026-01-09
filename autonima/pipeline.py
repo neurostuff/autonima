@@ -701,7 +701,8 @@ class AutonimaPipeline:
                                 name=analysis_data.get('name'),
                                 description=analysis_data.get('description'),
                                 points=points,
-                                parsed=analysis_data.get('parsed', True)
+                                parsed=analysis_data.get('parsed', True),
+                                table_id=analysis_data.get('table_id')
                             ))
                         loaded_count += 1
             
@@ -731,6 +732,7 @@ class AutonimaPipeline:
                             {
                                 "name": analysis.name,
                                 "description": analysis.description,
+                                "table_id": analysis.table_id,
                                 "points": [
                                     {
                                         "coordinates": point.coordinates,
