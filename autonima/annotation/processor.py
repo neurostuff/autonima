@@ -11,6 +11,7 @@ from .schema import AnnotationConfig, AnnotationDecision, AnalysisMetadata, Anno
 from .client import AnnotationClient
 from ..models.types import Study
 from ..coordinates.schema import Analysis
+from ..coordinates.nimads_models import sanitize_analysis_name
 from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
@@ -19,16 +20,17 @@ logger = logging.getLogger(__name__)
 class AnnotationProcessor:
     """Processor for annotating analyses based on LLM decisions."""
     
-    def __init__(self, config: AnnotationConfig, num_workers: int = 1):
+    def __init__(self, config: AnnotationConfig, num_workers: int = 1, max_retries: int = 3):
         """
         Initialize the annotation processor.
         
         Args:
             config: Annotation configuration
             num_workers: Number of parallel workers for processing
+            max_retries: Maximum number of retries for malformed LLM responses
         """
         self.config = config
-        self.client = AnnotationClient()
+        self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
     
@@ -128,8 +130,8 @@ class AnnotationProcessor:
         
         for study in studies:
             for i, analysis in enumerate(study.analyses):
-                # Create a unique analysis ID
-                analysis_id = f"{study.pmid}_analysis_{i}"
+                # Create a unique analysis ID (sanitized)
+                analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
                 
                 # Create decision for the annotation
                 decision = AnnotationDecision(
@@ -185,8 +187,8 @@ class AnnotationProcessor:
             
             for study in studies_to_process:
                 for i, analysis in enumerate(study.analyses):
-                    # Create a unique analysis ID
-                    analysis_id = f"{study.pmid}_analysis_{i}"
+                    # Create a unique analysis ID (sanitized)
+                    analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
                     
                     # Create decision for the annotation
                     decision = AnnotationDecision(
@@ -297,20 +299,34 @@ class AnnotationProcessor:
         """
         study_decisions = []
         
-        # Process each analysis for this study with all required annotations at once
-        for i, analysis in enumerate(study.analyses):
-            # Create a unique analysis ID
-            analysis_id = f"{study.pmid}_analysis_{i}"
+        # Check if we should use multi_analysis prompt (process whole study at once)
+        if self.config.prompt_type == "multi_analysis":
+            # Build StudyAnalysisGroup once for the entire study
+            study_group = self._build_study_analysis_group(study, metadata_fields)
             
-            # Extract metadata for the analysis 
-            metadata = self._extract_analysis_metadata(study, analysis, analysis_id, metadata_fields)
-            
-            # Make multi-annotation decision for this analysis
-            analysis_decisions = self.client.make_multi_decision(
-                metadata, annotations_to_process, model
+            # Make multi-annotation decision for all analyses in the study at once
+            study_decisions = self.client.make_decision(
+                study_group, annotations_to_process, metadata_fields,
+                model=model,
+                prompt_type=self.config.prompt_type
             )
-            
-            study_decisions.extend(analysis_decisions)
+        else:
+            # Process each analysis individually (single_analysis mode)
+            for i, analysis in enumerate(study.analyses):
+                # Create a unique analysis ID (sanitized)
+                analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+                
+                # Extract metadata for the analysis
+                metadata = self._extract_analysis_metadata(study, analysis, analysis_id, metadata_fields)
+                
+                # Make multi-annotation decision for this analysis
+                analysis_decisions = self.client.make_decision(
+                    metadata, annotations_to_process, metadata_fields,
+                    model=model,
+                    prompt_type=self.config.prompt_type
+                )
+                
+                study_decisions.extend(analysis_decisions)
         
         return study_decisions
     
@@ -491,6 +507,66 @@ class AnnotationProcessor:
         metadata = AnalysisMetadata(**kwargs)
         
         return metadata
+    
+    def _build_study_analysis_group(
+        self,
+        study: Study,
+        metadata_fields: List[str]
+    ) -> 'StudyAnalysisGroup':
+        """
+        Build a StudyAnalysisGroup from a study for multi_analysis prompts.
+        
+        Args:
+            study: Study to convert
+            metadata_fields: List of metadata fields to include
+            
+        Returns:
+            StudyAnalysisGroup with all analyses and tables
+        """
+        from .schema import StudyAnalysisGroup, TableMetadata
+        
+        # Build study-level metadata
+        study_kwargs = {
+            'study_id': study.pmid
+        }
+        
+        if 'study_title' in metadata_fields:
+            study_kwargs['study_title'] = study.title
+        if 'study_abstract' in metadata_fields:
+            study_kwargs['study_abstract'] = study.abstract
+        if 'study_authors' in metadata_fields:
+            study_kwargs['study_authors'] = study.authors
+        if 'study_journal' in metadata_fields:
+            study_kwargs['study_journal'] = study.journal
+        if 'study_publication_date' in metadata_fields:
+            study_kwargs['study_publication_date'] = study.publication_date
+        if 'study_fulltext' in metadata_fields:
+            study_kwargs['study_fulltext'] = study.full_text
+        
+        # Build table metadata
+        tables = []
+        if study.activation_tables:
+            for table in study.activation_tables:
+                tables.append(TableMetadata(
+                    table_id=table.table_id,
+                    caption=table.table_caption,
+                    footer=table.table_foot
+                ))
+        
+        # Build analysis metadata for all analyses
+        analyses = []
+        for i, analysis in enumerate(study.analyses):
+            # Create sanitized analysis ID
+            analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+            analysis_metadata = self._extract_analysis_metadata(
+                study, analysis, analysis_id, metadata_fields
+            )
+            analyses.append(analysis_metadata)
+        
+        study_kwargs['tables'] = tables
+        study_kwargs['analyses'] = analyses
+        
+        return StudyAnalysisGroup(**study_kwargs)
 
     def _are_cached_results_valid(self, cached_results: List[AnnotationDecision]) -> bool:
         """

@@ -130,6 +130,9 @@ def run_meta_analysis_for_column(studyset, annotation, annotation_data, column, 
 def run_meta_analyses(output_folder, estimator_name="mkdadensity", estimator_args=None,
                       corrector_name="fdr", corrector_args=None):
     """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
+    # Import sanitization functions
+    from .coordinates.nimads_models import sanitize_studyset_dict, sanitize_annotation_dict
+    
     # Find the NiMADS files
     output_folder = Path(output_folder) / "outputs"
     studyset_file, annotation_file = find_nimads_files(output_folder)
@@ -146,6 +149,15 @@ def run_meta_analyses(output_folder, estimator_name="mkdadensity", estimator_arg
     print("Loading annotation JSON...")
     with open(annotation_file, 'r') as f:
         annotation_data = json.load(f)
+    
+    # Sanitize the data before passing to NiMARE
+    print("Sanitizing studyset data...")
+    studyset_data = sanitize_studyset_dict(studyset_data)
+    
+    print("Sanitizing annotation data...")
+    if isinstance(annotation_data, list):
+        annotation_data = annotation_data[0] if annotation_data else {}
+    annotation_data = sanitize_annotation_dict(annotation_data)
     
     # Process the files using NiMARE classes
     print("Creating studyset...")

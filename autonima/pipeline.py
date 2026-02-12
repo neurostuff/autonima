@@ -603,7 +603,7 @@ class AutonimaPipeline:
         if not included_studies and not all_studies:
             logger.info("No studies with parsed analyses found for annotation")
             return
-        
+                
         # Load criteria mapping and inject it into annotation config
         from .utils.criteria import load_criteria_mapping
         criteria_mapping = load_criteria_mapping(self.config.output.directory)
@@ -863,7 +863,9 @@ class AutonimaPipeline:
             from .coordinates.nimads_models import (
                 convert_to_nimads_studyset,
                 create_default_annotation,
-                create_annotations_from_results
+                create_annotations_from_results,
+                sanitize_studyset_dict,
+                sanitize_annotation_dict
             )
             
             # Create a studyset from the studies
@@ -875,10 +877,12 @@ class AutonimaPipeline:
             )
             
             # Save NiMADS studyset output using the to_dict method
+            # Apply sanitization to ensure analysis names are clean
             output_dir = Path(self.config.output.directory)
             nimads_output_file = output_dir / "outputs" / "nimads_studyset.json"
+            studyset_dict = sanitize_studyset_dict(studyset.to_dict())
             with open(nimads_output_file, 'w') as f:
-                json.dump(studyset.to_dict(), f, indent=2)
+                json.dump(studyset_dict, f, indent=2)
             
             # Create annotations based on annotation results
             # First, try to load annotation results from the annotation processor
@@ -899,7 +903,7 @@ class AutonimaPipeline:
                     )
                     
                     # Save all annotations to a single file
-                    annotations_data = annotations.to_dict()
+                    annotations_data = sanitize_annotation_dict(annotations.to_dict())
                     nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
                     with open(nimads_annotations_file, 'w') as f:
                         json.dump(annotations_data, f, indent=2)
@@ -907,15 +911,17 @@ class AutonimaPipeline:
                     # Create a default annotation if no results are available
                     annotation = create_default_annotation(studyset_id, studyset)
                     nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
+                    annotation_dict = sanitize_annotation_dict(annotation.to_dict())
                     with open(nimads_annotations_file, 'w') as f:
-                        json.dump([annotation.to_dict()], f, indent=2)
+                        json.dump([annotation_dict], f, indent=2)
             except Exception as annotation_error:
                 logger.warning(f"Failed to create annotations from results: {annotation_error}")
                 # Create a default annotation as fallback
                 annotation = create_default_annotation(studyset_id, studyset)
                 nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
+                annotation_dict = sanitize_annotation_dict(annotation.to_dict())
                 with open(nimads_annotations_file, 'w') as f:
-                    json.dump([annotation.to_dict()], f, indent=2)
+                    json.dump([annotation_dict], f, indent=2)
             
             logger.info(
                 f"NiMADS output generated: {len(studies_with_analyses)} studies "

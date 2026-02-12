@@ -1,5 +1,6 @@
 """Configuration management and validation for Autonima."""
 
+import logging
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
@@ -13,6 +14,8 @@ from .models.types import (
     OutputConfig
 )
 from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationError(Exception):
@@ -295,22 +298,18 @@ class ConfigManager:
         Raises:
             ConfigurationError: If screening configuration is invalid
         """
-        # Validate that at least one screening stage has an objective
+        # Get screening configuration
         abstract_objective = config.screening.abstract.get('objective')
         fulltext_objective = config.screening.fulltext.get('objective')
-        
-        if not abstract_objective and not fulltext_objective:
-            raise ConfigurationError(
-                "At least one screening stage must have an objective"
-            )
-        
-        # Validate that at least one screening stage has inclusion criteria
         abstract_inclusion = config.screening.abstract.get('inclusion_criteria')
         fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria')
         
-        if not abstract_inclusion and not fulltext_inclusion:
-            raise ConfigurationError(
-                "At least one screening stage must have inclusion criteria"
+        # Log a warning if both screening stages are skipped
+        if not abstract_objective and not fulltext_objective:
+            logger.warning(
+                "No screening objectives configured. Screening stage will be "
+                "skipped and all studies from the search stage will pass to "
+                "the next pipeline stage."
             )
         
         # Validate abstract screening if it has an objective
@@ -374,6 +373,7 @@ class ConfigManager:
                 create_all_from_search_annotation=create_all_from_search,
                 annotations=annotations,
                 enabled=annotation_dict.get('enabled', True),
+                prompt_type=annotation_dict.get('prompt_type', 'single_analysis'),
                 metadata_fields=annotation_dict.get('metadata_fields', [
                     "analysis_name",
                     "analysis_description",
