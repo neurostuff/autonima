@@ -303,30 +303,57 @@ class ConfigManager:
         fulltext_objective = config.screening.fulltext.get('objective')
         abstract_inclusion = config.screening.abstract.get('inclusion_criteria')
         fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria')
+        abstract_skip = config.screening.abstract.get('skip_stage', False)
+        fulltext_skip = config.screening.fulltext.get('skip_stage', False)
         
-        # Log a warning if both screening stages are skipped
-        if not abstract_objective and not fulltext_objective:
-            logger.warning(
-                "No screening objectives configured. Screening stage will be "
-                "skipped and all studies from the search stage will pass to "
-                "the next pipeline stage."
-            )
-        
-        # Validate abstract screening if it has an objective
-        if abstract_objective:
+        # Validate abstract screening
+        if abstract_skip:
+            # If skip_stage is True, objective should not be set
+            if abstract_objective:
+                logger.warning(
+                    "Abstract screening has skip_stage=True but also has an objective. "
+                    "The stage will be skipped and the objective will be ignored."
+                )
+        else:
+            # If skip_stage is False (or not set), objective is required
+            if not abstract_objective:
+                raise ConfigurationError(
+                    "Abstract screening must have an 'objective' or set 'skip_stage: true'"
+                )
+            # If objective is set, inclusion criteria are required
             if not abstract_inclusion:
                 raise ConfigurationError(
                     "Abstract screening must have inclusion criteria when "
                     "objective is specified"
                 )
         
-        # Validate fulltext screening if it has an objective
-        if fulltext_objective:
+        # Validate fulltext screening
+        if fulltext_skip:
+            # If skip_stage is True, objective should not be set
+            if fulltext_objective:
+                logger.warning(
+                    "Fulltext screening has skip_stage=True but also has an objective. "
+                    "The stage will be skipped and the objective will be ignored."
+                )
+        else:
+            # If skip_stage is False (or not set), objective is required
+            if not fulltext_objective:
+                raise ConfigurationError(
+                    "Fulltext screening must have an 'objective' or set 'skip_stage: true'"
+                )
+            # If objective is set, inclusion criteria are required
             if not fulltext_inclusion:
                 raise ConfigurationError(
                     "Fulltext screening must have inclusion criteria when "
                     "objective is specified"
                 )
+        
+        # Log a warning if both screening stages are skipped
+        if abstract_skip and fulltext_skip:
+            logger.warning(
+                "Both abstract and fulltext screening stages are skipped. "
+                "All studies from the search stage will pass to the next pipeline stage."
+            )
 
     def _load_annotation_config(
         self, annotation_dict: Dict[str, Any]

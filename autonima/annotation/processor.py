@@ -235,7 +235,6 @@ class AnnotationProcessor:
             annotations_to_process = [a for a in self.config.annotations if a.name not in study_annotations_complete]
             
             if not annotations_to_process:
-                logger.info(f"Study {study.pmid} already has complete results for all annotations")
                 continue
             
             studies_to_process.append((study, annotations_to_process))

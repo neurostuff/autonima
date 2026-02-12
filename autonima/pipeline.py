@@ -177,6 +177,16 @@ class AutonimaPipeline:
     async def _execute_abstract_screening(self):
         """Execute abstract screening phase."""
 
+        # Check if abstract screening should be skipped
+        abstract_skip = self.config.screening.abstract.get('skip_stage', False)
+        if abstract_skip:
+            logger.info("Abstract screening skipped (skip_stage=True)")
+            # Mark all pending studies as included to pass to next stage
+            for study in self.results.studies:
+                if study.status == StudyStatus.PENDING:
+                    study.status = StudyStatus.INCLUDED_ABSTRACT
+            return
+
         # Get studies that need screening
         pending_studies = [
             s for s in self.results.studies if s.status == StudyStatus.PENDING]
@@ -421,6 +431,16 @@ class AutonimaPipeline:
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""
+
+        # Check if fulltext screening should be skipped
+        fulltext_skip = self.config.screening.fulltext.get('skip_stage', False)
+        if fulltext_skip:
+            logger.info("Full-text screening skipped (skip_stage=True)")
+            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next stage
+            for study in self.results.studies:
+                if study.status == StudyStatus.INCLUDED_ABSTRACT:
+                    study.status = StudyStatus.INCLUDED_FULLTEXT
+            return
 
         # Get studies with full text that need screening
         screenable_studies = [
