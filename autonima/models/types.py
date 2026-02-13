@@ -296,6 +296,11 @@ class PipelineConfig:
             screening_dict: Dict[str, Any]
         ) -> Dict[str, Any]:
             """Serialize a screening dict, handling CriteriaMapping objects."""
+            # Check if this stage is skipped
+            if screening_dict.get('skip_stage', False):
+                return {"skip_stage": True}
+            
+            # Otherwise, serialize all fields
             result = {}
             for key, value in screening_dict.items():
                 if isinstance(value, CriteriaMapping):
