@@ -358,12 +358,7 @@ class LLMScreener(ScreeningEngine):
                 criteria_mapping=criteria_mapping,
                 objective=objective,
                 confidence_reporting=confidence_reporting,
-                additional_instructions=additional_instructions,
-                **(
-                    dict(output_dir=str(self.result_dir))
-                    if screening_type == "fulltext"
-                    else {}
-                )
+                additional_instructions=additional_instructions
             )
 
             model = config.get(

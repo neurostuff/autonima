@@ -1,92 +1,296 @@
 """Prompt templates for annotation decisions."""
 
 from typing import List
-from .schema import AnalysisMetadata, AnnotationCriteriaConfig
+from collections import defaultdict
+from .schema import AnalysisMetadata, AnnotationCriteriaConfig, TableMetadata, StudyAnalysisGroup
 
 
-def create_annotation_prompt(
-    metadata: AnalysisMetadata,
-    criteria: AnnotationCriteriaConfig,
+def create_study_multi_annotation_prompt(
+    study_group: StudyAnalysisGroup,
+    criteria_list: List[AnnotationCriteriaConfig],
     metadata_fields: List[str] = None
 ) -> str:
     """
-    Create a prompt for the LLM to decide if an analysis should be included 
-    in an annotation.
+    Create a prompt for annotating all analyses in a study for multiple annotation criteria.
+    High-impact reliability fixes:
+      1) Remove placeholder annotation labels (annotation_1, etc.) from the output example.
+      2) Add an explicit allowed-values ENUM for annotation_name.
+      3) Add a fixed mapping from ANNOTATION N -> canonical criteria.name.
+      4) Add a lightweight self-check to prevent placeholders.
+    """
+    if metadata_fields is None:
+        metadata_fields = []
+
+    # -------------------------
+    # Study-level metadata
+    # -------------------------
+    study_metadata = []
+
+    if "study_title" in metadata_fields and study_group.study_title:
+        study_metadata.append(
+            f"STUDY (APPLIES TO ALL ANALYSES):\nStudy Title: {study_group.study_title}"
+        )
+
+    if ("study_abstract" in metadata_fields
+        and study_group.study_abstract
+    ):
+        study_metadata.append(
+            f"Study Abstract: {study_group.study_abstract}"
+        )
+    if ("study_fulltext" in metadata_fields
+          and study_group.study_fulltext):
+        study_metadata.append(
+            f"Study Full Text: {study_group.study_fulltext}"
+        )
+
+    # -------------------------
+    # Group analyses by table
+    # -------------------------
+    table_map = {t.table_id: t for t in study_group.tables}
+    table_analyses = defaultdict(list)
+    for analysis in study_group.analyses:
+        table_analyses[analysis.table_id].append(analysis)
+
+    # -------------------------
+    # Tables and analyses section
+    # -------------------------
+    table_sections = []
+    for table_id, analyses in table_analyses.items():
+        table = table_map.get(table_id, TableMetadata(table_id=table_id))
+        table_section = [f"TABLE: {table.caption or 'Unnamed Table'}"]
+        if table.footer:
+            table_section.append(f"Footer: {table.footer}")
+
+        for analysis in analyses:
+            analysis_lines = [f"Analysis ID: {analysis.analysis_id}"]
+            if "analysis_name" in metadata_fields and analysis.analysis_name:
+                analysis_lines.append(f"- Name: {analysis.analysis_name}")
+            if "analysis_description" in metadata_fields and analysis.analysis_description:
+                analysis_lines.append(f"- Description: {analysis.analysis_description}")
+            table_section.append("\n".join(analysis_lines))
+
+        table_sections.append("\n".join(table_section))
+
+    # -------------------------
+    # Criteria sections + mapping/ENUM
+    # -------------------------
+    criteria_sections = []
+    # Canonical allowed annotation names (exact strings)
+    allowed_annotation_names = [c.name for c in criteria_list]
+
+    # Fixed mapping from ordinal annotation to canonical name (for humans + model)
+    mapping_lines = []
+    for i, c in enumerate(criteria_list):
+        mapping_lines.append(f'ANNOTATION {i+1} → "{c.name}"')
+
+    annotation_mapping_str = "\n".join(mapping_lines)
+    allowed_names_str = "\n".join([f'- "{name}"' for name in allowed_annotation_names])
+
+    for i, criteria in enumerate(criteria_list):
+        if criteria.criteria_mapping:
+            inclusion_items = criteria.criteria_mapping.get("inclusion", {}).items()
+            inclusion_text = "\n".join([f"{cid}: {text}" for cid, text in inclusion_items])
+
+            exclusion_items = criteria.criteria_mapping.get("exclusion", {}).items()
+            exclusion_text = "\n".join([f"{cid}: {text}" for cid, text in exclusion_items])
+        else:
+            inclusion_text = "\n".join([f"  - {c}" for c in criteria.inclusion_criteria])
+            exclusion_text = "\n".join([f"  - {c}" for c in criteria.exclusion_criteria])
+
+        criteria_section = f"""
+ANNOTATION {i+1}: "{criteria.name}"
+Description: {criteria.description or "No description provided"}
+
+INCLUSION CRITERIA:
+{inclusion_text or "No inclusion criteria specified"}
+
+EXCLUSION CRITERIA:
+{exclusion_text or "No exclusion criteria specified"}
+""".strip()
+        criteria_sections.append(criteria_section)
+
+    # -------------------------
+    # Prepare context strings
+    # -------------------------
+    study_context_str = "\n".join(study_metadata) if study_metadata else "No study context available"
+    tables_str = "\n\n".join(table_sections) if table_sections else "No tables available"
+    criteria_str = "\n\n".join(criteria_sections)
+
+    # -------------------------
+    # Output example: use canonical names, not placeholders
+    # Keep it short and correct (LLMs anchor hard to examples)
+    # -------------------------
+    # Provide an example annotation list using ALL allowed names, with minimal scaffolding.
+    example_annotations = []
+    for name in allowed_annotation_names:
+        example_annotations.append(f"""{{
+          "annotation_name": "{name}",
+          "include": true,
+          "reasoning": "...",
+          "inclusion_criteria_applied": ["I1"],
+          "exclusion_criteria_applied": []
+        }}""")
+
+    example_annotations_str = ",\n        ".join(example_annotations)
+
+    prompt = f"""
+You are a neuroimaging meta-analysis expert evaluating all analyses from an entire study for multiple annotations.
+
+STUDY CONTEXT:
+NOTE:
+The Study Title and Abstract above apply to ALL analyses below and should be used
+as shared context when making annotation decisions.
+
+
+{study_context_str}
+
+TABLES AND ANALYSES:
+{tables_str}
+
+ANNOTATION NAME MAPPING (FIXED IDENTIFIERS):
+{annotation_mapping_str}
+
+IMPORTANT CONSTRAINT (ENUM):
+The field "annotation_name" MUST be one of the following exact strings and MUST NOT use placeholders like "annotation_1":
+{allowed_names_str}
+
+{criteria_str}
+
+For EACH analysis and EACH annotation, provide:
+- Include decision (true/false)
+- Reasoning
+- Applied inclusion/exclusion criteria
+
+IMPORTANT:
+- Use the exact "Analysis ID" shown above for each analysis.
+- Do NOT output placeholder strings such as "annotation_1". Use the canonical annotation names listed in the ENUM.
+
+Output JSON format:
+{{
+  "study_id": "{study_group.study_id}",
+  "decisions": [
+    {{
+      "analysis_id": "<use exact Analysis ID from above>",
+      "annotations": [
+        {example_annotations_str}
+      ]
+    }}
+  ]
+}}
+
+FINAL SELF-CHECK (before you respond):
+- Every annotation_name exactly matches one of the allowed strings in the ENUM.
+- No placeholder strings like "annotation_1" appear anywhere.
+""".strip()
+
+    return prompt
+
+
+def create_single_study_annotation_prompt(
+    metadata: AnalysisMetadata,
+    criteria_list: List[AnnotationCriteriaConfig],
+    metadata_fields: List[str] = None
+) -> str:
+    """
+    Create a prompt for the LLM to decide if an analysis should be included
+    in multiple annotations at once.
     
     Args:
         metadata: Analysis metadata to include in the prompt
-        criteria: Annotation criteria configuration
-        metadata_fields: List of metadata fields to include
+        criteria_list: List of annotation criteria configurations
+        metadata_fields: List of metadata fields to include (already filtered by config)
         
     Returns:
         Formatted prompt string
     """
-    # Use the provided metadata_fields or fall back to criteria.metadata_fields
-    fields_to_use = metadata_fields or criteria.metadata_fields or [
-        "analysis_name",
-        "analysis_description",
-        "table_caption",
-        "study_title"
-    ]
+    if metadata_fields is None:
+        metadata_fields = []
     
     # Build the metadata section based on configured fields
     metadata_lines = []
     
-    if "analysis_name" in fields_to_use and metadata.analysis_name:
-        metadata_lines.append(f"- Name: {metadata.analysis_name}")
+    if "analysis_name" in metadata_fields and metadata.analysis_name:
+        metadata_lines.append(f"- Analysis Name: {metadata.analysis_name}")
         
-    if "analysis_description" in fields_to_use and metadata.analysis_description:
-        metadata_lines.append(f"- Description: {metadata.analysis_description}")
-        
-    if "table_caption" in fields_to_use and metadata.table_caption:
+    if ("analysis_description" in metadata_fields and
+            metadata.analysis_description):
+        metadata_lines.append(
+            f"- Analysis Description: {metadata.analysis_description}"
+        )
+    
+    if "table_caption" in metadata_fields and metadata.table_caption:
         metadata_lines.append(f"- Table Caption: {metadata.table_caption}")
-        
-    if "table_footer" in fields_to_use and metadata.table_footer:
+    
+    if "table_footer" in metadata_fields and metadata.table_footer:
         metadata_lines.append(f"- Table Footer: {metadata.table_footer}")
         
-    if "study_title" in fields_to_use and metadata.study_title:
+    if "study_title" in metadata_fields and metadata.study_title:
         metadata_lines.append(f"- Study Title: {metadata.study_title}")
         
-    if "study_abstract" in fields_to_use and metadata.study_abstract:
+    if "study_abstract" in metadata_fields and metadata.study_abstract:
         metadata_lines.append(f"- Study Abstract: {metadata.study_abstract}")
         
-    if "study_authors" in fields_to_use and metadata.study_authors:
+    if "study_authors" in metadata_fields and metadata.study_authors:
         authors = ', '.join(metadata.study_authors)
         metadata_lines.append(f"- Study Authors: {authors}")
         
-    if "study_journal" in fields_to_use and metadata.study_journal:
+    if "study_journal" in metadata_fields and metadata.study_journal:
         metadata_lines.append(f"- Study Journal: {metadata.study_journal}")
         
-    if ("study_publication_date" in fields_to_use and 
+    if ("study_publication_date" in metadata_fields and
             metadata.study_publication_date):
         date_str = metadata.study_publication_date
         metadata_lines.append(f"- Study Publication Date: {date_str}")
     
+    if "study_fulltext" in metadata_fields and metadata.study_fulltext:
+        metadata_lines.append(
+            f"- Study Full Text: {metadata.study_fulltext}"
+        )
+    
     # Add any custom fields
     for field_name, field_value in metadata.custom_fields.items():
-        if field_name in fields_to_use and field_value:
+        if field_name in metadata_fields and field_value:
             formatted_name = field_name.replace('_', ' ').title()
             metadata_lines.append(f"- {formatted_name}: {field_value}")
     
-    # Format criteria with IDs if mapping is provided
-    if criteria.criteria_mapping:
-        inclusion_items = criteria.criteria_mapping.get('inclusion', {}).items()
-        inclusion_list = [f"{id}: {text}" for id, text in inclusion_items]
-        inclusion_text = "\n".join(inclusion_list)
+    # Build criteria sections for all annotations
+    criteria_sections = []
+    for i, criteria in enumerate(criteria_list):
+        # Format criteria with IDs if mapping is provided
+        if criteria.criteria_mapping:
+            inclusion_items = criteria.criteria_mapping.get(
+                'inclusion', {}
+            ).items()
+            inclusion_list = [f"{id}: {text}" for id, text in inclusion_items]
+            inclusion_text = "\n".join(inclusion_list)
+            
+            exclusion_items = criteria.criteria_mapping.get(
+                'exclusion', {}
+            ).items()
+            exclusion_list = [f"{id}: {text}" for id, text in exclusion_items]
+            exclusion_text = "\n".join(exclusion_list)
+        else:
+            inclusion_list = [f"  - {c}" for c in criteria.inclusion_criteria]
+            inclusion_text = "\n".join(inclusion_list)
+            exclusion_list = [f"  - {c}" for c in criteria.exclusion_criteria]
+            exclusion_text = "\n".join(exclusion_list)
         
-        exclusion_items = criteria.criteria_mapping.get('exclusion', {}).items()
-        exclusion_list = [f"{id}: {text}" for id, text in exclusion_items]
-        exclusion_text = "\n".join(exclusion_list)
-    else:
-        inclusion_list = [f"  - {c}" for c in criteria.inclusion_criteria]
-        inclusion_text = "\n".join(inclusion_list)
-        exclusion_list = [f"  - {c}" for c in criteria.exclusion_criteria]
-        exclusion_text = "\n".join(exclusion_list)
+        criteria_section = f"""
+            ANNOTATION {i+1}: "{criteria.name}"
+            Description: {criteria.description or "No description provided"}
+
+            INCLUSION CRITERIA:
+            {inclusion_text or "No inclusion criteria specified"}
+
+            EXCLUSION CRITERIA:
+            {exclusion_text or "No exclusion criteria specified"}
+            """
+        criteria_sections.append(criteria_section)
     
     # Create the prompt
     prompt = f"""
 You are a neuroimaging meta-analysis expert evaluating whether an analysis meets 
-specific inclusion criteria.
+specific inclusion criteria for multiple annotations simultaneously.
 
 The following analysis has been extracted from within a table of a published 
 fMRI/neuroimaging article. You will be provided with metadata about the 
@@ -99,30 +303,32 @@ the analysis name and description for your decision.
 STUDY CONTEXT:
 {chr(10).join(metadata_lines) if metadata_lines else "No metadata available"}
 
-ANNOTATION CRITERIA: "{criteria.name}"
-Description: {criteria.description or "No description provided"}
+{chr(10).join(criteria_sections)}
 
-INCLUSION CRITERIA:
-{inclusion_text or "No inclusion criteria specified"}
+Based on the provided information, should this analysis be included in each of the 
+annotations listed above?
 
-EXCLUSION CRITERIA:
-{exclusion_text or "No exclusion criteria specified"}
-
-Based on the provided information, should this analysis be included in the 
-"{criteria.name}" annotation?
-
-IMPORTANT: In your response, you must specify which specific criteria IDs apply
+IMPORTANT: For each annotation, you must specify which specific criteria IDs apply
 to this analysis.
 - For included analyses: List the inclusion criteria IDs that are satisfied
 - For excluded analyses: List the exclusion criteria IDs that apply
 
-Respond with JSON:
-{{
-  "include": true/false,
-  "reasoning": "Brief explanation of decision",
-  "inclusion_criteria_applied": ["I1", "I2"],
-  "exclusion_criteria_applied": []
-}}
-"""
-    
+Respond with JSON array, one object for each annotation in the same order:
+[
+  {{
+    "annotation_name": "annotation_1_name",
+    "include": true/false,
+    "reasoning": "Brief explanation of decision",
+    "inclusion_criteria_applied": ["I1", "I2"],
+    "exclusion_criteria_applied": []
+  }},
+  {{
+    "annotation_name": "annotation_2_name",
+    "include": true/false,
+    "reasoning": "Brief explanation of decision",
+    "inclusion_criteria_applied": ["I3", "I4"],
+    "exclusion_criteria_applied": []
+  }}
+]
+"""    
     return prompt.strip()

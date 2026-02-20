@@ -234,10 +234,14 @@ def validate(config: str, output_folder: str, debug: bool):
               type=str,
               default='{}',
               help='JSON string of arguments for the corrector (default: {})')
+@click.option('--include-ids',
+              type=click.Path(exists=True, dir_okay=False),
+              default=None,
+              help='Path to text file with study IDs/PMIDs to include (one per line)')
 @click.option('--debug', is_flag=True,
               help='Enable debug mode with post-mortem debugging on errors')
 def meta(output_folder: str, estimator: str, estimator_args: str,
-         corrector: str, corrector_args: str, debug: bool):
+         corrector: str, corrector_args: str, include_ids: str, debug: bool):
     """
     Run meta-analyses on Autonima output using NiMARE.
 
@@ -252,6 +256,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
         --estimator-args         JSON string of arguments for the estimator
         --corrector              Corrector to use (fdr, montecarlo, bonferroni)
         --corrector-args         JSON string of arguments for the corrector
+        --include-ids            Path to newline-delimited study IDs/PMIDs for post-hoc filtering
 
     Examples:
         autonima meta results/outputs
@@ -292,7 +297,8 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
             estimator_name=estimator,
             estimator_args=estimator_args_dict,
             corrector_name=corrector,
-            corrector_args=corrector_args_dict
+            corrector_args=corrector_args_dict,
+            include_ids=include_ids,
         )
         
         print(f"Completed meta-analyses for {len(results)} columns")

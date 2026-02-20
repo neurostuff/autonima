@@ -55,6 +55,11 @@ class CoordinateProcessor:
             
             # Parse the table
             result = self.client.parse_analyses(prompt, model=self.model)
+            
+            # Set the table_id for each analysis
+            for analysis in result.analyses:
+                analysis.table_id = table.table_id
+            
             return result.analyses
             
         except Exception as e:

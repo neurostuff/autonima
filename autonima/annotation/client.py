@@ -2,148 +2,544 @@
 
 import json
 import logging
-from typing import Dict, Any, Optional
-from pydantic import BaseModel
-import sys
-import os
+from typing import List, Dict, Any, Union
+from pydantic import BaseModel, Field, field_validator
 from ..llm.client import GenericLLMClient
-from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision
+from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
+from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
 
 
 class AnnotationDecisionOutput(BaseModel):
     """Output schema for annotation decision."""
-    include: bool
-    reasoning: str
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
+
+
+class MultiAnnotationDecisionOutput(BaseModel):
+    """Output schema for multiple annotation decisions."""
+    annotation_name: str = Field(..., description="Name of the annotation")
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
+
+
+class MultiAnnotationDecisionOutputList(BaseModel):
+    """Output schema for list of multiple annotation decisions."""
+    decisions: List[MultiAnnotationDecisionOutput]
+
+
+class AnalysisAnnotations(BaseModel):
+    """Annotations for a single analysis in study-level response."""
+    annotation_name: str = Field(..., description="Name of the annotation")
+    include: bool = Field(..., description="Boolean decision: true to include, false to exclude")
+    reasoning: str = Field(..., description="Brief explanation for the decision")
+    inclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of inclusion criterion IDs that apply")
+    exclusion_criteria_applied: List[str] = Field(default_factory=list, description="List of exclusion criterion IDs that apply")
+    
+    @field_validator('include', mode='before')
+    @classmethod
+    def validate_include(cls, v):
+        """Ensure include is a valid boolean, not None."""
+        if v is None:
+            raise ValueError("'include' field cannot be None - must be true or false")
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ('true', 'yes', '1'):
+                return True
+            elif v_lower in ('false', 'no', '0'):
+                return False
+            raise ValueError(f"Invalid string value for 'include': {v}")
+        return bool(v)
+
+
+class StudyAnalysisDecision(BaseModel):
+    """Decision for a single analysis in study-level response."""
+    analysis_id: str
+    annotations: List[AnalysisAnnotations]
+
+
+class StudyMultiAnnotationOutput(BaseModel):
+    """Output schema for study-level multi-annotation decisions."""
+    study_id: str
+    decisions: List[StudyAnalysisDecision]
 
 
 class AnnotationClient:
     """LLM client for making annotation decisions."""
     
-    def __init__(self):
-        """Initialize the annotation client."""
+    def __init__(self, max_retries: int = 3):
+        """Initialize the annotation client.
+        
+        Args:
+            max_retries: Maximum number of retries for malformed responses
+        """
         self._client = GenericLLMClient()
+        self.max_retries = max_retries
+    
+    def _generate_function_schema(
+        self,
+        model_class: BaseModel,
+        function_name: str
+    ) -> Dict[str, Any]:
+        """Generate OpenAI function schema from Pydantic model.
+        
+        Args:
+            model_class: Pydantic model class
+            function_name: Name for the function
+            
+        Returns:
+            Dict representing the OpenAI function schema
+        """
+        schema = model_class.model_json_schema()
+        
+        # Convert JSON schema to OpenAI function schema
+        properties = {}
+        required = []
+        
+        for field_name, field_info in schema.get("properties", {}).items():
+            properties[field_name] = {
+                "type": field_info["type"],
+                "description": field_info.get("description", "")
+            }
+            
+            # Handle enum values
+            if "enum" in field_info:
+                properties[field_name]["enum"] = field_info["enum"]
+            
+            # Handle array items
+            if field_info["type"] == "array" and "items" in field_info:
+                properties[field_name]["items"] = field_info["items"]
+            
+            # Handle numeric constraints
+            if field_info["type"] == "number":
+                if "minimum" in field_info:
+                    properties[field_name]["minimum"] = field_info["minimum"]
+                if "maximum" in field_info:
+                    properties[field_name]["maximum"] = field_info["maximum"]
+        
+        # Get required fields
+        required = schema.get("required", [])
+        
+        # Create description for the function
+        description = "Make an annotation decision for a neuroimaging analysis"
+        
+        return {
+            "name": function_name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required
+            }
+        }
     
     def make_decision(
         self,
-        metadata: AnalysisMetadata,
-        criteria: AnnotationCriteriaConfig,
-        model: str = "gpt-4o-mini"
-    ) -> AnnotationDecision:
+        metadata: Union[AnalysisMetadata, StudyAnalysisGroup],
+        criteria_list: List[AnnotationCriteriaConfig],
+        metadata_fields: List[str],
+        model: str = "gpt-4o-mini",
+        prompt_type: str = "single_analysis",
+    ) -> List[AnnotationDecision]:
         """
-        Make a decision about whether an analysis should be included in an annotation.
+        Make decisions about whether an analysis should be included in multiple annotations.
         
         Args:
-            metadata: Analysis metadata
-            criteria: Annotation criteria configuration
+            metadata: Either AnalysisMetadata (for single_analysis) or
+                     StudyAnalysisGroup (for multi_analysis)
+            criteria_list: List of annotation criteria configurations
             model: LLM model to use
+            prompt_type: Type of prompt ("single_analysis" or "multi_analysis")
+            metadata_fields: List of metadata field names to include in prompt.
             
         Returns:
-            Annotation decision with inclusion boolean and reasoning
+            List of annotation decisions
+        """
+        if not criteria_list:
+            return []
+        
+        # Retry loop to handle malformed LLM responses
+        last_exception = None
+        for attempt in range(self.max_retries):
+            try:
+                return self._make_decision_attempt(
+                    metadata, criteria_list, metadata_fields, model, prompt_type
+                )
+            except (ValueError, KeyError, TypeError) as e:
+                last_exception = e
+                error_msg = str(e)
+                
+                # Check if it's a validation error we should retry
+                if any(keyword in error_msg.lower() for keyword in [
+                    'validation error', 'field required', 'missing', 'none',
+                    'hallucinated', 'invalid analysis_id'
+                ]):
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{self.max_retries} failed with validation error: {e}"
+                    )
+                    if attempt < self.max_retries - 1:
+                        logger.info(f"Retrying LLM request...")
+                        continue
+                else:
+                    # Don't retry for other types of errors
+                    raise
+        
+        # All retries exhausted
+        logger.error(f"All {self.max_retries} attempts failed. Last error: {last_exception}")
+        raise last_exception
+    
+    def _make_decision_attempt(
+        self,
+        metadata: Union[AnalysisMetadata, StudyAnalysisGroup],
+        criteria_list: List[AnnotationCriteriaConfig],
+        metadata_fields: List[str],
+        model: str,
+        prompt_type: str,
+    ) -> List[AnnotationDecision]:
+        """
+        Single attempt at making annotation decisions.
+        
+        Args:
+            metadata: Either AnalysisMetadata (for single_analysis) or
+                     StudyAnalysisGroup (for multi_analysis)
+            criteria_list: List of annotation criteria configurations
+            metadata_fields: List of metadata field names to include in prompt
+            model: LLM model to use
+            prompt_type: Type of prompt ("single_analysis" or "multi_analysis")
+            
+        Returns:
+            List of annotation decisions
+            
+        Raises:
+            ValueError: If response validation fails
         """
         try:
-            # Create the prompt
-            from .prompts import create_annotation_prompt
-            # Get metadata_fields from the criteria or use default
-            metadata_fields = getattr(criteria, 'metadata_fields', None)
-            prompt = create_annotation_prompt(metadata, criteria, metadata_fields)
+            # Extract valid analysis_ids from metadata for validation
+            valid_analysis_ids = self._get_valid_analysis_ids(metadata)
             
-            # Get the response from the LLM
-            response_text = self.chat_completion(
+            # Select the appropriate prompt based on metadata type
+            if isinstance(metadata, StudyAnalysisGroup):
+                from .prompts import create_study_multi_annotation_prompt
+                prompt = create_study_multi_annotation_prompt(
+                    metadata, criteria_list, metadata_fields
+                )
+            else:
+                from .prompts import create_single_study_annotation_prompt
+                prompt = create_single_study_annotation_prompt(
+                    metadata, criteria_list, metadata_fields
+                )
+            
+            # Generate function schema from Pydantic model
+            DecisionModel, OutputListModel = build_dynamic_multi_annotation_models(criteria_list)
+            func_name = "make_multi_annotation_decisions"
+            function_schema = self._generate_function_schema(
+                OutputListModel,
+                func_name
+            )
+            
+            # Call the LLM API with function calling
+            response = self._client.client.chat.completions.create(
+                model=model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a neuroimaging meta-analysis expert."
+                        "content": (
+                            "You are a neuroimaging meta-analysis expert. "
+                            "Respond using the make_multi_annotation_decisions function."
+                        )
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                model=model,
-                response_format={"type": "json_object"}
+                functions=[function_schema],
+                function_call={"name": func_name}
             )
             
-            # Parse the response
-            try:
-                response_data = json.loads(response_text)
-                decision_output = AnnotationDecisionOutput(**response_data)
-            except Exception as e:
-                logger.warning(f"Failed to parse JSON response: {e}. Response: {response}")
-                # Try to extract the information manually
-                decision_output = self._parse_response_manually(response)
+            # Extract the function call result
+            function_call = response.choices[0].message.function_call
+            if not function_call:
+                raise ValueError("No function call returned from API")
             
-            # Create the annotation decision
-            decision = AnnotationDecision(
-                annotation_name=criteria.name,
-                analysis_id=metadata.analysis_id,
-                study_id=metadata.study_id,
-                include=decision_output.include,
-                reasoning=decision_output.reasoning,
-                model_used=model
-            )
+            # Parse the result
+            result_dict = json.loads(function_call.arguments)
             
-            return decision
+            # Validate the response structure before parsing
+            self._validate_response_structure(result_dict, prompt_type, metadata)
+            
+            # Validate that all 'include' fields are present and boolean
+            self._validate_include_fields(result_dict, prompt_type)
+            
+            # Validate that analysis_ids in response match input metadata (prevents hallucination)
+            self._validate_analysis_ids(result_dict, valid_analysis_ids, prompt_type)
+            
+            # Handle different response formats
+            decisions = []
+            if prompt_type == "multi_analysis":
+                # Inject study_id from metadata if not in response
+                if 'study_id' not in result_dict and isinstance(metadata, StudyAnalysisGroup):
+                    result_dict['study_id'] = metadata.study_id
+                
+                # Parse study-level response
+                study_output = StudyMultiAnnotationOutput(**result_dict)
+                for analysis_decision in study_output.decisions:
+                    for annotation_output in analysis_decision.annotations:
+                        decision = AnnotationDecision(
+                            annotation_name=annotation_output.annotation_name,
+                            analysis_id=analysis_decision.analysis_id,
+                            study_id=study_output.study_id,
+                            include=annotation_output.include,
+                            reasoning=annotation_output.reasoning,
+                            model_used=model,
+                            inclusion_criteria_applied=annotation_output.inclusion_criteria_applied,
+                            exclusion_criteria_applied=annotation_output.exclusion_criteria_applied
+                        )
+                        decisions.append(decision)
+            else:
+                # Parse table-level response
+                decision_list_output = MultiAnnotationDecisionOutputList(
+                    **result_dict
+                )
+                decision_outputs = decision_list_output.decisions
+
+                for i, decision_output in enumerate(decision_outputs):
+                    if i < len(criteria_list):
+                        criteria = criteria_list[i]
+                        decision = AnnotationDecision(
+                            annotation_name=decision_output.annotation_name or criteria.name,
+                            analysis_id=metadata.analysis_id,
+                            study_id=metadata.study_id,
+                            include=decision_output.include,
+                            reasoning=decision_output.reasoning,
+                            model_used=model,
+                            inclusion_criteria_applied=decision_output.inclusion_criteria_applied,
+                            exclusion_criteria_applied=decision_output.exclusion_criteria_applied
+                        )
+                        decisions.append(decision)
+            
+            return decisions
             
         except Exception as e:
-            logger.error(f"Error making annotation decision: {e}")
-            # Return a default decision (exclude) in case of error
-            return AnnotationDecision(
-                annotation_name=criteria.name,
-                analysis_id=metadata.analysis_id,
-                study_id=metadata.study_id,
-                include=False,
-                reasoning=f"Error in decision making: {str(e)}",
-                model_used=model
-            )
+            logger.debug(f"Error in decision attempt: {e}")
+            logger.debug(f"Prompt used: {prompt[:500]}...")
+            if 'result_dict' in locals():
+                logger.debug(f"Response received: {json.dumps(result_dict, indent=2)[:1000]}")
+            raise
     
-    def _parse_response_manually(self, response: str) -> AnnotationDecisionOutput:
+    def _validate_response_structure(
+        self,
+        result_dict: Dict[str, Any],
+        prompt_type: str,
+        metadata: Union[AnalysisMetadata, StudyAnalysisGroup]
+    ) -> None:
         """
-        Attempt to parse the response manually if JSON parsing fails.
+        Validate the structure of the LLM response before parsing.
         
         Args:
-            response: Raw response string from the LLM
+            result_dict: The parsed response dictionary
+            prompt_type: Type of prompt used
+            metadata: Metadata object to get expected structure
+            
+        Raises:
+            ValueError: If response structure is invalid
+        """
+        if prompt_type == "multi_analysis":
+            # Validate study-level response structure
+            if 'decisions' not in result_dict:
+                raise ValueError(
+                    "Missing 'decisions' field in study-level response. "
+                    f"Response keys: {list(result_dict.keys())}"
+                )
+            
+            if not isinstance(result_dict['decisions'], list):
+                raise ValueError(
+                    f"'decisions' field must be a list, got {type(result_dict['decisions'])}"
+                )
+            
+            # Check each decision has required fields
+            for i, decision in enumerate(result_dict['decisions']):
+                if not isinstance(decision, dict):
+                    raise ValueError(
+                        f"decisions[{i}] must be a dict, got {type(decision)}"
+                    )
+                
+                # Check for analysis_id field
+                if 'analysis_id' not in decision:
+                    raise ValueError(
+                        f"Missing 'analysis_id' field in decisions[{i}]. "
+                        f"Available keys: {list(decision.keys())}"
+                    )
+                
+                # Check for annotations field
+                if 'annotations' not in decision:
+                    raise ValueError(
+                        f"Missing 'annotations' field in decisions[{i}]. "
+                        f"Available keys: {list(decision.keys())}"
+                    )
+                
+                if not isinstance(decision['annotations'], list):
+                    raise ValueError(
+                        f"decisions[{i}].annotations must be a list, "
+                        f"got {type(decision['annotations'])}"
+                    )
+        else:
+            # Validate single-analysis response structure
+            if 'decisions' not in result_dict:
+                raise ValueError(
+                    "Missing 'decisions' field in response. "
+                    f"Response keys: {list(result_dict.keys())}"
+                )
+            
+            if not isinstance(result_dict['decisions'], list):
+                raise ValueError(
+                    f"'decisions' field must be a list, got {type(result_dict['decisions'])}"
+                )
+    
+    def _validate_include_fields(self, result_dict: Dict[str, Any], prompt_type: str) -> None:
+        """
+        Validate that all 'include' fields in the response are present and boolean.
+        
+        Args:
+            result_dict: The parsed response dictionary
+            prompt_type: Type of prompt used
+            
+        Raises:
+            ValueError: If any 'include' field is None or invalid
+        """
+        if prompt_type == "multi_analysis":
+            # Validate study-level response
+            if 'decisions' in result_dict:
+                for i, analysis_decision in enumerate(result_dict['decisions']):
+                    if 'annotations' in analysis_decision:
+                        for j, annotation in enumerate(analysis_decision['annotations']):
+                            if 'include' not in annotation or annotation['include'] is None:
+                                raise ValueError(
+                                    f"Missing or None 'include' field in decisions[{i}].annotations[{j}]. "
+                                    f"The LLM must provide a boolean value (true/false) for every annotation."
+                                )
+        else:
+            # Validate single-analysis response
+            if 'decisions' in result_dict:
+                for i, decision in enumerate(result_dict['decisions']):
+                    if 'include' not in decision or decision['include'] is None:
+                        raise ValueError(
+                            f"Missing or None 'include' field in decisions[{i}]. "
+                            f"The LLM must provide a boolean value (true/false) for every annotation."
+                        )
+    
+    def _get_valid_analysis_ids(
+        self,
+        metadata: Union[AnalysisMetadata, StudyAnalysisGroup]
+    ) -> set:
+        """
+        Extract the set of valid analysis_ids from input metadata.
+        
+        Args:
+            metadata: Either AnalysisMetadata (single) or StudyAnalysisGroup (multiple)
             
         Returns:
-            Annotation decision output
+            Set of valid analysis_id strings
         """
-        # Default to excluding if we can't parse
-        include = False
-        reasoning = "Failed to parse response"
+        if isinstance(metadata, StudyAnalysisGroup):
+            return {analysis.analysis_id for analysis in metadata.analyses}
+        else:
+            # Single analysis metadata
+            return {metadata.analysis_id}
+
+    def _validate_analysis_ids(
+        self,
+        result_dict: Dict[str, Any],
+        valid_analysis_ids: set,
+        prompt_type: str
+    ) -> None:
+        """
+        Validate that all analysis_ids in the response exist in input metadata.
         
-        # Simple heuristics to extract information
-        response_lower = response.lower()
+        This prevents the LLM from hallucinating analysis_ids that don't correspond
+        to actual analyses in the study.
         
-        # Look for inclusion indicators
-        if '"include": true' in response_lower or '"include":true' in response_lower:
-            include = True
-        elif '"include": false' in response_lower or '"include":false' in response_lower:
-            include = False
+        Args:
+            result_dict: The parsed response dictionary
+            valid_analysis_ids: Set of valid analysis_ids from input metadata
+            prompt_type: Type of prompt used ("single_analysis" or "multi_analysis")
             
-        # Try to extract reasoning
-        if '"reasoning":' in response:
-            try:
-                # Find the reasoning part
-                start = response.find('"reasoning":') + len('"reasoning":')
-                if response[start] == '"':
-                    start += 1
-                    end = response.find('"', start)
-                    reasoning = response[start:end]
-                else:
-                    # Handle non-string reasoning (shouldn't happen with our prompt)
-                    end = response.find('}', start)
-                    if end == -1:
-                        end = len(response)
-                    reasoning = response[start:end].strip()
-                    # Remove trailing comma if present
-                    if reasoning.endswith(','):
-                        reasoning = reasoning[:-1]
-            except Exception:
-                pass
-                
-        return AnnotationDecisionOutput(include=include, reasoning=reasoning)
-    
+        Raises:
+            ValueError: If any analysis_id is hallucinated (not in valid set)
+        """
+        if prompt_type == "multi_analysis":
+            # Extract all analysis_ids from the response
+            returned_ids = set()
+            if 'decisions' in result_dict:
+                for decision in result_dict['decisions']:
+                    if isinstance(decision, dict) and 'analysis_id' in decision:
+                        # Strip whitespace to handle minor formatting issues
+                        analysis_id = str(decision['analysis_id']).strip()
+                        returned_ids.add(analysis_id)
+            
+            # Check for hallucinated IDs (in response but not in valid set)
+            hallucinated = returned_ids - valid_analysis_ids
+            
+            if hallucinated:
+                logger.warning(
+                    f"LLM hallucinated analysis_id(s): {sorted(hallucinated)}. "
+                    f"Valid IDs: {sorted(valid_analysis_ids)}. "
+                    f"Returned IDs: {sorted(returned_ids)}"
+                )
+                raise ValueError(
+                    f"LLM hallucinated analysis_id(s) that don't exist in input metadata: {sorted(hallucinated)}. "
+                    f"Valid IDs were: {sorted(valid_analysis_ids)}. "
+                    f"LLM returned: {sorted(returned_ids)}"
+                )
+            
+            logger.debug(
+                f"Analysis ID validation passed. All {len(returned_ids)} returned IDs are valid."
+            )
+        else:
+            # For single_analysis mode, validation is less critical since we inject the ID
+            # But we can still check if present in the response
+            if 'decisions' in result_dict:
+                for decision in result_dict['decisions']:
+                    if isinstance(decision, dict):
+                        # In single_analysis mode, the analysis_id is typically not in the decision
+                        # It gets injected later, so we don't need to validate here
+                        pass
+
     def chat_completion(self, messages, model, response_format=None):
         """
         Get a chat completion from the LLM.
@@ -165,5 +561,5 @@ class AnnotationClient:
             )
             return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Error in chat completion: {e}")
+            log_error_with_debug(logger, f"Error in chat completion: {e}")
             raise

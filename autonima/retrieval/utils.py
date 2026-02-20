@@ -18,13 +18,12 @@ except ImportError:
                      "Note: Node.js is also required for readabilipy to work.")
 
 
-def _load_full_text(study: Study, text_path: str = None, output_dir: str = None) -> Optional[str]:
+def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
     """
     Load the full text content for a study from a CSV file or a direct text file.
     
     Args:
         study: The study object containing the pmcid
-        text_path: Path to the text.csv file (deprecated, use output_dir instead)
         output_dir: Output directory where pubget data is stored
         
     Returns:
@@ -49,15 +48,13 @@ def _load_full_text(study: Study, text_path: str = None, output_dir: str = None)
                 else:
                     raise ValueError(f"Unsupported file format: {full_text_file.suffix}")
         
-        # Determine the text file path for CSV-based loading
-        if text_path:
-            text_file = Path(text_path)
-        elif output_dir:
-            # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
-            text_file = Path(output_dir) / "retrieval" / "pubget_data" / "text.csv"
-        else:
-            raise ValueError("Either text_path or output_dir must be provided")
-        
+        # If output_dir is not provided, cannot proceed
+        if not output_dir:
+            raise ValueError("output_dir must be provided if full_text_path is not set")
+
+        # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
+        text_file = Path(output_dir) / "pubget_data" / "text.csv"
+
         # Check if the text file exists
         if not text_file.exists():
             raise FileNotFoundError(f"Text file not found at {text_file}")
@@ -197,7 +194,7 @@ def _map_pmids_to_text(
         processed_data_path = Path(processed_data_path)
 
     analyses, tables = load_activation_table_map(
-        data_dir=processed_data_path,
+        processed_data_path=processed_data_path,
         processed_coordinate_paths=processed_coordinate_paths,
         ids_to_include=pmids_to_include,
         filter_by_coordinates=True,
@@ -397,7 +394,8 @@ def _load_analyses_from_coordinates_df(
             'name': str(table_id),
             'description': str(first_row['table_label']) if pd.notna(first_row['table_label']) else None,
             'points': points,
-            'parsed': False  # IMPORTANT: Set to False as requested
+            'parsed': False,  # IMPORTANT: Set to False as requested
+            'table_id': str(table_id)
         }
 
         id_to_analyses.setdefault(identifier, []).append(analysis_metadata)
@@ -406,7 +404,7 @@ def _load_analyses_from_coordinates_df(
 
 
 def load_activation_table_map(
-    processed_data_dir: Path,
+    processed_data_path: Path,
     processed_coordinate_paths: Optional[Dict[int, Path]] = None,
     ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
@@ -430,8 +428,8 @@ def load_activation_table_map(
     Returns:
         Tuple of (analyses_dict, tables_dict)
     """
-    if processed_data_dir is not None:
-        coords_file = processed_data_dir / "coordinates.csv"
+    if processed_data_path is not None:
+        coords_file = processed_data_path / "coordinates.csv"
         coords_df = pd.read_csv(coords_file) if coords_file.exists() else None
 
         # Load Analyses from coordinates
@@ -444,10 +442,10 @@ def load_activation_table_map(
         else:
             analyses = None
 
-        tables_file = processed_data_dir / "tables.csv"
+        tables_file = processed_data_path / "tables.csv"
 
         if not tables_file.exists():
-            logging.info(f"No tables.csv in {processed_data_dir}, skipping...")
+            logging.info(f"No tables.csv in {processed_data_path}, skipping...")
             return analyses, {}
 
         try:
@@ -462,7 +460,7 @@ def load_activation_table_map(
 
             tables = _load_activation_table_metadata(
                 df=df,
-                root_path=processed_data_dir,
+                root_path=processed_data_path,
                 ids_to_include=ids_to_include,
                 identifier_key=identifier_key,
             )
@@ -502,11 +500,13 @@ def load_activation_table_map(
                             })
                         
                         # Create analysis metadata
+                        metadata = analysis.get('metadata', {})
                         analysis_metadata = {
                             'name': analysis.get('name', ''),
-                            'description': analysis.get('metadata', {}).get('table_label'),
+                            'description': metadata.get('table_label'),
                             'points': points,
-                            'parsed': False
+                            'parsed': False,
+                            'table_id': metadata.get('table_id', '')
                         }
                         
                         # Add to analyses dict
@@ -534,7 +534,6 @@ def load_activation_table_map(
             except Exception as e:
                 logging.warning(f"Failed to load coordinates from {coord_file_path}: {e}")
                 continue
-        
         return analyses, tables
 
     return None, {}
@@ -587,6 +586,7 @@ def _apply_activation_tables_to_studies(
                     table_raw_path=t.get('table_raw_path', None),
                     table_caption=t['table_caption'],
                     table_foot=t['table_foot'],
+                    raw_table=t.get('raw_table', None)
                 )
             )
 
@@ -659,5 +659,6 @@ def _apply_analyses_to_studies(
                 name=analysis_data.get('name'),
                 description=analysis_data.get('description'),
                 points=points,
-                parsed=analysis_data.get('parsed', False)
+                parsed=analysis_data.get('parsed', False),
+                table_id=analysis_data.get('table_id')
             ))

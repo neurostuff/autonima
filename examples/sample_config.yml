@@ -99,6 +99,9 @@ output:
 annotation:
   enabled: true
   model: "gpt-4o-mini"
+  # Prompt type for annotation processing
+  # Options: "single_analysis" (per-analysis, multiple annotations) or "multi_analysis" (all analyses in study together)
+  prompt_type: "single_analysis"
   # Create an "all_analyses" annotation with all analyses from INCLUDED studies
   create_all_included_annotation: true
   # Create an "all_studies" annotation with ALL analyses from original search
@@ -111,6 +114,7 @@ annotation:
   #   - "table_caption"
   #   - "study_title"
   #   - "study_abstract"
+  #   - "study_fulltext"   # Add this to include full text in prompts
   # Define global inclusion/exclusion criteria (merged with annotation-specific criteria)
   # inclusion_criteria:
   #   - "Studies must be in English"

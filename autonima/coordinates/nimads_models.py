@@ -190,7 +190,7 @@ def convert_to_nimads_analysis(analysis_id: str, analysis: Analysis, study_id: s
     """Convert an analysis to a NiMADS analysis."""
     nimads_analysis = NimadsAnalysis(
         id=analysis_id,
-        name=analysis.name,
+        name=sanitize_analysis_name(analysis.name),
         description=analysis.description,
         study_id=study_id
     )
@@ -425,3 +425,90 @@ def sanitize_coordinates(coordinates: List[float]) -> List[int]:
     """
     # Convert float coordinates to integers
     return [int(round(coord)) for coord in coordinates]
+
+
+def sanitize_analysis_name(name: Optional[str]) -> Optional[str]:
+    """
+    Sanitize analysis names to avoid issues with special characters.
+    
+    This removes ALL single and double quotes from analysis names, not just
+    those at the edges, since quotes anywhere in the name can cause issues
+    with NiMARE.
+    
+    Args:
+        name: The original analysis name
+        
+    Returns:
+        Sanitized analysis name with problematic characters removed/replaced
+    """
+    if name is None:
+        return None
+    
+    # Remove ALL single quotes (they cause issues in NiMARE)
+    sanitized = name.replace("'", "")
+    
+    # Remove ALL double quotes
+    sanitized = sanitized.replace('"', '')
+    
+    # Remove leading/trailing whitespace
+    sanitized = sanitized.strip()
+    
+    # Return None if the name becomes empty after sanitization
+    return sanitized if sanitized else None
+
+
+def sanitize_studyset_dict(studyset_dict: dict) -> dict:
+    """
+    Sanitize all analysis names and IDs in a studyset dictionary before output.
+    
+    This ensures that even cached or loaded data has clean analysis names and IDs.
+    Both the 'name' and 'id' fields are sanitized, and any points referencing
+    these analyses also have their analysis_id fields updated.
+    
+    Args:
+        studyset_dict: The studyset dictionary from to_dict()
+        
+    Returns:
+        The sanitized studyset dictionary
+    """
+    if 'studies' in studyset_dict:
+        for study in studyset_dict['studies']:
+            if 'analyses' in study:
+                for analysis in study['analyses']:
+                    # Sanitize analysis name
+                    if 'name' in analysis and analysis['name']:
+                        analysis['name'] = sanitize_analysis_name(analysis['name'])
+                    
+                    # Sanitize analysis ID (which may contain quotes from the original name)
+                    if 'id' in analysis and analysis['id']:
+                        old_id = analysis['id']
+                        new_id = sanitize_analysis_name(analysis['id'])
+                        analysis['id'] = new_id
+                        
+                        # Update all point analysis_id references
+                        if 'points' in analysis:
+                            for point in analysis['points']:
+                                if 'analysis_id' in point and point['analysis_id'] == old_id:
+                                    point['analysis_id'] = new_id
+    return studyset_dict
+
+
+def sanitize_annotation_dict(annotation_dict: dict) -> dict:
+    """
+    Sanitize annotation dictionary to ensure consistency with studyset.
+    
+    This sanitizes the 'analysis' field in each note, which contains
+    analysis IDs that may have quotes from the original analysis names.
+    
+    Args:
+        annotation_dict: The annotation dictionary from to_dict()
+        
+    Returns:
+        The sanitized annotation dictionary
+    """
+    if 'notes' in annotation_dict:
+        for note in annotation_dict['notes']:
+            if 'analysis' in note and note['analysis']:
+                # Sanitize the analysis ID (which may contain quotes from the name)
+                note['analysis'] = sanitize_analysis_name(note['analysis'])
+    return annotation_dict

@@ -88,7 +88,7 @@ Autonima enables end-to-end automation of systematic review steps:
 
 3. **Full-Text Retrieval**
 
-   * Downloads full texts of candidate papers via a combination of **PubGet** and **ACE**.
+   * Downloads full texts of candidate papers via a combination of **PubGet**
 
 4. **Eligibility & Inclusion**
 

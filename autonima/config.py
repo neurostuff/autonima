@@ -1,5 +1,6 @@
 """Configuration management and validation for Autonima."""
 
+import logging
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
@@ -13,6 +14,8 @@ from .models.types import (
     OutputConfig
 )
 from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationError(Exception):
@@ -203,11 +206,12 @@ class ConfigManager:
             raise ConfigurationError("Output directory cannot be empty")
         
         # config.retrieval.coordinates_path_templates is mutually exclusive with processed_data_path for each source
-        for source in config.retrieval.sources:
-            if source.coordinates_path_templates and source.processed_data_path:
-                raise ConfigurationError(
-                    "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
-                )
+        for source in config.retrieval.full_text_sources:
+            if hasattr(source, 'coordinates_path_templates') and hasattr(source, 'processed_data_path'):
+                if source.coordinates_path_templates and source.processed_data_path:
+                    raise ConfigurationError(
+                        "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
+                    )
 
     def get_config(self) -> PipelineConfig:
         """Get the currently loaded configuration."""
@@ -294,39 +298,62 @@ class ConfigManager:
         Raises:
             ConfigurationError: If screening configuration is invalid
         """
-        # Validate that at least one screening stage has an objective
+        # Get screening configuration
         abstract_objective = config.screening.abstract.get('objective')
         fulltext_objective = config.screening.fulltext.get('objective')
-        
-        if not abstract_objective and not fulltext_objective:
-            raise ConfigurationError(
-                "At least one screening stage must have an objective"
-            )
-        
-        # Validate that at least one screening stage has inclusion criteria
         abstract_inclusion = config.screening.abstract.get('inclusion_criteria')
         fulltext_inclusion = config.screening.fulltext.get('inclusion_criteria')
+        abstract_skip = config.screening.abstract.get('skip_stage', False)
+        fulltext_skip = config.screening.fulltext.get('skip_stage', False)
         
-        if not abstract_inclusion and not fulltext_inclusion:
-            raise ConfigurationError(
-                "At least one screening stage must have inclusion criteria"
-            )
-        
-        # Validate abstract screening if it has an objective
-        if abstract_objective:
+        # Validate abstract screening
+        if abstract_skip:
+            # If skip_stage is True, objective should not be set
+            if abstract_objective:
+                logger.warning(
+                    "Abstract screening has skip_stage=True but also has an objective. "
+                    "The stage will be skipped and the objective will be ignored."
+                )
+        else:
+            # If skip_stage is False (or not set), objective is required
+            if not abstract_objective:
+                raise ConfigurationError(
+                    "Abstract screening must have an 'objective' or set 'skip_stage: true'"
+                )
+            # If objective is set, inclusion criteria are required
             if not abstract_inclusion:
                 raise ConfigurationError(
                     "Abstract screening must have inclusion criteria when "
                     "objective is specified"
                 )
         
-        # Validate fulltext screening if it has an objective
-        if fulltext_objective:
+        # Validate fulltext screening
+        if fulltext_skip:
+            # If skip_stage is True, objective should not be set
+            if fulltext_objective:
+                logger.warning(
+                    "Fulltext screening has skip_stage=True but also has an objective. "
+                    "The stage will be skipped and the objective will be ignored."
+                )
+        else:
+            # If skip_stage is False (or not set), objective is required
+            if not fulltext_objective:
+                raise ConfigurationError(
+                    "Fulltext screening must have an 'objective' or set 'skip_stage: true'"
+                )
+            # If objective is set, inclusion criteria are required
             if not fulltext_inclusion:
                 raise ConfigurationError(
                     "Fulltext screening must have inclusion criteria when "
                     "objective is specified"
                 )
+        
+        # Log a warning if both screening stages are skipped
+        if abstract_skip and fulltext_skip:
+            logger.warning(
+                "Both abstract and fulltext screening stages are skipped. "
+                "All studies from the search stage will pass to the next pipeline stage."
+            )
 
     def _load_annotation_config(
         self, annotation_dict: Dict[str, Any]
@@ -373,6 +400,7 @@ class ConfigManager:
                 create_all_from_search_annotation=create_all_from_search,
                 annotations=annotations,
                 enabled=annotation_dict.get('enabled', True),
+                prompt_type=annotation_dict.get('prompt_type', 'single_analysis'),
                 metadata_fields=annotation_dict.get('metadata_fields', [
                     "analysis_name",
                     "analysis_description",

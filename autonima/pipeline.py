@@ -92,6 +92,7 @@ class AutonimaPipeline:
         # Save criteria mapping early in pipeline
         from .utils.criteria import save_criteria_mapping
         save_criteria_mapping(self.config, self.config.output.directory)
+
     async def run(self) -> PipelineResult:
         """
         Execute the complete systematic review pipeline.
@@ -175,6 +176,16 @@ class AutonimaPipeline:
 
     async def _execute_abstract_screening(self):
         """Execute abstract screening phase."""
+
+        # Check if abstract screening should be skipped
+        abstract_skip = self.config.screening.abstract.get('skip_stage', False)
+        if abstract_skip:
+            logger.info("Abstract screening skipped (skip_stage=True)")
+            # Mark all pending studies as included to pass to next stage
+            for study in self.results.studies:
+                if study.status == StudyStatus.PENDING:
+                    study.status = StudyStatus.INCLUDED_ABSTRACT
+            return
 
         # Get studies that need screening
         pending_studies = [
@@ -311,13 +322,19 @@ class AutonimaPipeline:
                         identifier_key="pmid",
                         identifier_type="str"
                     )
-
-                studies_from_user_sources += studies_from_source
-            
-            logger.info(
-                f"Found {len(studies_from_user_sources)} studies in user-provided "
-                "full text sources"
-            )
+    
+                    studies_from_user_sources += studies_from_source
+                
+                # Set full_text_output_dir for studies from user-provided sources
+                # This must be set so they can load full text during screening
+                output_dir = Path(self.config.output.directory)
+                for study in studies_from_user_sources:
+                    study.full_text_output_dir = str(output_dir)
+                
+                logger.info(
+                    f"Found {len(studies_from_user_sources)} studies in user-provided "
+                    "full text sources"
+                )
              
         except Exception as e:
             log_error_with_debug(logger, 
@@ -414,6 +431,16 @@ class AutonimaPipeline:
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""
+
+        # Check if fulltext screening should be skipped
+        fulltext_skip = self.config.screening.fulltext.get('skip_stage', False)
+        if fulltext_skip:
+            logger.info("Full-text screening skipped (skip_stage=True)")
+            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next stage
+            for study in self.results.studies:
+                if study.status == StudyStatus.INCLUDED_ABSTRACT:
+                    study.status = StudyStatus.INCLUDED_FULLTEXT
+            return
 
         # Get studies with full text that need screening
         screenable_studies = [
@@ -596,9 +623,47 @@ class AutonimaPipeline:
         if not included_studies and not all_studies:
             logger.info("No studies with parsed analyses found for annotation")
             return
+                
+        # Load criteria mapping and inject it into annotation config
+        from .utils.criteria import load_criteria_mapping
+        criteria_mapping = load_criteria_mapping(self.config.output.directory)
         
-        # Initialize the annotation processor
-        processor = AnnotationProcessor(self.config.annotation)
+        # Create a copy of the annotation config with criteria mapping injected
+        from copy import deepcopy
+        annotation_config = deepcopy(self.config.annotation)
+        
+        # Inject criteria mapping into global annotation criteria
+        if criteria_mapping and "annotation" in criteria_mapping:
+            annotation_data = criteria_mapping["annotation"]
+            
+            # Inject global criteria mapping
+            if "global" in annotation_data:
+                global_mapping = annotation_data["global"]
+                # Update the annotation config's global criteria with mapping
+                has_inclusion = (
+                    hasattr(annotation_config, 'inclusion_criteria') and
+                    annotation_config.inclusion_criteria
+                )
+                if has_inclusion:
+                    # Create a criteria mapping for global criteria
+                    annotation_config.inclusion_criteria = list(
+                        global_mapping.get("inclusion", {}).values()
+                    )
+                    annotation_config.exclusion_criteria = list(
+                        global_mapping.get("exclusion", {}).values()
+                    )
+            
+            # Inject per-annotation criteria mapping
+            if "annotations" in annotation_data:
+                annotations_mapping = annotation_data["annotations"]
+                for annotation in annotation_config.annotations:
+                    if annotation.name in annotations_mapping:
+                        mapping = annotations_mapping[annotation.name]
+                        # Update the annotation's criteria mapping
+                        annotation.criteria_mapping = mapping
+        
+        # Initialize the annotation processor with updated config and num_workers
+        processor = AnnotationProcessor(annotation_config, num_workers=self.num_workers)
         
         # Process studies
         annotation_results = processor.process_studies(
@@ -656,7 +721,8 @@ class AutonimaPipeline:
                                 name=analysis_data.get('name'),
                                 description=analysis_data.get('description'),
                                 points=points,
-                                parsed=analysis_data.get('parsed', True)
+                                parsed=analysis_data.get('parsed', True),
+                                table_id=analysis_data.get('table_id')
                             ))
                         loaded_count += 1
             
@@ -686,6 +752,7 @@ class AutonimaPipeline:
                             {
                                 "name": analysis.name,
                                 "description": analysis.description,
+                                "table_id": analysis.table_id,
                                 "points": [
                                     {
                                         "coordinates": point.coordinates,
@@ -816,7 +883,9 @@ class AutonimaPipeline:
             from .coordinates.nimads_models import (
                 convert_to_nimads_studyset,
                 create_default_annotation,
-                create_annotations_from_results
+                create_annotations_from_results,
+                sanitize_studyset_dict,
+                sanitize_annotation_dict
             )
             
             # Create a studyset from the studies
@@ -828,10 +897,12 @@ class AutonimaPipeline:
             )
             
             # Save NiMADS studyset output using the to_dict method
+            # Apply sanitization to ensure analysis names are clean
             output_dir = Path(self.config.output.directory)
             nimads_output_file = output_dir / "outputs" / "nimads_studyset.json"
+            studyset_dict = sanitize_studyset_dict(studyset.to_dict())
             with open(nimads_output_file, 'w') as f:
-                json.dump(studyset.to_dict(), f, indent=2)
+                json.dump(studyset_dict, f, indent=2)
             
             # Create annotations based on annotation results
             # First, try to load annotation results from the annotation processor
@@ -852,7 +923,7 @@ class AutonimaPipeline:
                     )
                     
                     # Save all annotations to a single file
-                    annotations_data = annotations.to_dict()
+                    annotations_data = sanitize_annotation_dict(annotations.to_dict())
                     nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
                     with open(nimads_annotations_file, 'w') as f:
                         json.dump(annotations_data, f, indent=2)
@@ -860,15 +931,17 @@ class AutonimaPipeline:
                     # Create a default annotation if no results are available
                     annotation = create_default_annotation(studyset_id, studyset)
                     nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
+                    annotation_dict = sanitize_annotation_dict(annotation.to_dict())
                     with open(nimads_annotations_file, 'w') as f:
-                        json.dump([annotation.to_dict()], f, indent=2)
+                        json.dump([annotation_dict], f, indent=2)
             except Exception as annotation_error:
                 logger.warning(f"Failed to create annotations from results: {annotation_error}")
                 # Create a default annotation as fallback
                 annotation = create_default_annotation(studyset_id, studyset)
                 nimads_annotations_file = output_dir / "outputs" / "nimads_annotation.json"
+                annotation_dict = sanitize_annotation_dict(annotation.to_dict())
                 with open(nimads_annotations_file, 'w') as f:
-                    json.dump([annotation.to_dict()], f, indent=2)
+                    json.dump([annotation_dict], f, indent=2)
             
             logger.info(
                 f"NiMADS output generated: {len(studies_with_analyses)} studies "

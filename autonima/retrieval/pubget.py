@@ -371,6 +371,12 @@ class PubGetRetriever(BaseRetriever):
             List of studies with updated status
         """
         data_dir = Path(output_dir) / "pubget_data"
+        
+        # Set full_text_output_dir for all studies so they can load full text
+        # This must be done here (in retrieval phase) rather than in screening
+        # because cached screening results also need access to full text
+        for study in studies:
+            study.full_text_output_dir = str(output_dir)
         if not data_dir.exists():
             logger.warning("PubGet data directory not found")
             return studies
@@ -385,7 +391,7 @@ class PubGetRetriever(BaseRetriever):
         retrieved_pmcid = set(df['pmcid'].dropna().astype(int).tolist())
         
         pmcid_to_analyses, pmcid_to_tables = load_activation_table_map(
-            data_dir=data_dir,
+            processed_data_path=data_dir,
             filter_by_coordinates=True,
             identifier_key="pmcid",
         )
