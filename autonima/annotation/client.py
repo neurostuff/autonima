@@ -3,7 +3,7 @@
 import json
 import logging
 from typing import List, Dict, Any, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
 from ..utils import log_error_with_debug
@@ -127,45 +127,13 @@ class AnnotationClient:
         """
         schema = model_class.model_json_schema()
         
-        # Convert JSON schema to OpenAI function schema
-        properties = {}
-        required = []
-        
-        for field_name, field_info in schema.get("properties", {}).items():
-            properties[field_name] = {
-                "type": field_info["type"],
-                "description": field_info.get("description", "")
-            }
-            
-            # Handle enum values
-            if "enum" in field_info:
-                properties[field_name]["enum"] = field_info["enum"]
-            
-            # Handle array items
-            if field_info["type"] == "array" and "items" in field_info:
-                properties[field_name]["items"] = field_info["items"]
-            
-            # Handle numeric constraints
-            if field_info["type"] == "number":
-                if "minimum" in field_info:
-                    properties[field_name]["minimum"] = field_info["minimum"]
-                if "maximum" in field_info:
-                    properties[field_name]["maximum"] = field_info["maximum"]
-        
-        # Get required fields
-        required = schema.get("required", [])
-        
         # Create description for the function
         description = "Make an annotation decision for a neuroimaging analysis"
         
         return {
             "name": function_name,
             "description": description,
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required
-            }
+            "parameters": schema,
         }
     
     def make_decision(
@@ -264,11 +232,42 @@ class AnnotationClient:
                     metadata, criteria_list, metadata_fields
                 )
             
-            # Generate function schema from Pydantic model
+            # Generate function schema from dynamic Pydantic models
             DecisionModel, OutputListModel = build_dynamic_multi_annotation_models(criteria_list)
+            FunctionModel = OutputListModel
+            if prompt_type == "multi_analysis":
+                allowed_annotation_names = [c.name for c in criteria_list]
+
+                class StudyAnalysisDecisionDynamic(BaseModel):
+                    analysis_id: str
+                    annotations: List[DecisionModel]
+
+                    @model_validator(mode="after")
+                    def validate_annotation_coverage(self):
+                        names = [a.annotation_name for a in self.annotations]
+                        if len(set(names)) != len(names):
+                            raise ValueError(
+                                f"Duplicate annotation_name values found in analysis {self.analysis_id}: {names}"
+                            )
+                        missing = [
+                            name for name in allowed_annotation_names
+                            if name not in set(names)
+                        ]
+                        if missing:
+                            raise ValueError(
+                                f"Missing annotation decisions for analysis {self.analysis_id}: {missing}"
+                            )
+                        return self
+
+                class StudyMultiAnnotationOutputDynamic(BaseModel):
+                    study_id: str
+                    decisions: List[StudyAnalysisDecisionDynamic]
+
+                FunctionModel = StudyMultiAnnotationOutputDynamic
+
             func_name = "make_multi_annotation_decisions"
             function_schema = self._generate_function_schema(
-                OutputListModel,
+                FunctionModel,
                 func_name
             )
             
@@ -316,8 +315,8 @@ class AnnotationClient:
                 if 'study_id' not in result_dict and isinstance(metadata, StudyAnalysisGroup):
                     result_dict['study_id'] = metadata.study_id
                 
-                # Parse study-level response
-                study_output = StudyMultiAnnotationOutput(**result_dict)
+                # Parse study-level response with strict dynamic validation.
+                study_output = FunctionModel(**result_dict)
                 for analysis_decision in study_output.decisions:
                     for annotation_output in analysis_decision.annotations:
                         decision = AnnotationDecision(
@@ -332,10 +331,8 @@ class AnnotationClient:
                         )
                         decisions.append(decision)
             else:
-                # Parse table-level response
-                decision_list_output = MultiAnnotationDecisionOutputList(
-                    **result_dict
-                )
+                # Parse single-analysis response with strict dynamic validation.
+                decision_list_output = OutputListModel(**result_dict)
                 decision_outputs = decision_list_output.decisions
 
                 for i, decision_output in enumerate(decision_outputs):

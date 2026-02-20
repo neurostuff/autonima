@@ -110,7 +110,7 @@ class StudyAnalysisGroup(BaseModel):
 
 # ---------- helpers ----------
 
-_CRIT_ID_RE = re.compile(r"^[IE]\d+$")
+_CRIT_ID_RE = re.compile(r"^(?:[A-Z0-9_]+_)?[IE]\d+$")
 
 
 def _build_allowed_criteria_ids(criteria_list: List["AnnotationCriteriaConfig"]) -> Dict[str, Dict[str, set[str]]]:
@@ -195,7 +195,7 @@ def build_dynamic_multi_annotation_models(
             """
             Dynamic constraint for criteria IDs:
             - If criteria_mapping exists for this annotation, enforce membership in the mapping keys.
-            - Else enforce regex pattern ^[IE]\\d+$ (or allow empty lists).
+            - Else enforce regex pattern ^(?:[A-Z0-9_]+_)?[IE]\\d+$.
             """
             ann = self.annotation_name  # constrained already
             allowed_inc = allowed_by_annotation[ann]["inclusion"]
@@ -213,7 +213,8 @@ def build_dynamic_multi_annotation_models(
                 bad = [x for x in self.inclusion_criteria_applied if not _CRIT_ID_RE.match(x)]
                 if bad:
                     raise ValueError(
-                        f'Invalid inclusion_criteria_applied IDs (must match ^[IE]\\d+$) for annotation "{ann}": {bad}'
+                        "Invalid inclusion_criteria_applied IDs "
+                        f'(must match ^(?:[A-Z0-9_]+_)?[IE]\\d+$) for annotation "{ann}": {bad}'
                     )
 
             if allowed_exc:
@@ -227,7 +228,30 @@ def build_dynamic_multi_annotation_models(
                 bad = [x for x in self.exclusion_criteria_applied if not _CRIT_ID_RE.match(x)]
                 if bad:
                     raise ValueError(
-                        f'Invalid exclusion_criteria_applied IDs (must match ^[IE]\\d+$) for annotation "{ann}": {bad}'
+                        "Invalid exclusion_criteria_applied IDs "
+                        f'(must match ^(?:[A-Z0-9_]+_)?[IE]\\d+$) for annotation "{ann}": {bad}'
+                    )
+
+            if self.include and not self.inclusion_criteria_applied:
+                raise ValueError(
+                    f'annotation "{ann}" has include=true but inclusion_criteria_applied is empty'
+                )
+
+            if not self.include and not self.exclusion_criteria_applied:
+                reasoning_lower = self.reasoning.lower()
+                has_missing_phrase = any(
+                    token in reasoning_lower
+                    for token in ("missing", "not met", "unmet", "fails", "failed")
+                )
+                if allowed_inc:
+                    has_inclusion_id = any(cid in self.reasoning for cid in allowed_inc)
+                else:
+                    has_inclusion_id = bool(_CRIT_ID_RE.search(self.reasoning))
+
+                if not (has_missing_phrase and has_inclusion_id):
+                    raise ValueError(
+                        f'annotation "{ann}" has include=false with no exclusions; reasoning must '
+                        "state missing/not-met inclusion criteria IDs"
                     )
 
             return self

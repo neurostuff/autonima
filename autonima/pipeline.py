@@ -632,35 +632,49 @@ class AutonimaPipeline:
         from copy import deepcopy
         annotation_config = deepcopy(self.config.annotation)
         
-        # Inject criteria mapping into global annotation criteria
+        # Inject criteria mapping into annotation config
         if criteria_mapping and "annotation" in criteria_mapping:
             annotation_data = criteria_mapping["annotation"]
             
             # Inject global criteria mapping
-            if "global" in annotation_data:
-                global_mapping = annotation_data["global"]
+            global_mapping = annotation_data.get("global", {})
+            global_inclusion = global_mapping.get("inclusion", {})
+            global_exclusion = global_mapping.get("exclusion", {})
+            if global_mapping:
                 # Update the annotation config's global criteria with mapping
                 has_inclusion = (
                     hasattr(annotation_config, 'inclusion_criteria') and
                     annotation_config.inclusion_criteria
                 )
                 if has_inclusion:
-                    # Create a criteria mapping for global criteria
                     annotation_config.inclusion_criteria = list(
-                        global_mapping.get("inclusion", {}).values()
+                        global_inclusion.values()
                     )
                     annotation_config.exclusion_criteria = list(
-                        global_mapping.get("exclusion", {}).values()
+                        global_exclusion.values()
                     )
             
             # Inject per-annotation criteria mapping
             if "annotations" in annotation_data:
                 annotations_mapping = annotation_data["annotations"]
                 for annotation in annotation_config.annotations:
-                    if annotation.name in annotations_mapping:
-                        mapping = annotations_mapping[annotation.name]
-                        # Update the annotation's criteria mapping
-                        annotation.criteria_mapping = mapping
+                    if annotation.name not in annotations_mapping:
+                        continue
+
+                    local_mapping = annotations_mapping[annotation.name]
+                    local_inclusion = local_mapping.get("inclusion", {})
+                    local_exclusion = local_mapping.get("exclusion", {})
+
+                    # Merge global + local IDs for validation while retaining
+                    # dedicated blocks for prompt rendering.
+                    annotation.criteria_mapping = {
+                        "inclusion": {**global_inclusion, **local_inclusion},
+                        "exclusion": {**global_exclusion, **local_exclusion},
+                        "global_inclusion": global_inclusion,
+                        "global_exclusion": global_exclusion,
+                        "local_inclusion": local_inclusion,
+                        "local_exclusion": local_exclusion,
+                    }
         
         # Initialize the annotation processor with updated config and num_workers
         processor = AnnotationProcessor(annotation_config, num_workers=self.num_workers)

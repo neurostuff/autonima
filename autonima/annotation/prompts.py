@@ -75,37 +75,72 @@ def create_study_multi_annotation_prompt(
     # Criteria sections + mapping/ENUM
     # -------------------------
     criteria_sections = []
-    # Canonical allowed annotation names (exact strings)
     allowed_annotation_names = [c.name for c in criteria_list]
 
-    # Fixed mapping from ordinal annotation to canonical name (for humans + model)
-    mapping_lines = []
-    for i, c in enumerate(criteria_list):
-        mapping_lines.append(f'ANNOTATION {i+1} → "{c.name}"')
-
+    mapping_lines = [f'ANNOTATION {i+1} → "{c.name}"' for i, c in enumerate(criteria_list)]
     annotation_mapping_str = "\n".join(mapping_lines)
     allowed_names_str = "\n".join([f'- "{name}"' for name in allowed_annotation_names])
 
-    for i, criteria in enumerate(criteria_list):
-        if criteria.criteria_mapping:
-            inclusion_items = criteria.criteria_mapping.get("inclusion", {}).items()
-            inclusion_text = "\n".join([f"{cid}: {text}" for cid, text in inclusion_items])
+    # Build global criteria block once. These IDs are shared across annotations.
+    global_inclusion_map = {}
+    global_exclusion_map = {}
+    for criteria in criteria_list:
+        mapping = criteria.criteria_mapping or {}
+        global_inclusion_map.update(mapping.get("global_inclusion", {}))
+        global_exclusion_map.update(mapping.get("global_exclusion", {}))
 
-            exclusion_items = criteria.criteria_mapping.get("exclusion", {}).items()
-            exclusion_text = "\n".join([f"{cid}: {text}" for cid, text in exclusion_items])
+    if global_inclusion_map:
+        global_inclusion_text = "\n".join(
+            [f"{cid}: {text}" for cid, text in global_inclusion_map.items()]
+        )
+    else:
+        global_inclusion_text = "No global inclusion criteria specified"
+
+    if global_exclusion_map:
+        global_exclusion_text = "\n".join(
+            [f"{cid}: {text}" for cid, text in global_exclusion_map.items()]
+        )
+    else:
+        global_exclusion_text = "No global exclusion criteria specified"
+
+    for i, criteria in enumerate(criteria_list):
+        mapping = criteria.criteria_mapping or {}
+        local_inclusion = mapping.get("local_inclusion")
+        local_exclusion = mapping.get("local_exclusion")
+
+        # Fallback for unit tests and configs that do not include explicit local blocks.
+        if local_inclusion is None:
+            local_inclusion = mapping.get("inclusion", {})
+        if local_exclusion is None:
+            local_exclusion = mapping.get("exclusion", {})
+
+        if local_inclusion:
+            local_inclusion_text = "\n".join(
+                [f"{cid}: {text}" for cid, text in local_inclusion.items()]
+            )
         else:
-            inclusion_text = "\n".join([f"  - {c}" for c in criteria.inclusion_criteria])
-            exclusion_text = "\n".join([f"  - {c}" for c in criteria.exclusion_criteria])
+            local_inclusion_text = "\n".join(
+                [f"  - {c}" for c in criteria.inclusion_criteria]
+            ) or "No local inclusion criteria specified"
+
+        if local_exclusion:
+            local_exclusion_text = "\n".join(
+                [f"{cid}: {text}" for cid, text in local_exclusion.items()]
+            )
+        else:
+            local_exclusion_text = "\n".join(
+                [f"  - {c}" for c in criteria.exclusion_criteria]
+            ) or "No local exclusion criteria specified"
 
         criteria_section = f"""
 ANNOTATION {i+1}: "{criteria.name}"
 Description: {criteria.description or "No description provided"}
 
-INCLUSION CRITERIA:
-{inclusion_text or "No inclusion criteria specified"}
+LOCAL INCLUSION CRITERIA:
+{local_inclusion_text}
 
-EXCLUSION CRITERIA:
-{exclusion_text or "No exclusion criteria specified"}
+LOCAL EXCLUSION CRITERIA:
+{local_exclusion_text}
 """.strip()
         criteria_sections.append(criteria_section)
 
@@ -117,18 +152,50 @@ EXCLUSION CRITERIA:
     criteria_str = "\n\n".join(criteria_sections)
 
     # -------------------------
-    # Output example: use canonical names, not placeholders
-    # Keep it short and correct (LLMs anchor hard to examples)
+    # Output examples: canonical names + namespaced criteria IDs
     # -------------------------
-    # Provide an example annotation list using ALL allowed names, with minimal scaffolding.
+    global_inc_example_id = next(iter(global_inclusion_map.keys()), "GLOBAL_I1")
+    global_exc_example_id = next(iter(global_exclusion_map.keys()), "GLOBAL_E1")
+
     example_annotations = []
-    for name in allowed_annotation_names:
-        example_annotations.append(f"""{{
-          "annotation_name": "{name}",
+    for i, criteria in enumerate(criteria_list):
+        mapping = criteria.criteria_mapping or {}
+        local_inc = mapping.get("local_inclusion") or mapping.get("inclusion") or {}
+        local_exc = mapping.get("local_exclusion") or mapping.get("exclusion") or {}
+        local_inc_example_id = next(
+            iter(local_inc.keys()),
+            f'{criteria.name.upper().replace("-", "_").replace(" ", "_")}_I1'
+        )
+        local_exc_example_id = next(iter(local_exc.keys()), "")
+
+        if i == 0:
+            example_annotations.append(f"""{{
+          "annotation_name": "{criteria.name}",
           "include": true,
-          "reasoning": "...",
-          "inclusion_criteria_applied": ["I1"],
+          "reasoning": "Global and local inclusion criteria are met for this construct.",
+          "inclusion_criteria_applied": ["{global_inc_example_id}", "{local_inc_example_id}"],
           "exclusion_criteria_applied": []
+        }}""")
+            continue
+
+        if local_exc_example_id:
+            exclusion_example_ids = f'["{global_exc_example_id}", "{local_exc_example_id}"]'
+            example_reasoning = (
+                f"Excluded because {global_exc_example_id} and/or {local_exc_example_id} apply."
+            )
+        else:
+            exclusion_example_ids = "[]"
+            example_reasoning = (
+                f"Excluded because missing inclusion criteria: "
+                f"{global_inc_example_id}, {local_inc_example_id}."
+            )
+
+        example_annotations.append(f"""{{
+          "annotation_name": "{criteria.name}",
+          "include": false,
+          "reasoning": "{example_reasoning}",
+          "inclusion_criteria_applied": [],
+          "exclusion_criteria_applied": {exclusion_example_ids}
         }}""")
 
     example_annotations_str = ",\n        ".join(example_annotations)
@@ -139,7 +206,8 @@ You are a neuroimaging meta-analysis expert evaluating all analyses from an enti
 STUDY CONTEXT:
 NOTE:
 The Study Title and Abstract above apply to ALL analyses below and should be used
-as shared context when making annotation decisions.
+as shared context when making annotation decisions. Prioritize analysis-level metadata
+(analysis name and analysis description) over broad study context when they conflict.
 
 
 {study_context_str}
@@ -151,8 +219,15 @@ ANNOTATION NAME MAPPING (FIXED IDENTIFIERS):
 {annotation_mapping_str}
 
 IMPORTANT CONSTRAINT (ENUM):
-The field "annotation_name" MUST be one of the following exact strings and MUST NOT use placeholders like "annotation_1":
+The field "annotation_name" MUST be one of the following exact strings and MUST NOT use placeholder labels:
 {allowed_names_str}
+
+GLOBAL CRITERIA (APPLIES TO ALL ANNOTATIONS; HARD GATE)
+GLOBAL INCLUSION CRITERIA:
+{global_inclusion_text}
+
+GLOBAL EXCLUSION CRITERIA:
+{global_exclusion_text}
 
 {criteria_str}
 
@@ -163,7 +238,13 @@ For EACH analysis and EACH annotation, provide:
 
 IMPORTANT:
 - Use the exact "Analysis ID" shown above for each analysis.
-- Do NOT output placeholder strings such as "annotation_1". Use the canonical annotation names listed in the ENUM.
+- Do NOT output placeholder annotation labels. Use the canonical annotation names listed in the ENUM.
+- Decision policy:
+  1) Apply global criteria first.
+  2) If any global exclusion applies OR required global inclusion criteria are not met, set include=false.
+  3) Only if global criteria pass, evaluate local annotation criteria.
+- For include=true: include both global/local inclusion IDs that justify inclusion.
+- For include=false: provide exclusion IDs when applicable; if none apply, explicitly name missing inclusion IDs in reasoning.
 
 Output JSON format:
 {{
@@ -180,7 +261,9 @@ Output JSON format:
 
 FINAL SELF-CHECK (before you respond):
 - Every annotation_name exactly matches one of the allowed strings in the ENUM.
-- No placeholder strings like "annotation_1" appear anywhere.
+- No placeholder annotation labels appear anywhere.
+- For include=true decisions, inclusion_criteria_applied is not empty.
+- For include=false decisions with empty exclusion_criteria_applied, reasoning names missing inclusion criteria IDs.
 """.strip()
 
     return prompt

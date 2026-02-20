@@ -3,6 +3,7 @@
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 import json
+import re
 from pathlib import Path
 
 
@@ -32,7 +33,9 @@ class CriteriaIDAssigner:
     def assign_ids(
         self,
         inclusion_criteria: List[str],
-        exclusion_criteria: List[str]
+        exclusion_criteria: List[str],
+        inclusion_prefix: str = "I",
+        exclusion_prefix: str = "E",
     ) -> CriteriaMapping:
         """
         Assign unique IDs to criteria lists.
@@ -47,14 +50,14 @@ class CriteriaIDAssigner:
         inclusion_mapping = {}
         if inclusion_criteria:
             for criterion in inclusion_criteria:
-                criterion_id = f"I{self.next_inclusion_id}"
+                criterion_id = f"{inclusion_prefix}{self.next_inclusion_id}"
                 inclusion_mapping[criterion_id] = criterion
                 self.next_inclusion_id += 1
         
         exclusion_mapping = {}
         if exclusion_criteria:
             for criterion in exclusion_criteria:
-                criterion_id = f"E{self.next_exclusion_id}"
+                criterion_id = f"{exclusion_prefix}{self.next_exclusion_id}"
                 exclusion_mapping[criterion_id] = criterion
                 self.next_exclusion_id += 1
         
@@ -62,6 +65,13 @@ class CriteriaIDAssigner:
             inclusion=inclusion_mapping,
             exclusion=exclusion_mapping
         )
+
+
+def sanitize_criteria_namespace(name: str) -> str:
+    """Convert an annotation name into a stable uppercase criteria namespace."""
+    namespace = re.sub(r"[^A-Za-z0-9]+", "_", name or "")
+    namespace = re.sub(r"_+", "_", namespace).strip("_").upper()
+    return namespace or "ANNOTATION"
 
 
 def save_criteria_mapping(config, output_dir: str) -> None:
@@ -133,17 +143,11 @@ def save_criteria_mapping(config, output_dir: str) -> None:
         if (config.annotation.inclusion_criteria or
                 config.annotation.exclusion_criteria):
             annotation_assigner = CriteriaIDAssigner()
-            # Set the counters to continue from where screening left off
-            annotation_assigner.next_inclusion_id = getattr(
-                abstract_mapping, 'next_inclusion_id', 1
-            ) if abstract_mapping else 1
-            annotation_assigner.next_exclusion_id = getattr(
-                abstract_mapping, 'next_exclusion_id', 1
-            ) if abstract_mapping else 1
-            
             annotation_mapping = annotation_assigner.assign_ids(
                 config.annotation.inclusion_criteria,
-                config.annotation.exclusion_criteria
+                config.annotation.exclusion_criteria,
+                inclusion_prefix="GLOBAL_I",
+                exclusion_prefix="GLOBAL_E",
             )
             mapping_dict = annotation_mapping.to_dict()
             mapping_data["annotation"]["global"]["inclusion"] = (
@@ -154,10 +158,13 @@ def save_criteria_mapping(config, output_dir: str) -> None:
         # Per-annotation criteria
         for annotation in config.annotation.annotations:
             if annotation.inclusion_criteria or annotation.exclusion_criteria:
+                namespace = sanitize_criteria_namespace(annotation.name)
                 annotation_assigner = CriteriaIDAssigner()
                 annotation_mapping = annotation_assigner.assign_ids(
                     annotation.inclusion_criteria,
-                    annotation.exclusion_criteria
+                    annotation.exclusion_criteria,
+                    inclusion_prefix=f"{namespace}_I",
+                    exclusion_prefix=f"{namespace}_E",
                 )
                 mapping_dict = annotation_mapping.to_dict()
                 mapping_data["annotation"]["annotations"][annotation.name] = {
