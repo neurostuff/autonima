@@ -44,6 +44,7 @@ autonima/utils/__init__.py
 autonima/utils/base.py
 autonima/utils/criteria.py
 tests/test_annotation_incremental_caching.py
+tests/test_annotation_retry.py
 tests/test_basic.py
 tests/test_confidence_reporting.py
 tests/test_criteria_mapping.py

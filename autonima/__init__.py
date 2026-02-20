@@ -21,37 +21,60 @@ __version__ = "0.1.0"
 __author__ = "Autonima Development Team"
 __description__ = "LLM-powered automated systematic review and meta-analysis"
 
-from .pipeline import AutonimaPipeline
-from .config import PipelineConfig
+__all__ = []
 
-# Import retrieval module components
-from .retrieval import BaseRetriever, PubGetRetriever
+# Core pipeline/config imports may rely on optional dependencies in submodules.
+try:
+    from .pipeline import AutonimaPipeline
+    from .config import PipelineConfig
 
-# Import coordinate parsing module components
-from .coordinates import CoordinatePoint, Analysis, ParseAnalysesOutput, parse_tables, CoordinateParsingClient
+    __all__.extend(["AutonimaPipeline", "PipelineConfig"])
+except ImportError:
+    pass
 
-# Import LLM module components
-from .llm.client import GenericLLMClient
+# Retrieval module components (optional dependency: pubget and related stack)
+try:
+    from .retrieval import BaseRetriever, PubGetRetriever
 
-# Import meta-analysis module components
+    __all__.extend(["BaseRetriever", "PubGetRetriever"])
+except ImportError:
+    pass
+
+# Coordinate parsing module components
+try:
+    from .coordinates import (
+        CoordinatePoint,
+        Analysis,
+        ParseAnalysesOutput,
+        parse_tables,
+        CoordinateParsingClient,
+    )
+
+    __all__.extend(
+        [
+            "CoordinatePoint",
+            "Analysis",
+            "ParseAnalysesOutput",
+            "parse_tables",
+            "CoordinateParsingClient",
+        ]
+    )
+except ImportError:
+    pass
+
+# LLM client (optional dependency: openai)
+try:
+    from .llm.client import GenericLLMClient
+
+    __all__.append("GenericLLMClient")
+except ImportError:
+    pass
+
+# Meta-analysis module components (optional dependency: nimare)
 try:
     from .meta import run_meta_analyses
+
     HAS_META = True
+    __all__.append("run_meta_analyses")
 except ImportError:
     HAS_META = False
-
-__all__ = [
-    "AutonimaPipeline",
-    "PipelineConfig",
-    "BaseRetriever",
-    "PubGetRetriever",
-    "CoordinatePoint",
-    "Analysis",
-    "ParseAnalysesOutput",
-    "parse_tables",
-    "CoordinateParsingClient",
-    "GenericLLMClient"
-]
-
-if HAS_META:
-    __all__.append("run_meta_analyses")

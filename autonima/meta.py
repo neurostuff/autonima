@@ -107,8 +107,7 @@ def _normalize_include_ids(include_ids) -> Optional[Set[str]]:
 
 
 def _load_and_sanitize_data(studyset_file: Path, annotation_file: Path):
-    """Load and sanitize NiMADS studyset + annotation payloads."""
-    from .coordinates.nimads_models import sanitize_studyset_dict, sanitize_annotation_dict
+    """Load NiMADS studyset + annotation payloads with minimal normalization."""
 
     print("Loading studyset JSON...")
     with open(studyset_file, "r") as f:
@@ -118,13 +117,9 @@ def _load_and_sanitize_data(studyset_file: Path, annotation_file: Path):
     with open(annotation_file, "r") as f:
         annotation_data = json.load(f)
 
-    print("Sanitizing studyset data...")
-    studyset_data = sanitize_studyset_dict(studyset_data)
-
-    print("Sanitizing annotation data...")
+    print("Normalizing annotation data...")
     if isinstance(annotation_data, list):
         annotation_data = annotation_data[0] if annotation_data else {}
-    annotation_data = sanitize_annotation_dict(annotation_data)
 
     return studyset_data, annotation_data
 
