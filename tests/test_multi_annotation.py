@@ -202,8 +202,87 @@ def test_study_multi_annotation_prompt_creation():
     assert "12345_analysis_3" in prompt
     
     # Check table grouping structure
-    assert "TABLE 1" in prompt or "Table 1" in prompt
-    assert "TABLE 2" in prompt or "Table 2" in prompt
+    assert "TABLE:" in prompt
+
+
+def test_study_multi_annotation_prompt_global_hard_gate_and_namespaced_ids():
+    """Prompt should expose global gating and namespaced criteria IDs."""
+    from autonima.annotation.prompts import create_study_multi_annotation_prompt
+    from autonima.annotation.schema import StudyAnalysisGroup, AnalysisMetadata
+
+    study_group = StudyAnalysisGroup(
+        study_id="12345",
+        study_title="Test study",
+        analyses=[
+            AnalysisMetadata(
+                analysis_id="12345_analysis_0",
+                study_id="12345",
+                table_id="table1",
+                analysis_name="Loved one > stranger"
+            )
+        ]
+    )
+
+    criteria1 = AnnotationCriteriaConfig(
+        name="affiliation_attachment",
+        description="Affiliation construct",
+        criteria_mapping={
+            "inclusion": {
+                "GLOBAL_I1": "Healthy adults",
+                "AFFILIATION_ATTACHMENT_I1": "Affiliation task",
+            },
+            "exclusion": {
+                "GLOBAL_E1": "ROI-only analysis",
+            },
+            "global_inclusion": {
+                "GLOBAL_I1": "Healthy adults",
+            },
+            "global_exclusion": {
+                "GLOBAL_E1": "ROI-only analysis",
+            },
+            "local_inclusion": {
+                "AFFILIATION_ATTACHMENT_I1": "Affiliation task",
+            },
+            "local_exclusion": {},
+        }
+    )
+    criteria2 = AnnotationCriteriaConfig(
+        name="social_communication",
+        description="Social communication construct",
+        criteria_mapping={
+            "inclusion": {
+                "GLOBAL_I1": "Healthy adults",
+                "SOCIAL_COMMUNICATION_I1": "Communication task",
+            },
+            "exclusion": {
+                "GLOBAL_E1": "ROI-only analysis",
+            },
+            "global_inclusion": {
+                "GLOBAL_I1": "Healthy adults",
+            },
+            "global_exclusion": {
+                "GLOBAL_E1": "ROI-only analysis",
+            },
+            "local_inclusion": {
+                "SOCIAL_COMMUNICATION_I1": "Communication task",
+            },
+            "local_exclusion": {},
+        }
+    )
+
+    prompt = create_study_multi_annotation_prompt(
+        study_group, [criteria1, criteria2], ["analysis_name", "study_title"]
+    )
+
+    assert "GLOBAL CRITERIA (APPLIES TO ALL ANNOTATIONS; HARD GATE)" in prompt
+    assert "GLOBAL_I1: Healthy adults" in prompt
+    assert "GLOBAL_E1: ROI-only analysis" in prompt
+    assert "LOCAL INCLUSION CRITERIA:" in prompt
+    assert "AFFILIATION_ATTACHMENT_I1: Affiliation task" in prompt
+    assert "SOCIAL_COMMUNICATION_I1: Communication task" in prompt
+    assert '"annotation_name": "affiliation_attachment"' in prompt
+    assert '"inclusion_criteria_applied": ["I1"]' not in prompt
+    assert "Decision policy:" in prompt
 
 
 def test_study_analysis_group_creation():

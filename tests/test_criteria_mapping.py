@@ -1,6 +1,13 @@
 """Pytest tests for criteria mapping functionality."""
 
-from autonima.utils.criteria import CriteriaIDAssigner, CriteriaMapping
+import json
+from types import SimpleNamespace
+
+from autonima.utils.criteria import (
+    CriteriaIDAssigner,
+    CriteriaMapping,
+    save_criteria_mapping,
+)
 from autonima.config import ConfigManager
 
 
@@ -73,12 +80,13 @@ def test_criteria_mapping_in_config():
                     "Review articles",
                     "Non-fMRI imaging"
                 ]
-            },
-            "fulltext": {
-                "inclusion_criteria": [
-                    "Sample size > 10",
-                    "Statistical significance reported"
-                ],
+                },
+                "fulltext": {
+                    "objective": "Fulltext test objective",
+                    "inclusion_criteria": [
+                        "Sample size > 10",
+                        "Statistical significance reported"
+                    ],
                 "exclusion_criteria": [
                     "Insufficient methodological detail"
                 ]
@@ -155,3 +163,46 @@ def test_criteria_mapping_with_none_values():
     assert len(mapping.exclusion) == 0
     assert mapping.inclusion["I1"] == "Human participants"
     assert mapping.inclusion["I2"] == "fMRI neuroimaging"
+
+
+def test_annotation_criteria_mapping_uses_namespaced_ids(tmp_path):
+    """Annotation criteria IDs should be namespaced in saved mapping."""
+    config = SimpleNamespace(
+        screening=SimpleNamespace(
+            abstract={"criteria_mapping": None},
+            fulltext={"criteria_mapping": None},
+        ),
+        annotation=SimpleNamespace(
+            inclusion_criteria=["Healthy adults"],
+            exclusion_criteria=["ROI analyses"],
+            annotations=[
+                SimpleNamespace(
+                    name="affiliation_attachment",
+                    inclusion_criteria=["Affiliation contrast"],
+                    exclusion_criteria=[],
+                ),
+                SimpleNamespace(
+                    name="social_communication",
+                    inclusion_criteria=["Communication contrast"],
+                    exclusion_criteria=["Resting state"],
+                ),
+            ],
+        ),
+    )
+
+    save_criteria_mapping(config, str(tmp_path))
+    mapping_path = tmp_path / "outputs" / "criteria_mapping.json"
+    saved = json.loads(mapping_path.read_text())
+    ann = saved["annotation"]
+
+    assert list(ann["global"]["inclusion"].keys()) == ["GLOBAL_I1"]
+    assert list(ann["global"]["exclusion"].keys()) == ["GLOBAL_E1"]
+    assert list(ann["annotations"]["affiliation_attachment"]["inclusion"].keys()) == [
+        "AFFILIATION_ATTACHMENT_I1"
+    ]
+    assert list(ann["annotations"]["social_communication"]["inclusion"].keys()) == [
+        "SOCIAL_COMMUNICATION_I1"
+    ]
+    assert list(ann["annotations"]["social_communication"]["exclusion"].keys()) == [
+        "SOCIAL_COMMUNICATION_E1"
+    ]
