@@ -400,7 +400,7 @@ class ConfigManager:
                 create_all_from_search_annotation=create_all_from_search,
                 annotations=annotations,
                 enabled=annotation_dict.get('enabled', True),
-                prompt_type=annotation_dict.get('prompt_type', 'single_analysis'),
+                prompt_type=annotation_dict.get('prompt_type', 'multi_analysis'),
                 metadata_fields=annotation_dict.get('metadata_fields', [
                     "analysis_name",
                     "analysis_description",
