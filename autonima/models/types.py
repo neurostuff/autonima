@@ -29,6 +29,10 @@ class ActivationTable:
     table_foot: Optional[str] = None  # Footer of the table
     table_data_path: Optional[str] = None  # Path to processed table data file
     table_raw_path: Optional[str] = None  # Path to raw table data file
+    table_html_path: Optional[str] = None  # HTML table path alias
+    table_xml_path: Optional[str] = None  # Pubget tables.xml path
+    table_source_type: Optional[str] = None  # pubget_xml|ace_html|csv_fallback
+    table_normalized_json: Optional[Dict[str, Any]] = None  # Canonical table
     raw_table: Optional[str] = None  # Raw table XML content
     
     def load_raw_table(self) -> None:
@@ -45,7 +49,12 @@ class ActivationTable:
             return
         
         # Define the path preference hierarchy
-        path_preference = ['table_raw_path', 'table_data_path']
+        path_preference = [
+            'table_html_path',
+            'table_raw_path',
+            'table_data_path',
+            'table_xml_path',
+        ]
         
         # Try to load the raw table content from the preferred paths
         for path_attr in path_preference:
@@ -142,7 +151,10 @@ class Study:
                     "table_caption": table.table_caption,
                     "table_foot": table.table_foot,
                     "table_data_path": table.table_data_path,
-                    "table_raw_path": table.table_raw_path
+                    "table_raw_path": table.table_raw_path,
+                    "table_html_path": table.table_html_path,
+                    "table_xml_path": table.table_xml_path,
+                    "table_source_type": table.table_source_type,
                 } for table in self.activation_tables
             ],
             "analyses": [
@@ -265,6 +277,7 @@ class ParsingConfig:
     """Configuration for the parsing phase."""
     parse_coordinates: bool = False
     coordinate_model: str = "gpt-4o-mini"
+    use_canonical_table_json: bool = True
 
 
 @dataclass
@@ -338,6 +351,9 @@ class PipelineConfig:
             "parsing": {
                 "parse_coordinates": self.parsing.parse_coordinates,
                 "coordinate_model": self.parsing.coordinate_model,
+                "use_canonical_table_json": (
+                    self.parsing.use_canonical_table_json
+                ),
             },
             "annotation": {
                 "model": self.annotation.model,

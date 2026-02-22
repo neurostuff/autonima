@@ -526,7 +526,13 @@ class AutonimaPipeline:
  
         # Initialize the coordinate processor
         model = getattr(self.config.parsing, 'coordinate_model', 'gpt-4o-mini')
-        processor = CoordinateProcessor(model=model)
+        use_canonical_table_json = getattr(
+            self.config.parsing, "use_canonical_table_json", True
+        )
+        processor = CoordinateProcessor(
+            model=model,
+            use_canonical_table_json=use_canonical_table_json,
+        )
  
         # Prepare all table processing jobs
         table_jobs = []
@@ -592,6 +598,7 @@ class AutonimaPipeline:
  
         # Save coordinate parsing results
         await self._save_coordinate_parsing_results()
+        await self._save_table_parsing_diagnostics(processor.get_table_diagnostics())
  
         logger.info(
             f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
@@ -803,6 +810,29 @@ class AutonimaPipeline:
             
         except Exception as e:
             logger.warning(f"Failed to save coordinate parsing results: {e}")
+
+    async def _save_table_parsing_diagnostics(self, diagnostics):
+        """Save per-table parsing diagnostics to cache."""
+        try:
+            output_dir = Path(self.config.output.directory)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            diagnostics_file = output_dir / "outputs" / "table_parsing_diagnostics.json"
+            diagnostics_file.parent.mkdir(parents=True, exist_ok=True)
+
+            payload = {
+                "tables": diagnostics,
+                "timestamp": datetime.now().isoformat(),
+            }
+            import json
+            with open(diagnostics_file, "w") as f:
+                json.dump(payload, f, indent=2)
+
+            logger.info(
+                "Saved table parsing diagnostics for %s tables",
+                len(diagnostics),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save table parsing diagnostics: {e}")
  
     async def _execute_output_phase(self):
         """Execute output generation phase."""

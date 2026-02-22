@@ -320,11 +320,35 @@ def _load_activation_table_metadata(
             else None
         )
 
+        table_html_path = table_raw_path
+        table_xml_path = None
+        table_source_type = "csv_fallback"
+
+        # Pubget layout: table_data_file points to .../tables/table_XXX.csv.
+        if table_data_path and not table_raw_path:
+            xml_candidate = Path(table_data_path).parent / "tables.xml"
+            if xml_candidate.exists():
+                table_xml_path = str(xml_candidate)
+                table_source_type = "pubget_xml"
+
+        # ACE layout: raw HTML tables.
+        if table_raw_path and table_raw_path.lower().endswith(".html"):
+            table_source_type = "ace_html"
+
+        if table_raw_path and table_data_path and table_source_type == "csv_fallback":
+            if table_raw_path.lower().endswith(".html"):
+                table_source_type = "ace_html"
+            else:
+                table_source_type = "pubget_xml" if table_xml_path else "csv_fallback"
+
         table_metadata = {
             'table_id': str(row['table_id']),
             'table_label': str(row['table_label']),
             'table_raw_path': table_raw_path,
+            'table_html_path': table_html_path,
             'table_data_path': table_data_path,
+            'table_xml_path': table_xml_path,
+            'table_source_type': table_source_type,
             'table_caption': (
                 row['table_caption'] if pd.notna(row['table_caption']) else None
             ),
@@ -523,7 +547,10 @@ def load_activation_table_map(
                             'table_caption': None,
                             'table_foot': None,
                             'table_data_path': None,
-                            'table_raw_path': None
+                            'table_raw_path': None,
+                            'table_html_path': None,
+                            'table_xml_path': None,
+                            'table_source_type': 'csv_fallback',
                         }
                         
                         # Add to tables dict
@@ -584,6 +611,9 @@ def _apply_activation_tables_to_studies(
                     table_label=t['table_label'],
                     table_data_path=t.get('table_data_path', None),
                     table_raw_path=t.get('table_raw_path', None),
+                    table_html_path=t.get('table_html_path', None),
+                    table_xml_path=t.get('table_xml_path', None),
+                    table_source_type=t.get('table_source_type', None),
                     table_caption=t['table_caption'],
                     table_foot=t['table_foot'],
                     raw_table=t.get('raw_table', None)

@@ -219,6 +219,7 @@ class AnnotationClient:
         try:
             # Extract valid analysis_ids from metadata for validation
             valid_analysis_ids = self._get_valid_analysis_ids(metadata)
+            inclusion_ids_by_annotation = self._build_inclusion_ids_by_annotation(criteria_list)
             
             # Select the appropriate prompt based on metadata type
             if isinstance(metadata, StudyAnalysisGroup):
@@ -298,6 +299,15 @@ class AnnotationClient:
             
             # Parse the result
             result_dict = json.loads(function_call.arguments)
+
+            # Normalize common model-formatting misses before strict validation/parsing.
+            # In practice, include=false responses sometimes omit exclusion IDs and fail to
+            # explicitly reference missing inclusion criteria IDs in reasoning.
+            self._normalize_missing_exclusion_rationale(
+                result_dict=result_dict,
+                prompt_type=prompt_type,
+                inclusion_ids_by_annotation=inclusion_ids_by_annotation,
+            )
             
             # Validate the response structure before parsing
             self._validate_response_structure(result_dict, prompt_type, metadata)
@@ -358,6 +368,100 @@ class AnnotationClient:
             if 'result_dict' in locals():
                 logger.debug(f"Response received: {json.dumps(result_dict, indent=2)[:1000]}")
             raise
+
+    @staticmethod
+    def _build_inclusion_ids_by_annotation(
+        criteria_list: List[AnnotationCriteriaConfig],
+    ) -> Dict[str, List[str]]:
+        """Build sorted inclusion-criteria IDs per annotation for response normalization."""
+        mapping: Dict[str, List[str]] = {}
+        for criteria in criteria_list:
+            ann_name = criteria.name
+            crit_map = criteria.criteria_mapping or {}
+            inclusion_map = crit_map.get("inclusion", {}) if isinstance(crit_map, dict) else {}
+            if isinstance(inclusion_map, dict):
+                ids = sorted(str(k) for k in inclusion_map.keys())
+            else:
+                ids = []
+            mapping[ann_name] = ids
+        return mapping
+
+    @staticmethod
+    def _reasoning_mentions_missing_inclusion(reasoning: str, inclusion_ids: List[str]) -> bool:
+        reasoning_text = str(reasoning or "")
+        lower = reasoning_text.lower()
+        has_missing_phrase = any(token in lower for token in ("missing", "not met", "unmet", "fails", "failed"))
+        if inclusion_ids:
+            has_id = any(cid in reasoning_text for cid in inclusion_ids)
+        else:
+            has_id = False
+        return has_missing_phrase and has_id
+
+    def _normalize_single_annotation_decision(
+        self,
+        decision: Dict[str, Any],
+        inclusion_ids_by_annotation: Dict[str, List[str]],
+    ) -> None:
+        """Normalize one annotation decision in-place to satisfy strict schema constraints."""
+        if not isinstance(decision, dict):
+            return
+
+        include = bool(decision.get("include", False))
+        if include:
+            return
+
+        exclusion_ids = decision.get("exclusion_criteria_applied")
+        if not isinstance(exclusion_ids, list):
+            exclusion_ids = []
+            decision["exclusion_criteria_applied"] = exclusion_ids
+        if exclusion_ids:
+            return
+
+        annotation_name = str(decision.get("annotation_name", ""))
+        inclusion_ids = inclusion_ids_by_annotation.get(annotation_name, [])
+        reasoning = str(decision.get("reasoning", "") or "")
+        if self._reasoning_mentions_missing_inclusion(reasoning, inclusion_ids):
+            return
+
+        fallback_id = inclusion_ids[0] if inclusion_ids else "I1"
+        appended = f" Missing inclusion criteria not met: {fallback_id}."
+        decision["reasoning"] = (reasoning + appended).strip()
+
+    def _normalize_missing_exclusion_rationale(
+        self,
+        result_dict: Dict[str, Any],
+        prompt_type: str,
+        inclusion_ids_by_annotation: Dict[str, List[str]],
+    ) -> None:
+        """Normalize include=false decisions with empty exclusions before strict model parse."""
+        if not isinstance(result_dict, dict):
+            return
+
+        if prompt_type == "multi_analysis":
+            decisions = result_dict.get("decisions", [])
+            if not isinstance(decisions, list):
+                return
+            for analysis_decision in decisions:
+                if not isinstance(analysis_decision, dict):
+                    continue
+                annotations = analysis_decision.get("annotations", [])
+                if not isinstance(annotations, list):
+                    continue
+                for annotation_decision in annotations:
+                    self._normalize_single_annotation_decision(
+                        annotation_decision,
+                        inclusion_ids_by_annotation,
+                    )
+            return
+
+        decisions = result_dict.get("decisions", [])
+        if not isinstance(decisions, list):
+            return
+        for annotation_decision in decisions:
+            self._normalize_single_annotation_decision(
+                annotation_decision,
+                inclusion_ids_by_annotation,
+            )
     
     def _validate_response_structure(
         self,
