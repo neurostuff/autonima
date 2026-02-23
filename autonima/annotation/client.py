@@ -4,11 +4,7 @@ import json
 import logging
 import re
 from typing import List, Dict, Any, Union
-<<<<<<< Updated upstream
 from pydantic import BaseModel, Field, field_validator, model_validator
-=======
-from pydantic import BaseModel, Field, field_validator, create_model, ConfigDict
->>>>>>> Stashed changes
 from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
 from ..utils import log_error_with_debug
@@ -361,7 +357,7 @@ class AnnotationClient:
         try:
             # Extract valid analysis_ids from metadata for validation
             valid_analysis_ids = self._get_valid_analysis_ids(metadata)
-            inclusion_ids_by_annotation = self._build_inclusion_ids_by_annotation(criteria_list)
+            inclusion_ids_by_annotation = self._build_all_inclusion_ids_by_annotation(criteria_list)
             
             # Select the appropriate prompt based on metadata type
             if isinstance(metadata, StudyAnalysisGroup):
@@ -378,6 +374,7 @@ class AnnotationClient:
             # Generate function schema from dynamic Pydantic models
             DecisionModel, OutputListModel = build_dynamic_multi_annotation_models(criteria_list)
             FunctionModel = OutputListModel
+            StudyOutputModel = None
             if prompt_type == "multi_analysis":
                 allowed_annotation_names = [c.name for c in criteria_list]
 
@@ -407,21 +404,13 @@ class AnnotationClient:
                     decisions: List[StudyAnalysisDecisionDynamic]
 
                 FunctionModel = StudyMultiAnnotationOutputDynamic
+                StudyOutputModel = StudyMultiAnnotationOutputDynamic
 
             func_name = "make_multi_annotation_decisions"
             function_schema = self._generate_function_schema(
                 FunctionModel,
                 func_name
             )
-            StudyOutputModel = create_model(
-                "StudyOutputModel",
-                study_id=(str, ...),
-                decisions=(List[StudyAnalysisDecisionModel], ...),
-                __config__=ConfigDict(extra="forbid"),
-            )
-            func_name = "make_multi_annotation_decisions"
-            schema_model = StudyOutputModel if prompt_type == "multi_analysis" else OutputListModel
-            function_schema = self._generate_function_schema(schema_model, func_name)
             
             # Call the LLM API with function calling
             response = self._client.client.chat.completions.create(
@@ -526,7 +515,7 @@ class AnnotationClient:
             raise
 
     @staticmethod
-    def _build_inclusion_ids_by_annotation(
+    def _build_all_inclusion_ids_by_annotation(
         criteria_list: List[AnnotationCriteriaConfig],
     ) -> Dict[str, List[str]]:
         """Build sorted inclusion-criteria IDs per annotation for response normalization."""
