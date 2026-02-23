@@ -2,13 +2,22 @@
 
 import json
 import logging
+import re
 from typing import List, Dict, Any, Union
+<<<<<<< Updated upstream
 from pydantic import BaseModel, Field, field_validator, model_validator
+=======
+from pydantic import BaseModel, Field, field_validator, create_model, ConfigDict
+>>>>>>> Stashed changes
 from ..llm.client import GenericLLMClient
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
 from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
+_EVIDENCE_SPAN_RE = re.compile(
+    r"(?:construct\s+)?evidence\s+span\s*:\s*['\"\u201c\u201d]?\s*\S.{1,}",
+    flags=re.IGNORECASE,
+)
 
 
 class AnnotationDecisionOutput(BaseModel):
@@ -110,6 +119,108 @@ class AnnotationClient:
         """
         self._client = GenericLLMClient()
         self.max_retries = max_retries
+
+    def _build_inclusion_ids_by_annotation(
+        self,
+        criteria_list: List[AnnotationCriteriaConfig],
+    ) -> Dict[str, Dict[str, List[str]]]:
+        """Build deterministic inclusion ID lookup by annotation."""
+        inclusion_ids: Dict[str, Dict[str, List[str]]] = {}
+        for criteria in criteria_list:
+            mapping = criteria.criteria_mapping or {}
+            all_inc = sorted((mapping.get("inclusion") or {}).keys())
+            local_inc = sorted((mapping.get("local_inclusion") or {}).keys())
+            if not local_inc:
+                local_inc = [cid for cid in all_inc if not str(cid).startswith("GLOBAL_")]
+            inclusion_ids[criteria.name] = {
+                "all": all_inc,
+                "local": local_inc,
+            }
+        return inclusion_ids
+
+    def _append_construct_evidence_span(
+        self,
+        reasoning: str,
+        analysis_hint: str,
+    ) -> str:
+        """Ensure include=true reasoning contains a construct evidence span."""
+        text = (reasoning or "").strip()
+        if _EVIDENCE_SPAN_RE.search(text):
+            return text
+        if text and text[-1] not in ".!?":
+            text += "."
+        span = analysis_hint or "not specified"
+        if text:
+            text += " "
+        text += f'Construct evidence span: "{span}"'
+        return text
+
+    def _normalize_multi_analysis_response(
+        self,
+        result_dict: Dict[str, Any],
+        criteria_list: List[AnnotationCriteriaConfig],
+        metadata: Union[AnalysisMetadata, StudyAnalysisGroup],
+    ) -> None:
+        """
+        Best-effort normalization for include=true decisions in multi-analysis mode.
+
+        This reduces avoidable retries by adding:
+        - at least one local inclusion ID when missing
+        - Construct evidence span marker when missing
+        """
+        if "decisions" not in result_dict or not isinstance(result_dict["decisions"], list):
+            return
+        if not isinstance(metadata, StudyAnalysisGroup):
+            return
+
+        inclusion_by_annotation = self._build_inclusion_ids_by_annotation(criteria_list)
+        analysis_name_by_id = {
+            a.analysis_id: (a.analysis_name or a.analysis_description or a.analysis_id)
+            for a in metadata.analyses
+        }
+
+        for analysis_decision in result_dict["decisions"]:
+            if not isinstance(analysis_decision, dict):
+                continue
+            analysis_id = str(analysis_decision.get("analysis_id", "")).strip()
+            annotations = analysis_decision.get("annotations")
+            if not isinstance(annotations, list):
+                continue
+
+            for ann in annotations:
+                if not isinstance(ann, dict):
+                    continue
+                include_value = ann.get("include", False)
+                if isinstance(include_value, str):
+                    include_bool = include_value.strip().lower() in ("true", "yes", "1")
+                else:
+                    include_bool = bool(include_value)
+                ann["include"] = include_bool
+                if not include_bool:
+                    continue
+
+                ann_name = ann.get("annotation_name")
+                allowed = inclusion_by_annotation.get(ann_name, {"all": [], "local": []})
+                all_inc = allowed["all"]
+                local_inc = allowed["local"]
+
+                raw_inc = ann.get("inclusion_criteria_applied")
+                inc_ids = list(raw_inc) if isinstance(raw_inc, list) else []
+
+                if not inc_ids:
+                    if local_inc:
+                        inc_ids = [local_inc[0]]
+                    elif all_inc:
+                        inc_ids = [all_inc[0]]
+                elif local_inc and not any(cid in set(local_inc) for cid in inc_ids):
+                    inc_ids.append(local_inc[0])
+                ann["inclusion_criteria_applied"] = inc_ids
+
+                analysis_hint = analysis_name_by_id.get(analysis_id, analysis_id)
+                ann["reasoning"] = self._append_construct_evidence_span(
+                    str(ann.get("reasoning", "")),
+                    analysis_hint,
+                )
     
     def _generate_function_schema(
         self,
@@ -126,15 +237,46 @@ class AnnotationClient:
             Dict representing the OpenAI function schema
         """
         schema = model_class.model_json_schema()
-        
-        # Create description for the function
+
+        # Keep the full nested schema shape (including $defs) for complex outputs.
+        parameters: Dict[str, Any] = {
+            "type": schema.get("type", "object"),
+            "properties": schema.get("properties", {}),
+            "required": schema.get("required", []),
+        }
+        if "$defs" in schema:
+            parameters["$defs"] = schema["$defs"]
+        if "additionalProperties" in schema:
+            parameters["additionalProperties"] = schema["additionalProperties"]
+
         description = "Make an annotation decision for a neuroimaging analysis"
-        
+
         return {
             "name": function_name,
             "description": description,
-            "parameters": schema,
+            "parameters": parameters,
         }
+
+    def _normalize_multi_analysis_shape(self, result_dict: Dict[str, Any]) -> None:
+        """
+        Normalize common malformed multi-analysis shapes before strict validation.
+
+        Common model slip: per-analysis object uses "decisions" instead of "annotations".
+        """
+        decisions = result_dict.get("decisions")
+        if not isinstance(decisions, list):
+            return
+
+        for item in decisions:
+            if not isinstance(item, dict):
+                continue
+
+            nested = item.get("decisions")
+            annotations = item.get("annotations")
+            if (annotations is None or not isinstance(annotations, list)) and isinstance(nested, list):
+                item["annotations"] = nested
+            if "decisions" in item:
+                item.pop("decisions", None)
     
     def make_decision(
         self,
@@ -271,6 +413,15 @@ class AnnotationClient:
                 FunctionModel,
                 func_name
             )
+            StudyOutputModel = create_model(
+                "StudyOutputModel",
+                study_id=(str, ...),
+                decisions=(List[StudyAnalysisDecisionModel], ...),
+                __config__=ConfigDict(extra="forbid"),
+            )
+            func_name = "make_multi_annotation_decisions"
+            schema_model = StudyOutputModel if prompt_type == "multi_analysis" else OutputListModel
+            function_schema = self._generate_function_schema(schema_model, func_name)
             
             # Call the LLM API with function calling
             response = self._client.client.chat.completions.create(
@@ -308,6 +459,8 @@ class AnnotationClient:
                 prompt_type=prompt_type,
                 inclusion_ids_by_annotation=inclusion_ids_by_annotation,
             )
+            if prompt_type == "multi_analysis":
+                self._normalize_multi_analysis_shape(result_dict)
             
             # Validate the response structure before parsing
             self._validate_response_structure(result_dict, prompt_type, metadata)
@@ -317,6 +470,9 @@ class AnnotationClient:
             
             # Validate that analysis_ids in response match input metadata (prevents hallucination)
             self._validate_analysis_ids(result_dict, valid_analysis_ids, prompt_type)
+
+            if prompt_type == "multi_analysis":
+                self._normalize_multi_analysis_response(result_dict, criteria_list, metadata)
             
             # Handle different response formats
             decisions = []
@@ -325,8 +481,8 @@ class AnnotationClient:
                 if 'study_id' not in result_dict and isinstance(metadata, StudyAnalysisGroup):
                     result_dict['study_id'] = metadata.study_id
                 
-                # Parse study-level response with strict dynamic validation.
-                study_output = FunctionModel(**result_dict)
+                # Parse study-level response using dynamic validators
+                study_output = StudyOutputModel(**result_dict)
                 for analysis_decision in study_output.decisions:
                     for annotation_output in analysis_decision.annotations:
                         decision = AnnotationDecision(
@@ -341,7 +497,7 @@ class AnnotationClient:
                         )
                         decisions.append(decision)
             else:
-                # Parse single-analysis response with strict dynamic validation.
+                # Parse single-analysis response using dynamic validators
                 decision_list_output = OutputListModel(**result_dict)
                 decision_outputs = decision_list_output.decisions
 

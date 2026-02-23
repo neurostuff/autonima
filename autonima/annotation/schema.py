@@ -111,6 +111,10 @@ class StudyAnalysisGroup(BaseModel):
 # ---------- helpers ----------
 
 _CRIT_ID_RE = re.compile(r"^(?:[A-Z0-9_]+_)?[IE]\d+$")
+_EVIDENCE_SPAN_RE = re.compile(
+    r"(?:construct\s+)?evidence\s+span\s*:\s*['\"\u201c\u201d]?\s*\S.{1,}",
+    flags=re.IGNORECASE,
+)
 
 
 def _build_allowed_criteria_ids(criteria_list: List["AnnotationCriteriaConfig"]) -> Dict[str, Dict[str, set[str]]]:
@@ -118,8 +122,9 @@ def _build_allowed_criteria_ids(criteria_list: List["AnnotationCriteriaConfig"])
     Returns:
       {
         "<annotation_name>": {
-          "inclusion": {"I1","I2",...},
-          "exclusion": {"E1","E2",...}
+          "inclusion": {...},        # global + local inclusion IDs
+          "exclusion": {...},        # global + local exclusion IDs
+          "local_inclusion": {...},  # local inclusion IDs only
         },
         ...
       }
@@ -129,11 +134,22 @@ def _build_allowed_criteria_ids(criteria_list: List["AnnotationCriteriaConfig"])
         inc_ids: set[str] = set()
         exc_ids: set[str] = set()
 
+        local_inc: set[str] = set()
         if c.criteria_mapping:
-            inc_ids = set((c.criteria_mapping.get("inclusion") or {}).keys())
-            exc_ids = set((c.criteria_mapping.get("exclusion") or {}).keys())
+            mapping = c.criteria_mapping
+            inc_ids = set((mapping.get("inclusion") or {}).keys())
+            exc_ids = set((mapping.get("exclusion") or {}).keys())
+            local_inc = set((mapping.get("local_inclusion") or {}).keys())
 
-        allowed[c.name] = {"inclusion": inc_ids, "exclusion": exc_ids}
+        # Fallback split when explicit local mapping is unavailable.
+        if not local_inc:
+            local_inc = {cid for cid in inc_ids if not str(cid).startswith("GLOBAL_")}
+
+        allowed[c.name] = {
+            "inclusion": inc_ids,
+            "exclusion": exc_ids,
+            "local_inclusion": local_inc,
+        }
     return allowed
 
 
@@ -200,6 +216,7 @@ def build_dynamic_multi_annotation_models(
             ann = self.annotation_name  # constrained already
             allowed_inc = allowed_by_annotation[ann]["inclusion"]
             allowed_exc = allowed_by_annotation[ann]["exclusion"]
+            local_inc = allowed_by_annotation[ann]["local_inclusion"]
 
             # If mappings exist (non-empty sets), enforce strict membership
             if allowed_inc:
@@ -232,27 +249,38 @@ def build_dynamic_multi_annotation_models(
                         f'(must match ^(?:[A-Z0-9_]+_)?[IE]\\d+$) for annotation "{ann}": {bad}'
                     )
 
-            if self.include and not self.inclusion_criteria_applied:
-                raise ValueError(
-                    f'annotation "{ann}" has include=true but inclusion_criteria_applied is empty'
-                )
-
-            if not self.include and not self.exclusion_criteria_applied:
-                reasoning_lower = self.reasoning.lower()
-                has_missing_phrase = any(
-                    token in reasoning_lower
-                    for token in ("missing", "not met", "unmet", "fails", "failed")
-                )
-                if allowed_inc:
-                    has_inclusion_id = any(cid in self.reasoning for cid in allowed_inc)
-                else:
-                    has_inclusion_id = bool(_CRIT_ID_RE.search(self.reasoning))
-
-                if not (has_missing_phrase and has_inclusion_id):
+            if self.include:
+                if not self.inclusion_criteria_applied:
                     raise ValueError(
-                        f'annotation "{ann}" has include=false with no exclusions; reasoning must '
-                        "state missing/not-met inclusion criteria IDs"
+                        f'annotation "{ann}" has include=true but inclusion_criteria_applied is empty'
                     )
+                if local_inc and not any(cid in local_inc for cid in self.inclusion_criteria_applied):
+                    raise ValueError(
+                        f'annotation "{ann}" has include=true but no local inclusion criteria were applied. '
+                        f"Expected at least one of: {sorted(local_inc)}"
+                    )
+                if not _EVIDENCE_SPAN_RE.search(self.reasoning or ""):
+                    raise ValueError(
+                        f'annotation "{ann}" has include=true but reasoning lacks a construct evidence span '
+                        '(expected pattern: "Construct evidence span: ...")'
+                    )
+            else:
+                if not self.exclusion_criteria_applied:
+                    reasoning_lower = (self.reasoning or "").lower()
+                    has_missing_phrase = any(
+                        token in reasoning_lower
+                        for token in ("missing", "not met", "unmet", "fails", "failed")
+                    )
+                    if allowed_inc:
+                        has_inclusion_id = any(cid in (self.reasoning or "") for cid in allowed_inc)
+                    else:
+                        has_inclusion_id = bool(_CRIT_ID_RE.search(self.reasoning or ""))
+
+                    if not (has_missing_phrase and has_inclusion_id):
+                        raise ValueError(
+                            f'annotation "{ann}" has include=false with no exclusions; reasoning must '
+                            "state missing/not-met inclusion criteria IDs"
+                        )
 
             return self
 

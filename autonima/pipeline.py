@@ -714,10 +714,17 @@ class AutonimaPipeline:
                 cached_data = json.load(f)
             
             # Apply cached results to studies
-            cached_studies = {study_data['pmid']: study_data for study_data in cached_data.get('studies', [])}
+            cached_studies = {
+                str(study_data['pmid']): study_data
+                for study_data in cached_data.get('studies', [])
+                if study_data.get('pmid') is not None
+            }
             loaded_count = 0
+            matched_count = 0
             
             for study in self.results.studies:
+                if study.pmid in cached_studies:
+                    matched_count += 1
                 if study.pmid in cached_studies and not any(a.parsed for a in study.analyses):
                     study.analyses = []
                     cached_study = cached_studies[study.pmid]
@@ -747,7 +754,10 @@ class AutonimaPipeline:
                             ))
                         loaded_count += 1
             
-            logger.info(f"Loaded cached coordinate parsing results for {loaded_count} studies")
+            logger.info(
+                "Loaded cached coordinate parsing results for "
+                f"{loaded_count} studies (cache entries={len(cached_studies)}, PMID matches={matched_count})"
+            )
             
         except Exception as e:
             logger.warning(f"Failed to load cached coordinate parsing results: {e}")
@@ -763,50 +773,78 @@ class AutonimaPipeline:
             
             if not studies_with_analyses:
                 return
-            
-            # Prepare data for saving
-            cached_data = {
-                "studies": [
-                    {
-                        "pmid": study.pmid,
-                        "analyses": [
-                            {
-                                "name": analysis.name,
-                                "description": analysis.description,
-                                "table_id": analysis.table_id,
-                                "points": [
-                                    {
-                                        "coordinates": point.coordinates,
-                                        "space": point.space,
-                                        "values": [
-                                            {
-                                                "value": value.value,
-                                                "kind": value.kind
-                                            }
-                                            for value in point.values or []
-                                        ]
-                                    }
-                                    for point in analysis.points
-                                ]
-                            }
-                            for analysis in study.analyses
-                        ]
-                    }
-                    for study in studies_with_analyses
-                ],
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            # Save to file
+
             output_dir = Path(self.config.output.directory)
             output_dir.mkdir(parents=True, exist_ok=True)
             coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
-            
+
+            # Load existing cache so subset/smoke runs do not clobber previously cached PMIDs.
+            existing_by_pmid: Dict[str, Dict[str, Any]] = {}
+            if coordinate_cache_file.exists():
+                try:
+                    with open(coordinate_cache_file, 'r') as f:
+                        existing_data = json.load(f)
+                    for study_data in existing_data.get("studies", []):
+                        pmid = study_data.get("pmid")
+                        if pmid is not None:
+                            existing_by_pmid[str(pmid)] = study_data
+                except Exception as e:
+                    logger.warning(
+                        "Failed to load existing coordinate cache for merge; "
+                        f"will overwrite cache file instead: {e}"
+                    )
+                    existing_by_pmid = {}
+
+            # Prepare current entries and overwrite only PMIDs present in this run.
+            current_by_pmid: Dict[str, Dict[str, Any]] = {}
+            for study in studies_with_analyses:
+                current_by_pmid[str(study.pmid)] = {
+                    "pmid": study.pmid,
+                    "analyses": [
+                        {
+                            "name": analysis.name,
+                            "description": analysis.description,
+                            "parsed": bool(getattr(analysis, "parsed", True)),
+                            "table_id": analysis.table_id,
+                            "points": [
+                                {
+                                    "coordinates": point.coordinates,
+                                    "space": point.space,
+                                    "values": [
+                                        {
+                                            "value": value.value,
+                                            "kind": value.kind
+                                        }
+                                        for value in point.values or []
+                                    ]
+                                }
+                                for point in analysis.points
+                            ]
+                        }
+                        for analysis in study.analyses
+                    ]
+                }
+
+            merged_by_pmid = dict(existing_by_pmid)
+            merged_by_pmid.update(current_by_pmid)
+
+            cached_data = {
+                "studies": [
+                    merged_by_pmid[pmid]
+                    for pmid in sorted(merged_by_pmid.keys(), key=lambda x: str(x))
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+
             import json
             with open(coordinate_cache_file, 'w') as f:
                 json.dump(cached_data, f, indent=2)
             
-            logger.info(f"Saved coordinate parsing results for {len(studies_with_analyses)} studies")
+            logger.info(
+                "Saved coordinate parsing results for "
+                f"{len(studies_with_analyses)} studies "
+                f"(cache merged total={len(merged_by_pmid)}, replaced={len(current_by_pmid)})"
+            )
             
         except Exception as e:
             logger.warning(f"Failed to save coordinate parsing results: {e}")

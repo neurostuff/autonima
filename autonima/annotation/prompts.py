@@ -1,5 +1,6 @@
 """Prompt templates for annotation decisions."""
 
+import json
 from typing import List
 from collections import defaultdict
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, TableMetadata, StudyAnalysisGroup
@@ -152,42 +153,66 @@ LOCAL EXCLUSION CRITERIA:
     criteria_str = "\n\n".join(criteria_sections)
 
     # -------------------------
-    # Output examples: canonical names + namespaced criteria IDs
+    # Output examples: canonical names + realistic IDs (works with namespaced or legacy mappings)
     # -------------------------
-    global_inc_example_id = next(iter(global_inclusion_map.keys()), "GLOBAL_I1")
-    global_exc_example_id = next(iter(global_exclusion_map.keys()), "GLOBAL_E1")
+    global_inc_example_id = next(iter(global_inclusion_map.keys()), None)
+    global_exc_example_id = next(iter(global_exclusion_map.keys()), None)
 
     example_annotations = []
     for i, criteria in enumerate(criteria_list):
         mapping = criteria.criteria_mapping or {}
-        local_inc = mapping.get("local_inclusion") or mapping.get("inclusion") or {}
-        local_exc = mapping.get("local_exclusion") or mapping.get("exclusion") or {}
+        local_inc_map = mapping.get("local_inclusion") or {}
+        local_exc_map = mapping.get("local_exclusion") or {}
+        inclusion_map = mapping.get("inclusion") or {}
+        exclusion_map = mapping.get("exclusion") or {}
+
+        # Backward-compatible fallbacks when explicit local maps are not present.
+        if not local_inc_map and inclusion_map:
+            local_inc_map = {
+                cid: txt for cid, txt in inclusion_map.items()
+                if not str(cid).startswith("GLOBAL_")
+            } or inclusion_map
+        if not local_exc_map and exclusion_map:
+            local_exc_map = {
+                cid: txt for cid, txt in exclusion_map.items()
+                if not str(cid).startswith("GLOBAL_")
+            } or exclusion_map
+
         local_inc_example_id = next(
-            iter(local_inc.keys()),
-            f'{criteria.name.upper().replace("-", "_").replace(" ", "_")}_I1'
+            iter(local_inc_map.keys()),
+            (next(iter(inclusion_map.keys()), "I1"))
         )
-        local_exc_example_id = next(iter(local_exc.keys()), "")
+        local_exc_example_id = next(iter(local_exc_map.keys()), None)
 
         if i == 0:
+            include_ids = [local_inc_example_id]
+            if global_inc_example_id and global_inc_example_id not in include_ids:
+                include_ids.insert(0, global_inc_example_id)
             example_annotations.append(f"""{{
           "annotation_name": "{criteria.name}",
           "include": true,
-          "reasoning": "Global and local inclusion criteria are met for this construct.",
-          "inclusion_criteria_applied": ["{global_inc_example_id}", "{local_inc_example_id}"],
+          "reasoning": "Global and local inclusion criteria are met for this construct. Construct evidence span: \\"<short phrase copied from analysis/table text>\\".",
+          "inclusion_criteria_applied": {json.dumps(include_ids)},
           "exclusion_criteria_applied": []
         }}""")
             continue
 
-        if local_exc_example_id:
-            exclusion_example_ids = f'["{global_exc_example_id}", "{local_exc_example_id}"]'
+        if local_exc_example_id or global_exc_example_id:
+            exclusion_ids = []
+            if global_exc_example_id:
+                exclusion_ids.append(global_exc_example_id)
+            if local_exc_example_id and local_exc_example_id not in exclusion_ids:
+                exclusion_ids.append(local_exc_example_id)
             example_reasoning = (
-                f"Excluded because {global_exc_example_id} and/or {local_exc_example_id} apply."
+                "Excluded because one or more exclusion criteria apply."
             )
         else:
-            exclusion_example_ids = "[]"
+            exclusion_ids = []
+            missing_ids = [x for x in [global_inc_example_id, local_inc_example_id] if x]
             example_reasoning = (
-                f"Excluded because missing inclusion criteria: "
-                f"{global_inc_example_id}, {local_inc_example_id}."
+                "Excluded because missing inclusion criteria: "
+                + ", ".join(missing_ids or ["I1"])
+                + "."
             )
 
         example_annotations.append(f"""{{
@@ -195,7 +220,7 @@ LOCAL EXCLUSION CRITERIA:
           "include": false,
           "reasoning": "{example_reasoning}",
           "inclusion_criteria_applied": [],
-          "exclusion_criteria_applied": {exclusion_example_ids}
+          "exclusion_criteria_applied": {json.dumps(exclusion_ids)}
         }}""")
 
     example_annotations_str = ",\n        ".join(example_annotations)
@@ -238,13 +263,19 @@ For EACH analysis and EACH annotation, provide:
 
 IMPORTANT:
 - Use the exact "Analysis ID" shown above for each analysis.
-- Do NOT output placeholder annotation labels. Use the canonical annotation names listed in the ENUM.
+- Do NOT output placeholder strings such as "annotation_1". Use the canonical annotation names listed in the ENUM.
 - Decision policy:
   1) Apply global criteria first.
   2) If any global exclusion applies OR required global inclusion criteria are not met, set include=false.
   3) Only if global criteria pass, evaluate local annotation criteria.
-- For include=true: include both global/local inclusion IDs that justify inclusion.
-- For include=false: provide exclusion IDs when applicable; if none apply, explicitly name missing inclusion IDs in reasoning.
+- For include=true:
+  - Include both global/local inclusion IDs when available and applicable.
+  - `inclusion_criteria_applied` must include at least one LOCAL inclusion ID (non-`GLOBAL_`).
+  - Reasoning must include: `Construct evidence span: "<short phrase from analysis/table text>"`.
+- For include=false:
+  - Provide exclusion IDs when applicable.
+  - If no exclusion criteria apply, explicitly name missing inclusion criteria IDs in reasoning.
+- Overlap across sibling constructs is allowed when justified by construct-specific evidence.
 
 Output JSON format:
 {{
@@ -261,9 +292,11 @@ Output JSON format:
 
 FINAL SELF-CHECK (before you respond):
 - Every annotation_name exactly matches one of the allowed strings in the ENUM.
-- No placeholder annotation labels appear anywhere.
-- For include=true decisions, inclusion_criteria_applied is not empty.
-- For include=false decisions with empty exclusion_criteria_applied, reasoning names missing inclusion criteria IDs.
+- No placeholder strings like "annotation_1" appear anywhere.
+- For each include=true decision, inclusion_criteria_applied is not empty.
+- For each include=true decision, at least one local inclusion criterion ID is present.
+- For each include=true decision, reasoning contains `Construct evidence span: ...`.
+- For each include=false decision with empty exclusion_criteria_applied, reasoning names missing inclusion criteria IDs.
 """.strip()
 
     return prompt
@@ -395,13 +428,15 @@ IMPORTANT: For each annotation, you must specify which specific criteria IDs app
 to this analysis.
 - For included analyses: List the inclusion criteria IDs that are satisfied
 - For excluded analyses: List the exclusion criteria IDs that apply
+- For include=true decisions, reasoning must include:
+  `Construct evidence span: "<short phrase from analysis/table text>"`
 
 Respond with JSON array, one object for each annotation in the same order:
 [
   {{
     "annotation_name": "annotation_1_name",
     "include": true/false,
-    "reasoning": "Brief explanation of decision",
+    "reasoning": "Brief explanation of decision. Construct evidence span: \"...\"",
     "inclusion_criteria_applied": ["I1", "I2"],
     "exclusion_criteria_applied": []
   }},
