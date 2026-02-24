@@ -237,23 +237,6 @@ def build_dynamic_multi_annotation_models(
                     f'annotation "{ann}" has include=true but inclusion_criteria_applied is empty'
                 )
 
-            if not self.include and not self.exclusion_criteria_applied:
-                reasoning_lower = self.reasoning.lower()
-                has_missing_phrase = any(
-                    token in reasoning_lower
-                    for token in ("missing", "not met", "unmet", "fails", "failed")
-                )
-                if allowed_inc:
-                    has_inclusion_id = any(cid in self.reasoning for cid in allowed_inc)
-                else:
-                    has_inclusion_id = bool(_CRIT_ID_RE.search(self.reasoning))
-
-                if not (has_missing_phrase and has_inclusion_id):
-                    raise ValueError(
-                        f'annotation "{ann}" has include=false with no exclusions; reasoning must '
-                        "state missing/not-met inclusion criteria IDs"
-                    )
-
             return self
 
     DecisionModel = _DecisionBase
