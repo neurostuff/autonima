@@ -526,13 +526,7 @@ class AutonimaPipeline:
  
         # Initialize the coordinate processor
         model = getattr(self.config.parsing, 'coordinate_model', 'gpt-4o-mini')
-        use_canonical_table_json = getattr(
-            self.config.parsing, "use_canonical_table_json", True
-        )
-        processor = CoordinateProcessor(
-            model=model,
-            use_canonical_table_json=use_canonical_table_json,
-        )
+        processor = CoordinateProcessor(model=model)
  
         # Prepare all table processing jobs
         table_jobs = []
