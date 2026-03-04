@@ -1,10 +1,11 @@
+from importlib import resources
 import os
 import subprocess
 import sys
 
 from click.testing import CliRunner
 
-from autonima.cli import run, validate
+from autonima.cli import create_sample_config, run, validate
 from autonima.config import ConfigManager
 
 
@@ -95,4 +96,15 @@ def test_importing_cli_does_not_load_heavy_pipeline_modules():
 
     assert result.stdout.strip() == (
         '{"pipeline": false, "meta": false, "pubget": false, "nimare": false}'
+    )
+
+
+def test_create_sample_config_outputs_canonical_template():
+    result = CliRunner().invoke(create_sample_config)
+
+    assert result.exit_code == 0
+    assert result.output == (
+        resources.files("autonima.templates")
+        .joinpath("sample_config.yml")
+        .read_text(encoding="utf-8")
     )

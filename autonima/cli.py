@@ -349,24 +349,9 @@ def create_sample_config():
         autonima create-sample-config > config.yaml
     """
     try:
-        from .config import create_sample_config_file
-        import tempfile
+        from .config import get_sample_config_text
 
-        # Create sample config in temporary file
-        temp_path = Path(tempfile.mktemp(suffix='.yaml'))
-        create_sample_config_file(str(temp_path))
-
-        # Read and print the sample config
-        with open(temp_path, 'r') as f:
-            sample_config = f.read()
-
-        print("# Sample Autonima Configuration")
-        print("# Copy this to a file and modify as needed")
-        print()
-        print(sample_config)
-
-        # Clean up
-        temp_path.unlink()
+        print(get_sample_config_text(), end="")
 
     except Exception as e:
         log_error_with_debug(logger, f"Failed to create sample config: {e}")
