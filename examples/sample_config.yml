@@ -1,44 +1,49 @@
 # Example Autonima pipeline specification
-# Defines a systematic review according to PRISMA steps
+# Defines a systematic review according to PRISMA steps.
+#
+# This file is the canonical sample config used by:
+# - `autonima create-sample-config`
+# - the repository example config
+# - the user documentation
 
 search:
   database: "pubmed"
-  # Option 1: Specify a search query
+  # Option 1: Specify a search query.
   query: "schizophrenia AND working memory AND fMRI"
-  # Option 2: Provide a list of PMIDs directly
+  # Option 2: Provide a list of PMIDs directly.
   # pmids_list:
   #   - "12345678"
   #   - "23456789"
   #   - "34567890"
-  # Option 3: Provide a file with one PMID per line
+  # Option 3: Provide a file with one PMID per line.
   # pmids_file: "path/to/pmids.txt"
   max_results: 100
-  # Optional date filtering - format: YYYY/MM/DD
+  # Optional date filtering, formatted as YYYY/MM/DD.
   # date_from: "2020/01/01"
   # date_to: "2024/12/31"
-  email: "your.email@example.com"  # Optional but recommended for NCBI API access
+  email: "your.email@example.com"  # Recommended for NCBI API access.
 
 retrieval:
-  load_excluded: false  # Whether to load full texts for excluded studies from abstract stage
+  load_excluded: false  # Load full texts for abstract-excluded studies too.
   sources:
     - pubget
   # full_text_sources:
-  #   # Example for HTML files where filename is the PMID (searches recursively)
+  #   # Example: HTML files where the filename is the PMID.
   #   - root_path: "/path/to/your/html/files"
   #     pmid_source: "file_name"
   #     allowed_extensions: [".html"]
-  #     # Table source for this specific source (pubget-like format)
-  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
-  #       This directory should contain coordinates.csv and tables.csv files like pubget output
-  #   # Example for folder-based structure with text files
+  #     # Table source for this specific source (pubget-like format).
+  #     processed_data_path: "/path/to/processed/pubget_like_data"
+  #
+  #   # Example: folder-based structure with plain-text files.
   #   - root_path: "/path/to/your/first/full/texts"
   #     pmid_source: "folder_name"  # or "json" or "file_name"
   #     text_path_templates:
   #       - "fulltext.txt"
   #       - "text.txt"
-  #     # Table source for this specific source (pubget-like format)
-  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
-  #   # Example for another folder-based structure with JSON metadata
+  #     processed_data_path: "/path/to/processed/pubget_like_data"
+  #
+  #   # Example: folder-based structure with JSON metadata.
   #   - root_path: "/path/to/your/second/full/texts"
   #     pmid_source: "json"
   #     text_path_templates:
@@ -46,12 +51,15 @@ retrieval:
   #       - "text.txt"
   #     json_filename: "identifiers.json"
   #     json_pmid_key: "pmid"
-  #     # Table source for this specific source (pubget-like format)
-  #     processed_data_path: "/data/alejandro/projects/autonima-results/social-processing/ace_scrape/processed/"
+  #     # Use coordinates_path_templates instead of processed_data_path when
+  #     # coordinates live alongside each document source.
+  #     # coordinates_path_templates:
+  #     #   - "coordinates.json"
+  #     processed_data_path: "/path/to/processed/pubget_like_data"
 
 screening:
   abstract:
-    model: "gpt-5-mini-2025-08-07"   # LLM for abstract screening
+    model: "gpt-5-mini-2025-08-07"
     objective: "Identify fMRI studies of working memory in schizophrenia"
     inclusion_criteria:
       - Human participants
@@ -63,71 +71,64 @@ screening:
       - Review articles, meta-analyses, or theoretical papers
       - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
       - Studies without a control or comparison group
-    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
-    # threshold: 0.9  # Optional: probability cutoff for inclusion (default: none)
-    # additional_instructions: "Pay special attention to sample sizes and effect sizes reported."
+    # confidence_reporting: false  # Optional, default false.
+    # threshold: 0.9  # Optional probability cutoff.
+    # additional_instructions: "Pay special attention to sample sizes."
+
   fulltext:
     model: "gpt-5-mini-2025-08-07"
-    # objective: "Identify fMRI studies of working memory in schizophrenia"  # Optional: override abstract objective
-    # inclusion_criteria:  # Optional: override abstract inclusion criteria
-    #   - Human participants
-    #   - fMRI neuroimaging
-    #   - Case-control or experimental design
-    #   - Task-based working memory paradigm
-    # exclusion_criteria:  # Optional: override abstract exclusion criteria
-    #   - Animal studies
-    #   - Review articles, meta-analyses, or theoretical papers
-    #   - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
-    #   - Studies without a control or comparison group
-    # confidence_reporting: false  # Optional: enable confidence reporting (default: false)
-    # threshold: 0.95  # Optional: probability cutoff for inclusion (default: none)
-    # additional_instructions: "Focus on methodological rigor and statistical significance."
+    # Full-text screening must currently define its own objective and
+    # inclusion criteria (or set skip_stage: true).
+    objective: "Identify fMRI studies of working memory in schizophrenia"
+    inclusion_criteria:
+      - Human participants
+      - fMRI neuroimaging
+      - Case-control or experimental design
+      - Task-based working memory paradigm
+    exclusion_criteria:
+      - Animal studies
+      - Review articles, meta-analyses, or theoretical papers
+      - Non-fMRI imaging modalities (e.g., PET, EEG, MEG)
+      - Studies without a control or comparison group
+    # confidence_reporting: false
+    # threshold: 0.95
+    # additional_instructions: "Focus on methodological rigor."
 
 parsing:
-  # Coordinate parsing options
-  parse_coordinates: true  # Enable coordinate parsing for studies with activation tables
-  coordinate_model: "gpt-4o-mini"  # Model to use for coordinate parsing
-
+  parse_coordinates: true
+  coordinate_model: "gpt-4o-mini"
 
 output:
+  # Keep this non-empty. The CLI can override it with an explicit output folder
+  # or default to a folder derived from the config filename.
   directory: "results"
   formats: ["csv", "json"]
-  nimads: false  # Output in NiMADS format (default: false)
-  export_excluded_studies: false  # Export excluded studies to NiMADS (default: false)
+  nimads: false
+  export_excluded_studies: false
 
-# Annotation configuration for categorizing analyses
 annotation:
   enabled: true
   model: "gpt-4o-mini"
-  # Prompt type for annotation processing
-  # Options: "single_analysis" (per-analysis, multiple annotations) or "multi_analysis" (all analyses in study together)
+  # Options: "single_analysis" or "multi_analysis".
   prompt_type: "single_analysis"
-  # Create an "all_analyses" annotation with all analyses from INCLUDED studies
   create_all_included_annotation: true
-  # Create an "all_studies" annotation with ALL analyses from original search
-  # (INCLUDED + EXCLUDED studies - useful when export_excluded_studies is true)
   create_all_from_search_annotation: false
-  # Define metadata fields to include in prompts
   # metadata_fields:
   #   - "analysis_name"
   #   - "analysis_description"
   #   - "table_caption"
   #   - "study_title"
   #   - "study_abstract"
-  #   - "study_fulltext"   # Add this to include full text in prompts
-  # Define global inclusion/exclusion criteria (merged with annotation-specific criteria)
+  #   - "study_fulltext"
   # inclusion_criteria:
   #   - "Studies must be in English"
-  #   - "Studies must use human participants"
   # exclusion_criteria:
   #   - "Exclude animal studies"
-  #   - "Exclude review articles"
-  # Define custom annotations with inclusion/exclusion criteria
   # annotations:
   #   - name: "working_memory"
   #     description: "Working memory task-based analyses"
   #     inclusion_criteria:
-  #       - "Analysis involves working memory tasks (n-back, digit span, etc.)"
+  #       - "Analysis involves working memory tasks"
   #       - "Task-based fMRI with cognitive load manipulation"
   #     exclusion_criteria:
   #       - "Resting-state or passive viewing"

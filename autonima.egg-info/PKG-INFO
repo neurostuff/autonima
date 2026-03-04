@@ -2,12 +2,12 @@ Metadata-Version: 2.4
 Name: autonima
 Version: 0.1.0
 Summary: LLM-powered automated systematic review and meta-analysis
-Home-page: https://github.com/neurosynth/autonima
+Home-page: https://github.com/adelavega/autonima
 Author: Autonima Development Team
 Author-email: 
-Project-URL: Documentation, https://github.com/neurosynth/autonima
-Project-URL: Source, https://github.com/neurosynth/autonima
-Project-URL: Tracker, https://github.com/neurosynth/autonima/issues
+Project-URL: Documentation, https://adelavega.github.io/autonima/
+Project-URL: Source, https://github.com/adelavega/autonima
+Project-URL: Tracker, https://github.com/adelavega/autonima/issues
 Keywords: systematic-review,meta-analysis,neuroimaging,pubmed,llm,ai,literature-search,prisma,evidence-synthesis
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Science/Research
@@ -49,6 +49,11 @@ Provides-Extra: readability
 Requires-Dist: readabilipy>=0.2.0; extra == "readability"
 Provides-Extra: meta
 Requires-Dist: nimare>=0.1.0; extra == "meta"
+Provides-Extra: docs
+Requires-Dist: mkdocs>=1.6; extra == "docs"
+Requires-Dist: mkdocs-material>=9.5; extra == "docs"
+Requires-Dist: mkdocs-click>=0.8; extra == "docs"
+Requires-Dist: pymdown-extensions>=10.0; extra == "docs"
 Dynamic: author
 Dynamic: classifier
 Dynamic: description
@@ -63,163 +68,106 @@ Dynamic: summary
 
 # Autonima
 
-**Autonima** (Automated Neuroimaging Meta-Analysis) is an LLM-powered framework for automating systematic literature reviews and meta-analyses in neuroimaging.
+Autonima is an LLM-assisted CLI for neuroimaging review workflows: search PubMed, screen studies, retrieve full text, parse coordinates, and export NiMADS artifacts for downstream meta-analysis.
 
-Given a meta-analysis specification (e.g., inclusion/exclusion criteria, study objective, search parameters), Autonima automates the full evidence-synthesis workflow, from literature search to final inclusion of studies, in line with the **PRISMA** framework.
+Full documentation: https://adelavega.github.io/autonima/
 
-Autonima is part of the **Neurosynth family of tools** for open, reproducible, and scalable meta-analysis.
+## Install
 
----
-
-## 🌟 Key Features
-
-Autonima enables end-to-end automation of systematic review steps:
-
-1. **Automated Search**
-
-   * Uses PubMed to apply user-specified search parameters.
-   * Fetches all potentially relevant abstracts.
-
-2. **Abstract Screening (PRISMA Identification & Screening)**
-
-   * Applies inclusion/exclusion criteria to abstracts using LLM-based screening.
-   * Benchmarked against human/manual performance.
-   * Uses function calling with Pydantic schemas for structured output.
-
-3. **Full-Text Retrieval**
-
-   * Downloads full texts of candidate papers via a combination of **PubGet**
-
-4. **Eligibility & Inclusion**
-
-   * Applies full-text screening with LLMs.
-   * Produces a final set of included studies for meta-analysis.
-   * Uses function calling with Pydantic schemas for structured output.
-
-5. **Enhanced HTML Cleaning**
-
-   * Uses Mozilla's Readability algorithm via `readabilipy` to extract clean text content from HTML.
-   * Falls back to basic HTML cleaning when `readabilipy` is not available.
-   * Install with `pip install -e .[readability]` (requires Node.js).
-
----
-
-## 📊 Benchmarking
-
-Autonima is benchmarked against **[neurometabench](https://github.com/neurosynth/neurometabench)**, a structured dataset of neuroimaging meta-analyses designed to test automated reconstruction workflows.
-
-Benchmarking focuses on:
-
-* **Recall & precision** of included studies (abstract vs. full-text screening).
-* **Reproducibility** of original inclusion decisions.
-* **Scalability & speed** compared to human systematic reviews.
-
----
-
-## 📂 Repository Structure
-
-```
-autonima/
-├── autonima/             # Core Python package
-├── benchmarks/
-│   └── neurometabench/   # Scripts for benchmarking against neurometabench
-├── tests/                # Unit and integration tests
-└── README.md             # You are here
-```
-
----
-
-## 🚀 Quickstart
+Base install:
 
 ```bash
-# clone repository
-git clone https://github.com/neurosynth/autonima.git
+git clone git@github.com:adelavega/autonima.git
 cd autonima
-
-# install
 pip install -e .
-
-# install with enhanced HTML cleaning (requires Node.js)
-pip install -e .[readability]
-
-> Note: The enhanced HTML cleaning feature requires Node.js to be installed on your system.
-
-# run an example review pipeline
-python examples/run_pipeline.py --config examples/sample_config.yaml
 ```
 
-Where `sample_config.yaml` specifies:
+Useful extras:
 
-* Study objective
-* Search parameters
-* Inclusion/exclusion criteria
-
----
-
-## 🔍 Example Workflow
-
-1. Define your review specification (`YAML` or `JSON`):
-
-   ```yaml
-   search:
-     database: "pubmed"
-     query: "schizophrenia AND working memory AND fMRI"
-   screening:
-     abstract:
-       objective: "Identify fMRI studies of working memory in schizophrenia"
-       inclusion_criteria:
-         - Human participants
-         - fMRI neuroimaging
-         - Case-control design
-       exclusion_criteria:
-         - Animal studies
-         - Review articles
-   ```
-
-2. Run Autonima pipeline:
-
-   ```bash
-   autonima run --config config.yaml
-   ```
-
-3. Output:
-
-   * **PRISMA flow diagram** (records identified, screened, excluded, included).
-   * **Final included study list** (with metadata + DOIs/PMIDs).
-   * **NiMARE dataset** for downstream meta-analysis.
-
----
-
-## 🧬 Related Projects
-
-* [neurometabench](https://github.com/neurostuff/neurometabench) – benchmarking dataset
-* [NiMARE](https://github.com/neurostuff/NiMARE) – neuroimaging meta-analysis in Python
-* [Neurosynth Compose](https://compose.neurosynth.org) – human-in-the-loop neuroimaging meta-analysis
-
----
-
-## 🧠 Coordinate Parsing
-
-Autonima includes a specialized module for parsing neuroimaging coordinate tables using LLMs. This module can:
-
-* Parse CSV files containing neuroimaging results tables
-* Extract coordinate points and their associated metadata
-* Structure the data according to standardized schemas
-* Support parallel processing for improved performance
-
-### Python API
-
-```python
-from autonima.coordinates import parse_tables
-
-# Parse tables with default settings
-results = parse_tables("./input_tables", "./output_json")
-
-# Parse tables with custom model and parallel processing
-results = parse_tables(
-    "./input_tables",
-    "./output_json",
-    model="gpt-4",
-    num_workers=4
-)
+```bash
+pip install -e .[llm]          # screening and other LLM-backed workflows
+pip install -e .[meta]         # `autonima meta`
+pip install -e .[readability]  # enhanced HTML extraction
+pip install -e .[docs]         # local docs build
 ```
+
+## Quickstart
+
+Generate a starting config:
+
+```bash
+autonima create-sample-config > config.yaml
+```
+
+Validate it:
+
+```bash
+autonima validate config.yaml
+```
+
+Run the pipeline:
+
+```bash
+autonima run config.yaml
+```
+
+If you omit `OUTPUT_FOLDER`, the CLI derives it from the config filename stem. For example:
+
+- config: `projects/cue_reactivity/default.yaml`
+- default output folder: `projects/cue_reactivity/default/`
+
+You can still pass an explicit runtime output folder:
+
+```bash
+autonima run config.yaml runs/my_review
+```
+
+Run meta-analysis on the generated NiMADS outputs:
+
+```bash
+autonima meta runs/my_review/outputs
+```
+
+## Minimal Config Example
+
+```yaml
+search:
+  database: "pubmed"
+  query: "schizophrenia AND working memory AND fMRI"
+  max_results: 100
+
+retrieval:
+  sources:
+    - pubget
+  load_excluded: false
+
+screening:
+  abstract:
+    model: "gpt-5-mini-2025-08-07"
+    objective: "Identify fMRI studies of working memory in schizophrenia"
+    inclusion_criteria:
+      - Human participants
+      - fMRI neuroimaging
+  fulltext:
+    model: "gpt-5-mini-2025-08-07"
+    objective: "Identify fMRI studies of working memory in schizophrenia"
+    inclusion_criteria:
+      - Human participants
+      - fMRI neuroimaging
+
+parsing:
+  parse_coordinates: false
+  coordinate_model: "gpt-4o-mini"
+
+output:
+  directory: "results"
+
+annotation:
+  enabled: false
+```
+
+For the full sample config and field-by-field guidance, see:
+
+- https://adelavega.github.io/autonima/getting-started/quickstart/
+- https://adelavega.github.io/autonima/guides/configuration/
+- https://adelavega.github.io/autonima/guides/cli/
