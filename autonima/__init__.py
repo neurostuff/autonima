@@ -1,80 +1,71 @@
 """
-Autonima: Automated Neuroimaging Meta-Analysis
+Autonima: Automated Neuroimaging Meta-Analysis.
 
-An LLM-powered framework for automating systematic literature reviews
-and meta-analyses in neuroimaging, following the PRISMA framework.
-
-This package provides automated tools for:
-- Literature search via PubMed API
-- Abstract and full-text screening using LLMs
-- Full-text retrieval via PubGet
-- PRISMA-compliant workflow management
-- Output generation for downstream meta-analysis
-
-Example:
-    >>> from autonima import AutonimaPipeline
-    >>> pipeline = AutonimaPipeline("config.yaml")
-    >>> pipeline.run()
+This module keeps package import lightweight. Heavy optional dependencies are
+loaded only when their symbols are requested.
 """
+
+from importlib import import_module
 
 __version__ = "0.1.0"
 __author__ = "Autonima Development Team"
 __description__ = "LLM-powered automated systematic review and meta-analysis"
 
-__all__ = []
+__all__ = [
+    "AutonimaPipeline",
+    "PipelineConfig",
+    "BaseRetriever",
+    "PubGetRetriever",
+    "CoordinatePoint",
+    "Analysis",
+    "ParseAnalysesOutput",
+    "parse_tables",
+    "CoordinateParsingClient",
+    "CoordinateProcessor",
+    "GenericLLMClient",
+    "run_meta_analyses",
+    "HAS_META",
+]
 
-# Core pipeline/config imports may rely on optional dependencies in submodules.
-try:
-    from .pipeline import AutonimaPipeline
-    from .config import PipelineConfig
+_LAZY_IMPORTS = {
+    "AutonimaPipeline": ("autonima.pipeline", "AutonimaPipeline"),
+    "PipelineConfig": ("autonima.config", "PipelineConfig"),
+    "BaseRetriever": ("autonima.retrieval.base", "BaseRetriever"),
+    "PubGetRetriever": ("autonima.retrieval.pubget", "PubGetRetriever"),
+    "CoordinatePoint": ("autonima.coordinates.schema", "CoordinatePoint"),
+    "Analysis": ("autonima.coordinates.schema", "Analysis"),
+    "ParseAnalysesOutput": (
+        "autonima.coordinates.schema",
+        "ParseAnalysesOutput",
+    ),
+    "parse_tables": ("autonima.coordinates.parser", "parse_tables"),
+    "CoordinateParsingClient": (
+        "autonima.coordinates.openai_client",
+        "CoordinateParsingClient",
+    ),
+    "CoordinateProcessor": (
+        "autonima.coordinates.processor",
+        "CoordinateProcessor",
+    ),
+    "GenericLLMClient": ("autonima.llm.client", "GenericLLMClient"),
+    "run_meta_analyses": ("autonima.meta", "run_meta_analyses"),
+}
 
-    __all__.extend(["AutonimaPipeline", "PipelineConfig"])
-except ImportError:
-    pass
 
-# Retrieval module components (optional dependency: pubget and related stack)
-try:
-    from .retrieval import BaseRetriever, PubGetRetriever
+def __getattr__(name):
+    if name == "HAS_META":
+        try:
+            import_module("autonima.meta")
+        except ImportError:
+            return False
+        return True
 
-    __all__.extend(["BaseRetriever", "PubGetRetriever"])
-except ImportError:
-    pass
+    target = _LAZY_IMPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module 'autonima' has no attribute {name!r}")
 
-# Coordinate parsing module components
-try:
-    from .coordinates import (
-        CoordinatePoint,
-        Analysis,
-        ParseAnalysesOutput,
-        parse_tables,
-        CoordinateParsingClient,
-    )
-
-    __all__.extend(
-        [
-            "CoordinatePoint",
-            "Analysis",
-            "ParseAnalysesOutput",
-            "parse_tables",
-            "CoordinateParsingClient",
-        ]
-    )
-except ImportError:
-    pass
-
-# LLM client (optional dependency: openai)
-try:
-    from .llm.client import GenericLLMClient
-
-    __all__.append("GenericLLMClient")
-except ImportError:
-    pass
-
-# Meta-analysis module components (optional dependency: nimare)
-try:
-    from .meta import run_meta_analyses
-
-    HAS_META = True
-    __all__.append("run_meta_analyses")
-except ImportError:
-    HAS_META = False
+    module_name, attr_name = target
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value

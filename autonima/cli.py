@@ -7,8 +7,6 @@ from pathlib import Path
 
 import click
 
-from .config import ConfigManager, ConfigurationError
-from .pipeline import run_pipeline_from_config
 from .utils import set_debug_mode, log_error_with_debug
 
 # Set up logging
@@ -21,6 +19,18 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+
+def _get_config_dependencies():
+    from .config import ConfigManager, ConfigurationError
+
+    return ConfigManager, ConfigurationError
+
+
+def _get_run_pipeline_from_config():
+    from .pipeline import run_pipeline_from_config
+
+    return run_pipeline_from_config
 
 
 def _resolve_output_folder(
@@ -80,6 +90,7 @@ def run(
     
     # Set debug mode globally
     set_debug_mode(debug)
+    ConfigManager, ConfigurationError = _get_config_dependencies()
 
     config_path = Path(config)
     if not config_path.exists():
@@ -105,6 +116,7 @@ def run(
             return
 
         async def execute_pipeline():
+            run_pipeline_from_config = _get_run_pipeline_from_config()
             results = await run_pipeline_from_config(
                 config=pipeline_config, num_workers=num_workers
             )
@@ -167,6 +179,7 @@ def validate(config: str, output_folder: str | None, debug: bool):
         autonima validate config.yaml results
     """
     config_path = Path(config)
+    ConfigManager, ConfigurationError = _get_config_dependencies()
     if not config_path.exists():
         log_error_with_debug(
             logger, f"Configuration file not found: {config_path}"

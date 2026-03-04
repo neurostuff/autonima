@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+
 from click.testing import CliRunner
 
 from autonima.cli import run, validate
@@ -61,3 +65,34 @@ def test_validate_keeps_explicit_output_dir(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert sample_config.output.directory == str(explicit_output)
     assert f"✓ Output directory: {explicit_output}" in result.output
+
+
+def test_importing_cli_does_not_load_heavy_pipeline_modules():
+    env = os.environ.copy()
+    repo_root = os.path.dirname(os.path.dirname(__file__))
+    env["PYTHONPATH"] = repo_root
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import json, sys; "
+            "import autonima.cli; "
+            "print(json.dumps({"
+            "'pipeline': 'autonima.pipeline' in sys.modules, "
+            "'meta': 'autonima.meta' in sys.modules, "
+            "'pubget': 'pubget' in sys.modules, "
+            "'nimare': 'nimare' in sys.modules}))"
+        ),
+    ]
+
+    result = subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.stdout.strip() == (
+        '{"pipeline": false, "meta": false, "pubget": false, "nimare": false}'
+    )
