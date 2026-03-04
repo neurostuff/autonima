@@ -1,9 +1,10 @@
 """Configuration management and validation for Autonima."""
 
+from importlib import resources
 import logging
-import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
+import yaml
 
 from .models.types import (
     PipelineConfig,
@@ -16,6 +17,9 @@ from .models.types import (
 from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
 
 logger = logging.getLogger(__name__)
+
+_SAMPLE_CONFIG_PACKAGE = "autonima.templates"
+_SAMPLE_CONFIG_NAME = "sample_config.yml"
 
 
 class ConfigurationError(Exception):
@@ -239,54 +243,12 @@ class ConfigManager:
             yaml.dump(config_dict, f, default_flow_style=False, indent=2)
 
     def create_sample_config(self) -> PipelineConfig:
-        """Create a sample configuration for demonstration purposes."""
-        # Create a screening config with example values
-        screening_config = ScreeningConfig()
-        # Example with confidence reporting enabled and threshold set
-        screening_config.abstract.update({
-            "model": "gpt-4o-mini",
-            "confidence_reporting": True,
-            "threshold": 0.9,
-            "objective": "Identify fMRI studies of working memory in schizophrenia",
-            "inclusion_criteria": [
-                "Human participants",
-                "fMRI neuroimaging",
-                "Case-control or experimental design",
-                "Task-based working memory paradigm"
-            ],
-            "exclusion_criteria": [
-                "Animal studies",
-                "Review articles, meta-analyses, or theoretical papers",
-                "Non-fMRI imaging modalities (e.g., PET, EEG, MEG)",
-                "Studies without a control or comparison group"
-            ]
-        })
-        screening_config.fulltext.update({
-            "model": "gpt-4",
-            "confidence_reporting": True,
-            "threshold": 0.95
-        })
-        
-        return PipelineConfig(
-            search=SearchConfig(
-                database="pubmed",
-                query="schizophrenia AND working memory AND fMRI",
-                max_results=1000
-            ),
-            screening=screening_config,
-            retrieval=RetrievalConfig(),
-            output=OutputConfig(nimads=False),
-            parsing=ParsingConfig(
-                parse_coordinates=True,
-                coordinate_model="gpt-4o-mini"
-            ),
-            annotation=self._load_annotation_config({
-                "model": "gpt-4o-mini",
-                "create_all_included_annotation": True,
-                "create_all_from_search_annotation": False,
-                "annotations": []
-            })
-        )
+        """Create the canonical sample configuration as a validated object."""
+        sample_config_text = get_sample_config_text()
+        config_data = yaml.safe_load(sample_config_text)
+        if config_data is None:
+            raise ConfigurationError("Canonical sample configuration is empty")
+        return self.load_from_dict(config_data)
 
     def _validate_screening_config(self, config: PipelineConfig) -> None:
         """
@@ -443,6 +405,21 @@ def create_sample_config_file(output_path: Union[str, Path]) -> None:
     Args:
         output_path: Path where to save the sample configuration
     """
-    manager = ConfigManager()
-    sample_config = manager.create_sample_config()
-    manager.save_config(output_path, sample_config)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(get_sample_config_text(), encoding="utf-8")
+
+
+def get_sample_config_text() -> str:
+    """Return the canonical sample configuration YAML text."""
+    if hasattr(resources, "files"):
+        return (
+            resources.files(_SAMPLE_CONFIG_PACKAGE)
+            .joinpath(_SAMPLE_CONFIG_NAME)
+            .read_text(encoding="utf-8")
+        )
+    return resources.read_text(
+        _SAMPLE_CONFIG_PACKAGE,
+        _SAMPLE_CONFIG_NAME,
+        encoding="utf-8",
+    )

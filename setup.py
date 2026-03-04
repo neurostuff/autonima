@@ -25,7 +25,7 @@ setup(
     description="LLM-powered automated systematic review and meta-analysis",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/neurosynth/autonima",
+    url="https://github.com/adelavega/autonima",
     packages=find_packages(exclude=["tests*", "examples*"]),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -74,6 +74,12 @@ setup(
         ],
         "meta": [
             "nimare>=0.1.0"
+        ],
+        "docs": [
+            "mkdocs>=1.6",
+            "mkdocs-material>=9.5",
+            "mkdocs-click>=0.8",
+            "pymdown-extensions>=10.0",
         ]
     },
     entry_points={
@@ -84,6 +90,7 @@ setup(
     include_package_data=True,
     package_data={
         "autonima": ["py.typed"],
+        "autonima.templates": ["*.yml"],
     },
     keywords=[
         "systematic-review",
@@ -97,8 +104,8 @@ setup(
         "evidence-synthesis"
     ],
     project_urls={
-        "Documentation": "https://github.com/neurosynth/autonima",
-        "Source": "https://github.com/neurosynth/autonima",
-        "Tracker": "https://github.com/neurosynth/autonima/issues",
+        "Documentation": "https://adelavega.github.io/autonima/",
+        "Source": "https://github.com/adelavega/autonima",
+        "Tracker": "https://github.com/adelavega/autonima/issues",
     },
 )

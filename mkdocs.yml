@@ -1,0 +1,42 @@
+site_name: Autonima
+site_url: https://adelavega.github.io/autonima/
+repo_url: https://github.com/adelavega/autonima
+repo_name: adelavega/autonima
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - mkdocs-click
+  - pymdownx.details
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Guides:
+      - Configuration: guides/configuration.md
+      - CLI Usage: guides/cli.md
+      - Outputs: guides/outputs.md
+      - Full-Text Sources: guides/full-text-sources.md
+      - Meta-Analysis: guides/meta-analysis.md
+  - Reference:
+      - CLI Reference: reference/cli.md
+  - Contributing:
+      - Documentation: contributing/docs.md
