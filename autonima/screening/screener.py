@@ -2,6 +2,7 @@
 
 import logging
 import json
+import os
 import concurrent.futures
 import tqdm
 import time
@@ -16,6 +17,25 @@ from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
+
+
+def _acquire_lock(lock_file: Path, poll_seconds: float = 0.05) -> None:
+    """Acquire an inter-process lock via atomic lock-file creation."""
+    while True:
+        try:
+            fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            return
+        except FileExistsError:
+            time.sleep(poll_seconds)
+
+
+def _release_lock(lock_file: Path) -> None:
+    """Release lock file if present."""
+    try:
+        lock_file.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def load_screening_results_with_lock(
@@ -36,13 +56,9 @@ def load_screening_results_with_lock(
     """
     lock_file = file_path.with_suffix(file_path.suffix + lock_suffix)
     
-    # Wait for lock to be released
-    while lock_file.exists():
-        time.sleep(0.1)
-    
-    # Create lock file
+    # Acquire lock (atomic create to avoid races between workers/processes)
     try:
-        lock_file.touch()
+        _acquire_lock(lock_file)
         
         # Load results if file exists
         if file_path.exists():
@@ -57,13 +73,7 @@ def load_screening_results_with_lock(
                 return []
         return []
     finally:
-        # Remove lock file
-        try:
-            if lock_file.exists():
-                lock_file.unlink()
-        except FileNotFoundError:
-            # Lock file was already removed, ignore
-            pass
+        _release_lock(lock_file)
 
 
 def save_screening_result_with_lock(
@@ -85,13 +95,9 @@ def save_screening_result_with_lock(
     """
     lock_file = file_path.with_suffix(file_path.suffix + lock_suffix)
     
-    # Wait for lock to be released
-    while lock_file.exists():
-        time.sleep(0.1)
-    
-    # Create lock file
+    # Acquire lock (atomic create to avoid races between workers/processes)
     try:
-        lock_file.touch()
+        _acquire_lock(lock_file)
         
         # Load existing results
         if file_path.exists():
@@ -124,22 +130,18 @@ def save_screening_result_with_lock(
         data["screening_results"] = existing_results
         data["timestamp"] = datetime.now().isoformat()
         
-        # Save results
-        with open(file_path, 'w') as f:
+        # Save results atomically to avoid partially written JSON.
+        temp_file = file_path.with_suffix(file_path.suffix + ".tmp")
+        with open(temp_file, 'w') as f:
             json.dump(data, f, indent=2)
+        os.replace(temp_file, file_path)
             
         return True
     except Exception as e:
         logger.error(f"Failed to save screening result to {file_path}: {e}")
         return False
     finally:
-        # Remove lock file
-        try:
-            if lock_file.exists():
-                lock_file.unlink()
-        except FileNotFoundError:
-            # Lock file was already removed, ignore
-            pass
+        _release_lock(lock_file)
 
 
 def parallelize_screening(func):
@@ -565,6 +567,18 @@ class LLMScreener(ScreeningEngine):
             else:
                 studies_to_screen.append(study)
         
+        stage_label = (
+            "Abstract screening"
+            if screening_type == "abstract"
+            else "Full-text screening"
+        )
+        logger.info(
+            "Starting %s: %s to screen, %s cached",
+            stage_label,
+            len(studies_to_screen),
+            len(existing_results),
+        )
+
         # Process studies that need screening
         new_results = []
         if studies_to_screen:
@@ -580,16 +594,6 @@ class LLMScreener(ScreeningEngine):
         # Combine existing and new results
         results = existing_results + new_results
 
-        included_status = (
-            StudyStatus.INCLUDED_ABSTRACT
-            if screening_type == "abstract"
-            else StudyStatus.INCLUDED_FULLTEXT
-        )
-        excluded_status = (
-            StudyStatus.EXCLUDED_ABSTRACT
-            if screening_type == "abstract"
-            else StudyStatus.EXCLUDED_FULLTEXT
-        )
         included_count = 0
         excluded_count = 0
         failed_count = 0
@@ -612,24 +616,15 @@ class LLMScreener(ScreeningEngine):
             elif decision_value == StudyStatus.SCREENING_FAILED.value:
                 failed_count += 1
 
-        stage_label = (
-            "Abstract screening"
-            if screening_type == "abstract"
-            else "Full-text screening"
-        )
         skipped_suffix = (
             f", {skipped_count} skipped (missing "
             f"{'abstracts' if screening_type == 'abstract' else 'full text'})"
             if skipped_count
             else ""
         )
-        cached_summary = f"{len(existing_results)} cached"
-        if studies_to_screen:
-            cached_summary += f", {len(studies_to_screen)} to screen"
 
         logger.info(
-            f"{stage_label}: {len(screenable_studies)} eligible "
-            f"({cached_summary}), "
+            f"{stage_label}: {len(screenable_studies)} eligible, "
             f"{included_count} included, {excluded_count} excluded, "
             f"{failed_count} failed"
             f"{skipped_suffix}"
