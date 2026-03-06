@@ -65,6 +65,15 @@ class AnnotationProcessor:
             f"Processing {len(included_studies)} INCLUDED studies with "
             "analyses for annotation"
         )
+
+        if output_dir:
+            for study in included_studies:
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = output_dir
+            if all_studies:
+                for study in all_studies:
+                    if not study.full_text_output_dir:
+                        study.full_text_output_dir = output_dir
         
         # Process all analysis-annotation combinations incrementally by study
         all_decisions = []
@@ -489,7 +498,7 @@ class AnnotationProcessor:
             "study_authors": lambda: study.authors,
             "study_journal": lambda: study.journal,
             "study_publication_date": lambda: study.publication_date,
-            "study_fulltext": lambda: study.full_text,
+            "study_fulltext": lambda: self._safe_get_study_fulltext(study),
         }
         
         # If metadata_fields is None, include all fields
@@ -506,6 +515,13 @@ class AnnotationProcessor:
         metadata = AnalysisMetadata(**kwargs)
         
         return metadata
+
+    def _safe_get_study_fulltext(self, study: Study) -> Optional[str]:
+        """Best-effort full-text fetch for optional prompt fields."""
+        try:
+            return study.full_text
+        except (ValueError, FileNotFoundError):
+            return None
     
     def _build_study_analysis_group(
         self,
@@ -540,7 +556,9 @@ class AnnotationProcessor:
         if 'study_publication_date' in metadata_fields:
             study_kwargs['study_publication_date'] = study.publication_date
         if 'study_fulltext' in metadata_fields:
-            study_kwargs['study_fulltext'] = study.full_text
+            study_kwargs['study_fulltext'] = self._safe_get_study_fulltext(
+                study
+            )
         
         # Build table metadata
         tables = []
@@ -667,12 +685,32 @@ class AnnotationProcessor:
             existing_lookup = {(d.study_id, d.analysis_id, d.annotation_name): d 
                               for d in existing_decisions}
             
-            # For each study with new decisions, remove all existing decisions for that study
-            # and replace with the new complete set
+            # For each study with new decisions, replace only the annotations
+            # that were reprocessed for that study.
             for study_id, study_decisions in new_decisions_by_study.items():
-                # Remove all existing decisions for this study
-                existing_lookup = {key: decision for key, decision in existing_lookup.items() 
-                                  if decision.study_id != study_id}
+                updated_annotation_names = {
+                    decision.annotation_name for decision in study_decisions
+                }
+                keep_system_annotations = {"all_analyses", "all_studies"}
+                has_custom_updates = any(
+                    name not in keep_system_annotations
+                    for name in updated_annotation_names
+                )
+                existing_lookup = {
+                    key: decision
+                    for key, decision in existing_lookup.items()
+                    if not (
+                        decision.study_id == study_id
+                        and (
+                            decision.annotation_name in updated_annotation_names
+                            or (
+                                has_custom_updates
+                                and decision.annotation_name
+                                not in keep_system_annotations
+                            )
+                        )
+                    )
+                }
                 
                 # Add all new decisions for this study
                 for decision in study_decisions:

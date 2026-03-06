@@ -21,6 +21,21 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
+def _configure_run_logging(verbose: bool) -> None:
+    """Configure runtime logging for `autonima run`."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+
+    # Keep external dependencies quiet by default.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("pubget").setLevel(
+        logging.INFO if verbose else logging.WARNING
+    )
+    logging.getLogger("joblib").setLevel(
+        logging.INFO if verbose else logging.WARNING
+    )
+
+
 def _get_config_dependencies():
     from .config import ConfigManager, ConfigurationError
 
@@ -84,8 +99,8 @@ def run(
         autonima run config.yaml results --verbose
         autonima run config.yaml --dry-run
     """
+    _configure_run_logging(verbose)
     if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
         logger.info("Verbose logging enabled")
     
     # Set debug mode globally
@@ -101,7 +116,7 @@ def run(
 
     try:
         # Load and validate configuration
-        logger.info(f"Loading configuration from: {config_path}")
+        logger.debug(f"Loading configuration from: {config_path}")
         config_manager = ConfigManager()
         pipeline_config = config_manager.load_from_file(str(config_path))
 
@@ -128,17 +143,70 @@ def run(
             print("\n" + "="*60)
             print("AUTONIMA PIPELINE COMPLETED")
             print("="*60)
-            identified = prisma_stats.get('total_identified', 0)
-            print(f"Total studies identified: {identified}")
-            print(f"Studies included: {prisma_stats.get('final_included', 0)}")
-            print(f"Output directory: {pipeline_config.output.directory}")
+
+            studies = results.studies
+            total_identified = prisma_stats.get("total_identified", len(studies))
+            abstract_screened = sum(
+                1
+                for s in studies
+                if getattr(s.status, "value", str(s.status)) != "pending"
+            )
+            fulltext_screened = sum(
+                1
+                for s in studies
+                if getattr(s.status, "value", str(s.status)) in {
+                    "included_fulltext",
+                    "excluded_fulltext",
+                }
+            )
+            final_included = prisma_stats.get(
+                "final_included",
+                sum(
+                    1
+                    for s in studies
+                    if getattr(s.status, "value", str(s.status))
+                    == "included_fulltext"
+                )
+            )
+
+            parsing_stats = stats.get("coordinate_parsing", {})
+            parsing_enabled = parsing_stats.get(
+                "enabled",
+                getattr(pipeline_config.parsing, "parse_coordinates", False),
+            )
+            if parsing_enabled:
+                coordinate_summary = (
+                    "enabled"
+                    f" ({parsing_stats.get('tables_processed', 0)} tables,"
+                    f" {parsing_stats.get('studies_with_tables', 0)} studies)"
+                )
+            else:
+                coordinate_summary = "disabled"
+
+            annotation_stats = stats.get("annotation", {})
+            annotation_enabled = annotation_stats.get(
+                "enabled",
+                getattr(pipeline_config.annotation, "enabled", True),
+            )
+            if annotation_enabled:
+                annotation_summary = (
+                    "enabled"
+                    f" ({annotation_stats.get('decisions', 0)} decisions)"
+                )
+            else:
+                annotation_summary = "disabled"
+
+            print(f"Studies from search: {total_identified}")
+            print(f"Studies screened with abstract: {abstract_screened}")
+            print(f"Studies screened with full text: {fulltext_screened}")
+            print(f"Final included studies: {final_included}")
+            print(f"Coordinate parsing: {coordinate_summary}")
+            print(f"Annotation: {annotation_summary}")
 
             if results.errors:
                 print(f"\nErrors encountered: {len(results.errors)}")
                 for error in results.errors:
                     print(f"  - {error}")
-
-            print("\nResults saved to:", pipeline_config.output.directory)
             return results
 
         # Run the async pipeline

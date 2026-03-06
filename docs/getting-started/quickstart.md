@@ -72,3 +72,4 @@ pip install -e .[meta]
 - [Configuration Guide](../guides/configuration.md)
 - [CLI Usage Guide](../guides/cli.md)
 - [Outputs Guide](../guides/outputs.md)
+- [Interpreting Outputs](../guides/interpreting-outputs.md)

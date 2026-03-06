@@ -35,6 +35,10 @@ projects/cue_reactivity/default/
 
 The exact contents depend on which stages are enabled.
 
+## Need Help Interpreting These Files?
+
+Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-oriented walkthrough of what each artifact means and which file to inspect first.
+
 ## Key Files
 
 ## `outputs/search_results.json`

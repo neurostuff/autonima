@@ -2,6 +2,7 @@
 
 import json
 import logging
+from types import SimpleNamespace
 from typing import List, Dict, Any, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 from ..llm.client import GenericLLMClient
@@ -9,6 +10,27 @@ from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecisi
 from ..utils import log_error_with_debug
 
 logger = logging.getLogger(__name__)
+
+
+class _MissingAPIKeyCompletions:
+    """Placeholder completions API used when no API key is configured."""
+
+    def __init__(self, error: Exception):
+        self._error = error
+
+    def create(self, *args, **kwargs):
+        raise self._error
+
+
+class _MissingAPIKeyClient:
+    """Lightweight client shape compatible with test patching."""
+
+    def __init__(self, error: Exception):
+        self.client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=_MissingAPIKeyCompletions(error)
+            )
+        )
 
 
 class AnnotationDecisionOutput(BaseModel):
@@ -108,7 +130,15 @@ class AnnotationClient:
         Args:
             max_retries: Maximum number of retries for malformed responses
         """
-        self._client = GenericLLMClient()
+        try:
+            self._client = GenericLLMClient()
+        except ValueError as e:
+            if "API key must be provided" in str(e):
+                # Keep constructor usable for tests that patch
+                # `client._client.client.chat.completions.create`.
+                self._client = _MissingAPIKeyClient(e)
+            else:
+                raise
         self.max_retries = max_retries
     
     def _generate_function_schema(
@@ -291,13 +321,57 @@ class AnnotationClient:
                 function_call={"name": func_name}
             )
             
-            # Extract the function call result
-            function_call = response.choices[0].message.function_call
-            if not function_call:
-                raise ValueError("No function call returned from API")
-            
+            message = response.choices[0].message
+            function_call = getattr(message, "function_call", None)
+            function_args = (
+                getattr(function_call, "arguments", None)
+                if function_call is not None
+                else None
+            )
+
+            raw_payload = None
+            if isinstance(function_args, (str, bytes, bytearray)):
+                raw_payload = function_args
+            else:
+                message_content = getattr(message, "content", None)
+                if isinstance(message_content, (str, bytes, bytearray)):
+                    raw_payload = message_content
+
+            if raw_payload is None:
+                raise ValueError(
+                    "No parseable function_call arguments or message content "
+                    "returned from API"
+                )
+
             # Parse the result
-            result_dict = json.loads(function_call.arguments)
+            result_dict = json.loads(raw_payload)
+
+            # Backward-compatible single-decision response format.
+            if (
+                prompt_type != "multi_analysis"
+                and "decisions" not in result_dict
+                and "include" in result_dict
+            ):
+                if len(criteria_list) != 1:
+                    raise ValueError(
+                        "Single-object response format is only supported "
+                        "when exactly one annotation criterion is requested"
+                    )
+                result_dict = {
+                    "decisions": [
+                        {
+                            "annotation_name": criteria_list[0].name,
+                            "include": result_dict.get("include"),
+                            "reasoning": result_dict.get("reasoning", ""),
+                            "inclusion_criteria_applied": result_dict.get(
+                                "inclusion_criteria_applied", []
+                            ),
+                            "exclusion_criteria_applied": result_dict.get(
+                                "exclusion_criteria_applied", []
+                            ),
+                        }
+                    ]
+                }
             
             # Validate the response structure before parsing
             self._validate_response_structure(result_dict, prompt_type, metadata)

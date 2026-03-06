@@ -25,6 +25,8 @@ The documentation here is focused on how to run the CLI and how to author a work
 - [Quickstart](getting-started/quickstart.md)
 - [Configuration Guide](guides/configuration.md)
 - [CLI Usage Guide](guides/cli.md)
+- [Outputs Guide](guides/outputs.md)
+- [Interpreting Outputs](guides/interpreting-outputs.md)
 - [CLI Reference](reference/cli.md)
 
 ## Important Notes

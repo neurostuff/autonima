@@ -242,8 +242,14 @@ class LLMScreener(ScreeningEngine):
             # 2. Passed abstract screening (INCLUDED_ABSTRACT status)
             return [
                 s for s in studies
-                if (s.fulltext_available and
-                    s.status == StudyStatus.INCLUDED_ABSTRACT)
+                if (
+                    (
+                        s.fulltext_available
+                        or bool(s.full_text_path)
+                        or bool(s.pmcid)
+                    )
+                    and s.status == StudyStatus.INCLUDED_ABSTRACT
+                )
             ]
 
     def _get_screening_config(self, screening_type: str):
@@ -347,19 +353,34 @@ class LLMScreener(ScreeningEngine):
             criteria_mapping = config.get('criteria_mapping')
             
             # Build prompt with inclusion/exclusion criteria from config
-            prompt = (
-                PromptLibrary.get_abstract_screening_prompt
-                if screening_type == "abstract"
-                else PromptLibrary.get_fulltext_screening_prompt
-            )(
-                study=study,
-                inclusion_criteria=inclusion_criteria,
-                exclusion_criteria=exclusion_criteria,
-                criteria_mapping=criteria_mapping,
-                objective=objective,
-                confidence_reporting=confidence_reporting,
-                additional_instructions=additional_instructions
-            )
+            if screening_type == "abstract":
+                prompt = PromptLibrary.get_abstract_screening_prompt(
+                    study=study,
+                    inclusion_criteria=inclusion_criteria,
+                    exclusion_criteria=exclusion_criteria,
+                    criteria_mapping=criteria_mapping,
+                    objective=objective,
+                    confidence_reporting=confidence_reporting,
+                    additional_instructions=additional_instructions
+                )
+            else:
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = str(self.result_dir)
+                if not study.fulltext_available and (
+                    study.full_text_path or study.pmcid
+                ):
+                    study.fulltext_available = True
+
+                prompt = PromptLibrary.get_fulltext_screening_prompt(
+                    study=study,
+                    inclusion_criteria=inclusion_criteria,
+                    exclusion_criteria=exclusion_criteria,
+                    output_dir=str(self.result_dir),
+                    criteria_mapping=criteria_mapping,
+                    objective=objective,
+                    confidence_reporting=confidence_reporting,
+                    additional_instructions=additional_instructions
+                )
 
             model = config.get(
                 "model",
@@ -476,27 +497,13 @@ class LLMScreener(ScreeningEngine):
         Returns:
             List of screening results
         """
-        logger.info(
-            f"Starting {screening_type} screening for {len(studies)} studies"
-        )
-        
         self._initialize_llm_client()
-        
+
+        total_studies = len(studies)
         screenable_studies = self._filter_screenable_studies(
             studies, screening_type
         )
-        if len(screenable_studies) < len(studies):
-            text_type = (
-                'abstracts' if screening_type == 'abstract' else 'full text'
-            )
-            logger.warning(
-                f"Skipping {len(studies) - len(screenable_studies)} "
-                f"studies without {text_type}"
-            )
-            
-        if not screenable_studies:
-            return []
-            
+        skipped_count = total_studies - len(screenable_studies)
         config = self._get_screening_config(screening_type)
         
         # Separate existing results from studies that need screening
@@ -514,26 +521,28 @@ class LLMScreener(ScreeningEngine):
             if study.pmid in existing_results_dict:
                 existing_result = existing_results_dict[study.pmid]
                 
-                # Map old status values to new stage-specific statuses
-                old_decision = existing_result["decision"]
-                if old_decision == "included":
-                    # Map to stage-specific included status
-                    new_decision = (
-                        StudyStatus.INCLUDED_ABSTRACT
-                        if screening_type == "abstract"
-                        else StudyStatus.INCLUDED_FULLTEXT
+                # Normalize cached decisions to the current screening stage.
+                old_decision = str(existing_result["decision"]).strip().lower()
+                if old_decision in {
+                    "included",
+                    StudyStatus.INCLUDED_ABSTRACT.value,
+                    StudyStatus.INCLUDED_FULLTEXT.value,
+                }:
+                    new_decision = self._get_status_for_decision(
+                        screening_type, "INCLUDED"
                     )
-                elif old_decision == "excluded":
-                    # Map to stage-specific excluded status
-                    new_decision = (
-                        StudyStatus.EXCLUDED_ABSTRACT
-                        if screening_type == "abstract"
-                        else StudyStatus.EXCLUDED_FULLTEXT
+                elif old_decision in {
+                    "excluded",
+                    StudyStatus.EXCLUDED_ABSTRACT.value,
+                    StudyStatus.EXCLUDED_FULLTEXT.value,
+                }:
+                    new_decision = self._get_status_for_decision(
+                        screening_type, "EXCLUDED"
                     )
                 else:
-                    # Try to use the value directly (for new status values)
+                    # Try to use the value directly for newer serialized values.
                     try:
-                        new_decision = StudyStatus(old_decision)
+                        new_decision = StudyStatus(existing_result["decision"])
                     except ValueError:
                         # If invalid, skip this cached result
                         logger.warning(
@@ -556,16 +565,11 @@ class LLMScreener(ScreeningEngine):
             else:
                 studies_to_screen.append(study)
         
-        logger.info(
-            f"Found {len(existing_results)} existing results, "
-            f"{len(studies_to_screen)} studies to screen"
-        )
-        
         # Process studies that need screening
         new_results = []
         if studies_to_screen:
             # Use parallel processing if num_workers > 1
-            logger.info(f"Using {num_workers} workers for parallel screening")
+            logger.debug(f"Using {num_workers} workers for parallel screening")
             new_results = self._screen_single_study_wrapper(
                 studies_to_screen,
                 screening_type,
@@ -575,6 +579,61 @@ class LLMScreener(ScreeningEngine):
         
         # Combine existing and new results
         results = existing_results + new_results
+
+        included_status = (
+            StudyStatus.INCLUDED_ABSTRACT
+            if screening_type == "abstract"
+            else StudyStatus.INCLUDED_FULLTEXT
+        )
+        excluded_status = (
+            StudyStatus.EXCLUDED_ABSTRACT
+            if screening_type == "abstract"
+            else StudyStatus.EXCLUDED_FULLTEXT
+        )
+        included_count = 0
+        excluded_count = 0
+        failed_count = 0
+        for result in results:
+            decision_value = (
+                result.decision.value
+                if isinstance(result.decision, StudyStatus)
+                else str(result.decision).strip().lower()
+            )
+            if decision_value in {
+                StudyStatus.INCLUDED_ABSTRACT.value,
+                StudyStatus.INCLUDED_FULLTEXT.value,
+            }:
+                included_count += 1
+            elif decision_value in {
+                StudyStatus.EXCLUDED_ABSTRACT.value,
+                StudyStatus.EXCLUDED_FULLTEXT.value,
+            }:
+                excluded_count += 1
+            elif decision_value == StudyStatus.SCREENING_FAILED.value:
+                failed_count += 1
+
+        stage_label = (
+            "Abstract screening"
+            if screening_type == "abstract"
+            else "Full-text screening"
+        )
+        skipped_suffix = (
+            f", {skipped_count} skipped (missing "
+            f"{'abstracts' if screening_type == 'abstract' else 'full text'})"
+            if skipped_count
+            else ""
+        )
+        cached_summary = f"{len(existing_results)} cached"
+        if studies_to_screen:
+            cached_summary += f", {len(studies_to_screen)} to screen"
+
+        logger.info(
+            f"{stage_label}: {len(screenable_studies)} eligible "
+            f"({cached_summary}), "
+            f"{included_count} included, {excluded_count} excluded, "
+            f"{failed_count} failed"
+            f"{skipped_suffix}"
+        )
         
         return results
     

@@ -52,19 +52,24 @@ def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
         if not output_dir:
             raise ValueError("output_dir must be provided if full_text_path is not set")
 
-        # Construct the standard path: {output_dir}/retrieval/pubget_data/text.csv
-        text_file = Path(output_dir) / "pubget_data" / "text.csv"
-
-        # Check if the text file exists
-        if not text_file.exists():
-            raise FileNotFoundError(f"Text file not found at {text_file}")
+        # Prefer the current standard path but keep backward compatibility.
+        candidate_paths = [
+            Path(output_dir) / "retrieval" / "pubget_data" / "text.csv",
+            Path(output_dir) / "pubget_data" / "text.csv",
+        ]
+        text_file = next((p for p in candidate_paths if p.exists()), None)
+        if text_file is None:
+            raise FileNotFoundError(
+                "Text file not found at "
+                f"{candidate_paths[0]} or {candidate_paths[1]}"
+            )
             
         # Read the CSV file
         df = pd.read_csv(text_file)
         
         # Look for the row matching the study's pmcid
         if study.pmcid:
-            row = df[df['pmcid'] == int(study.pmcid)]
+            row = df[df['pmcid'].astype(str) == str(study.pmcid)]
             if not row.empty:
                 return row.iloc[0]['body']
         

@@ -34,6 +34,7 @@ nav:
       - Configuration: guides/configuration.md
       - CLI Usage: guides/cli.md
       - Outputs: guides/outputs.md
+      - Interpreting Outputs: guides/interpreting-outputs.md
       - Full-Text Sources: guides/full-text-sources.md
       - Meta-Analysis: guides/meta-analysis.md
   - Reference:

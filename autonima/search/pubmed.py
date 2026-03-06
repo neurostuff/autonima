@@ -53,6 +53,14 @@ class PubMedSearch(SearchEngine):
             List of Study objects
         """
         try:
+            query = (query or "").strip()
+            if not query and not (
+                self.config.pmids_file or self.config.pmids_list
+            ):
+                raise ValueError(
+                    "A non-empty query or pmids_file/pmids_list is required"
+                )
+
             # Build complete query
             pmids = []
             if query:
@@ -66,7 +74,7 @@ class PubMedSearch(SearchEngine):
                 pmids += self._load_pmids()
                 logger.info(f"Using {len(pmids)} PMIDs from config")
 
-            logger.info(f"Total PMIDs to process: {len(pmids)}")
+            logger.debug(f"Total PMIDs to process: {len(pmids)}")
 
             if not pmids:
                 return []
@@ -77,13 +85,19 @@ class PubMedSearch(SearchEngine):
             
             # Identify PMIDs that need to be fetched
             new_pmids = [pmid for pmid in pmids if pmid not in cached_pmids]
-            logger.info(f"Found meta-data for {len(cached_studies)} cached studies, {len(new_pmids)} new studies to fetch")
+            logger.debug(
+                "Found meta-data for %s cached studies, %s new studies to fetch",
+                len(cached_studies),
+                len(new_pmids),
+            )
 
             # Fetch details for new PMIDs only
             new_studies = []
             if new_pmids:
                 new_studies = await self._fetch_study_details(new_pmids)
-                logger.info(f"Successfully retrieved {len(new_studies)} new studies")
+                logger.debug(
+                    f"Successfully retrieved {len(new_studies)} new studies"
+                )
 
             # Combine cached and new studies
             studies = cached_studies + new_studies
@@ -125,7 +139,7 @@ class PubMedSearch(SearchEngine):
             search_results_file = Path(self.result_dir) / "outputs" / "search_results.json"
             
             if not search_results_file.exists():
-                logger.info(
+                logger.debug(
                     f"No existing search results file found at "
                     f"{search_results_file} for caching"
                 )
@@ -205,7 +219,7 @@ class PubMedSearch(SearchEngine):
         Returns:
             List of PubMed IDs
         """
-        logger.info(f"Executing search with query: {query}")
+        logger.debug(f"Executing search with query: {query}")
         
         try:
             # Use Entrez.esearch to search PubMed
@@ -553,7 +567,7 @@ class PubMedSearch(SearchEngine):
                 continue
         
         successful_count = len([v for v in pmid_to_pmcid.values() if v])
-        logger.info(
+        logger.debug(
             f"Successfully fetched PMCIDs for {successful_count} "
             f"out of {len(pmids)} PMIDs using PMC ID Converter API"
         )

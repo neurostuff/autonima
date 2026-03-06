@@ -18,6 +18,24 @@ class StudyStatus(Enum):
     EXCLUDED_FULLTEXT = "excluded_fulltext"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
+    # Backward-compatible aliases used in tests and older outputs.
+    INCLUDED = "included_abstract"
+    EXCLUDED = "excluded_abstract"
+    FULLTEXT_RETRIEVED = "included_abstract"
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map legacy serialized values to current stage-specific statuses."""
+        if not isinstance(value, str):
+            return None
+
+        normalized = value.strip().lower()
+        legacy_map = {
+            "included": cls.INCLUDED_ABSTRACT,
+            "excluded": cls.EXCLUDED_ABSTRACT,
+            "fulltext_retrieved": cls.INCLUDED_ABSTRACT,
+        }
+        return legacy_map.get(normalized)
 
 
 @dataclass
@@ -107,6 +125,17 @@ class Study:
     )
     full_text_output_dir: Optional[str] = None  # Full text output dir
     _full_text: Optional[str] = None  # Cached full text content
+
+    def __post_init__(self) -> None:
+        """Normalize status when it is provided as a string."""
+        if isinstance(self.status, StudyStatus):
+            return
+        if isinstance(self.status, str):
+            raw_status = self.status.strip()
+            if raw_status in StudyStatus.__members__:
+                self.status = StudyStatus[raw_status]
+            else:
+                self.status = StudyStatus(raw_status)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert study to dictionary representation."""
@@ -206,6 +235,12 @@ class Study:
             self, output_dir=self.full_text_output_dir
         )
         return self._full_text
+
+    def load_full_text(self, output_dir: Optional[str] = None) -> str:
+        """Compatibility method for eager full-text loading."""
+        if output_dir:
+            self.full_text_output_dir = output_dir
+        return self.full_text
 
 
 @dataclass

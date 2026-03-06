@@ -2,6 +2,8 @@
 
 import logging
 import tempfile
+import io
+from contextlib import redirect_stdout, redirect_stderr
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +34,24 @@ class PubGetRetriever(BaseRetriever):
             n_jobs: Number of parallel jobs for processing
         """
         self.n_jobs = n_jobs
+
+    def _run_pubget_call(self, func, **kwargs):
+        """Run pubget call while silencing noisy stdout/stderr unless verbose."""
+        if logger.isEnabledFor(logging.DEBUG):
+            return func(**kwargs)
+
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+            result = func(**kwargs)
+
+        suppressed_output = (
+            f"{stdout_buffer.getvalue()}\n{stderr_buffer.getvalue()}".strip()
+        )
+        if suppressed_output:
+            logger.debug("Suppressed pubget output:\n%s", suppressed_output)
+
+        return result
 
     def retrieve(
         self,
@@ -70,7 +90,7 @@ class PubGetRetriever(BaseRetriever):
             ]
         
         if not studies_with_pmcid:
-            logger.info("No studies with PMCID found for retrieval")
+            logger.debug("No studies with PMCID found for retrieval")
             return studies
         
         # Create output directory
@@ -104,12 +124,15 @@ class PubGetRetriever(BaseRetriever):
                 studies_to_download.append(study)
                 
         if not studies_to_download:
-            logger.info("All PMCIDs already downloaded, skipping retrieval")
+            logger.info(
+                "PubGet retrieval: 0 to download (%s cached)",
+                len(cached_studies),
+            )
             return studies
         
         logger.info(
-            f"Retrieving full-text for {len(studies_to_download)} studies "
-            f"(skipping {len(cached_studies)} already downloaded)"
+            f"PubGet retrieval: downloading {len(studies_to_download)} studies "
+            f"({len(cached_studies)} cached)"
         )
         
         # Extract PMCIDs for studies that need to be downloaded
@@ -123,8 +146,9 @@ class PubGetRetriever(BaseRetriever):
             
             try:
                 # Download articles using PMCIDs
-                logger.info("Downloading articles from PubMed Central...")
-                download_dir, download_exit_code = download_pmcids(
+                logger.debug("Downloading articles from PubMed Central...")
+                download_dir, download_exit_code = self._run_pubget_call(
+                    download_pmcids,
                     pmcids=pmcids,
                     data_dir=str(temp_path),
                     n_docs=kwargs.get('n_docs'),
@@ -143,8 +167,9 @@ class PubGetRetriever(BaseRetriever):
                     return studies
                                 
                 # Extract articles from bulk download
-                logger.info("Extracting articles...")
-                articles_dir, extract_exit_code = extract_articles(
+                logger.debug("Extracting articles...")
+                articles_dir, extract_exit_code = self._run_pubget_call(
+                    extract_articles,
                     articlesets_dir=download_dir,
                     output_dir=str(temp_path / "articles"),
                     n_jobs=self.n_jobs
@@ -154,8 +179,9 @@ class PubGetRetriever(BaseRetriever):
                     logger.warning("Article extraction was incomplete")
                 
                 # Extract data to CSV
-                logger.info("Extracting article data...")
-                data_dir, data_exit_code = extract_data_to_csv(
+                logger.debug("Extracting article data...")
+                data_dir, data_exit_code = self._run_pubget_call(
+                    extract_data_to_csv,
                     articles_dir=str(articles_dir),
                     output_dir=str(temp_path / "extracted_data"),
                     n_jobs=self.n_jobs
@@ -188,7 +214,7 @@ class PubGetRetriever(BaseRetriever):
                         # Copy the articles directory to the pubget_data directory
                         shutil.copytree(articles_dir, articles_output_dir)
                 
-                logger.info(
+                logger.debug(
                     f"Successfully retrieved {len(studies_to_download)} "
                     "articles"
                 )
@@ -268,7 +294,7 @@ class PubGetRetriever(BaseRetriever):
                         
                         # Save merged data
                         merged_df.to_csv(existing_file, index=False)
-                        logger.info(f"Merged {csv_file} with existing data")
+                        logger.debug(f"Merged {csv_file} with existing data")
                     except Exception as e:
                         logger.warning(f"Could not merge {csv_file}: {e}")
                         # Fall back to copying new file
@@ -325,7 +351,9 @@ class PubGetRetriever(BaseRetriever):
             # Check if coordinate_space.csv exists
             coord_space_file = data_dir / "coordinate_space.csv"
             if not coord_space_file.exists():
-                logger.info("Coordinate space file not found, skipping coordinate space processing")
+                logger.debug(
+                    "Coordinate space file not found, skipping coordinate space processing"
+                )
                 return studies
             
             # Load coordinate space data
@@ -348,7 +376,9 @@ class PubGetRetriever(BaseRetriever):
                 if study.pmcid and study.pmcid in pmcid_to_space:
                     study.coordinate_space = pmcid_to_space[study.pmcid]
             
-            logger.info(f"Processed coordinate space for {len(pmcid_to_space)} studies")
+            logger.debug(
+                f"Processed coordinate space for {len(pmcid_to_space)} studies"
+            )
             
         except Exception as e:
             logger.warning(f"Error processing coordinate space: {e}")

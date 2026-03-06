@@ -232,10 +232,28 @@ def build_dynamic_multi_annotation_models(
                         f'(must match ^(?:[A-Z0-9_]+_)?[IE]\\d+$) for annotation "{ann}": {bad}'
                     )
 
-            if self.include and not self.inclusion_criteria_applied:
+            if self.include and allowed_inc and not self.inclusion_criteria_applied:
                 raise ValueError(
                     f'annotation "{ann}" has include=true but inclusion_criteria_applied is empty'
                 )
+
+            if (
+                not self.include
+                and allowed_inc
+                and not self.exclusion_criteria_applied
+            ):
+                reasoning_upper = (self.reasoning or "").upper()
+                mentioned_missing_ids = [
+                    crit_id
+                    for crit_id in allowed_inc
+                    if crit_id.upper() in reasoning_upper
+                ]
+                if not mentioned_missing_ids:
+                    raise ValueError(
+                        f'annotation "{ann}" has include=false and no '
+                        "exclusion_criteria_applied; reasoning must cite "
+                        "missing/not-met inclusion criteria IDs"
+                    )
 
             return self
 
