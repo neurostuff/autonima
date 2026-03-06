@@ -1,6 +1,7 @@
 """Main pipeline orchestrator for Autonima."""
 
 import logging
+import os
 import csv
 import json
 from datetime import datetime
@@ -27,6 +28,15 @@ from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
 
 logger = logging.getLogger(__name__)
+
+
+def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
+    """Write JSON atomically to avoid partially written output files."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = file_path.with_suffix(file_path.suffix + ".tmp")
+    with open(temp_file, 'w') as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_file, file_path)
 
 
 class AutonimaPipeline:
@@ -227,9 +237,7 @@ class AutonimaPipeline:
             ],
             "timestamp": datetime.now().isoformat()
         }
-        with open(screening_results_file, 'w') as f:
-            import json
-            json.dump(screening_data, f, indent=2)
+        _atomic_write_json(screening_results_file, screening_data)
 
         screened_count = len([
             s for s in self.results.studies
@@ -505,9 +513,9 @@ class AutonimaPipeline:
             ],
             "timestamp": datetime.now().isoformat()
         }
-        with open(fulltext_screening_results_file, 'w') as f:
-            import json
-            json.dump(fulltext_screening_data, f, indent=2)
+        _atomic_write_json(
+            fulltext_screening_results_file, fulltext_screening_data
+        )
 
         final_count = len([
             s for s in self.results.studies
