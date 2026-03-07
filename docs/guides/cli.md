@@ -53,6 +53,7 @@ Useful options:
 - `-v` / `--verbose` for more logging
 - `--debug` for post-mortem debugging on errors
 - `-j` / `--num-workers` to control parallel screening workers
+- `--force-reextract-incomplete-fulltext` to re-run full-text screening for cached `fulltext_incomplete` studies using current files
 
 ## Omitted Output Folder
 

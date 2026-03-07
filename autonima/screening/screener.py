@@ -182,7 +182,8 @@ class LLMScreener(ScreeningEngine):
         self,
         config: ScreeningConfig,
         output_dir: str,
-        num_workers: int = 1
+        num_workers: int = 1,
+        force_reextract_incomplete_fulltext: bool = False
     ):
         """Initialize the unified LLM screener with configuration."""
         super().__init__(config)
@@ -191,6 +192,9 @@ class LLMScreener(ScreeningEngine):
         self.result_dir = Path(output_dir)
         self.result_dir.mkdir(parents=True, exist_ok=True)
         self.num_workers = num_workers
+        self.force_reextract_incomplete_fulltext = (
+            force_reextract_incomplete_fulltext
+        )
         # Load existing results
         self._existing_abstract_results = self._load_existing_results(
             "abstract"
@@ -275,6 +279,8 @@ class LLMScreener(ScreeningEngine):
                 else StudyStatus.EXCLUDED_ABSTRACT
             )
         else:  # fulltext
+            if decision == "FULLTEXT_INCOMPLETE":
+                return StudyStatus.FULLTEXT_INCOMPLETE
             return (
                 StudyStatus.INCLUDED_FULLTEXT
                 if decision == "INCLUDED"
@@ -293,6 +299,12 @@ class LLMScreener(ScreeningEngine):
         Returns:
             Tuple of (decision_string, reason)
         """
+        if (
+            screening_type == "fulltext"
+            and getattr(response, "fulltext_incomplete", False)
+        ):
+            return "FULLTEXT_INCOMPLETE", response.reason
+
         # Check if threshold should be applied
         threshold = config.get("threshold")
         threshold_enabled = (
@@ -372,6 +384,8 @@ class LLMScreener(ScreeningEngine):
                     study.full_text_path or study.pmcid
                 ):
                     study.fulltext_available = True
+                # Ensure reruns pick up latest on-disk content.
+                study._full_text = None
 
                 prompt = PromptLibrary.get_fulltext_screening_prompt(
                     study=study,
@@ -525,6 +539,13 @@ class LLMScreener(ScreeningEngine):
                 
                 # Normalize cached decisions to the current screening stage.
                 old_decision = str(existing_result["decision"]).strip().lower()
+                if (
+                    screening_type == "fulltext"
+                    and self.force_reextract_incomplete_fulltext
+                    and old_decision == StudyStatus.FULLTEXT_INCOMPLETE.value
+                ):
+                    studies_to_screen.append(study)
+                    continue
                 if old_decision in {
                     "included",
                     StudyStatus.INCLUDED_ABSTRACT.value,
@@ -596,6 +617,7 @@ class LLMScreener(ScreeningEngine):
 
         included_count = 0
         excluded_count = 0
+        incomplete_count = 0
         failed_count = 0
         for result in results:
             decision_value = (
@@ -613,6 +635,8 @@ class LLMScreener(ScreeningEngine):
                 StudyStatus.EXCLUDED_FULLTEXT.value,
             }:
                 excluded_count += 1
+            elif decision_value == StudyStatus.FULLTEXT_INCOMPLETE.value:
+                incomplete_count += 1
             elif decision_value == StudyStatus.SCREENING_FAILED.value:
                 failed_count += 1
 
@@ -626,6 +650,7 @@ class LLMScreener(ScreeningEngine):
         logger.info(
             f"{stage_label}: {len(screenable_studies)} eligible, "
             f"{included_count} included, {excluded_count} excluded, "
+            f"{incomplete_count} incomplete, "
             f"{failed_count} failed"
             f"{skipped_suffix}"
         )

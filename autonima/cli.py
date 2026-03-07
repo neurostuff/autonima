@@ -68,13 +68,22 @@ def _resolve_output_folder(
               help='Enable debug mode with post-mortem debugging on errors')
 @click.option('--num-workers', '-j', type=int, default=1,
               help='Number of parallel workers for screening (default: 1)')
+@click.option(
+    '--force-reextract-incomplete-fulltext',
+    is_flag=True,
+    help=(
+        "Re-run full-text screening for studies cached as "
+        "fulltext_incomplete using current full-text files."
+    ),
+)
 def run(
     config: str,
     output_folder: str | None,
     verbose: bool,
     dry_run: bool,
     debug: bool,
-    num_workers: int
+    num_workers: int,
+    force_reextract_incomplete_fulltext: bool,
 ):
     """
     Run the Autonima systematic review pipeline.
@@ -93,6 +102,9 @@ def run(
     Options:
         -v, --verbose   Enable verbose logging
         --dry-run       Validate configuration without running pipeline
+        --force-reextract-incomplete-fulltext
+                        Re-run full-text screening for cached
+                        fulltext_incomplete studies
 
     Examples:
         autonima run config.yaml
@@ -133,7 +145,11 @@ def run(
         async def execute_pipeline():
             run_pipeline_from_config = _get_run_pipeline_from_config()
             results = await run_pipeline_from_config(
-                config=pipeline_config, num_workers=num_workers
+                config=pipeline_config,
+                num_workers=num_workers,
+                force_reextract_incomplete_fulltext=(
+                    force_reextract_incomplete_fulltext
+                ),
             )
 
             # Print summary
@@ -157,7 +173,14 @@ def run(
                 if getattr(s.status, "value", str(s.status)) in {
                     "included_fulltext",
                     "excluded_fulltext",
+                    "fulltext_incomplete",
                 }
+            )
+            fulltext_incomplete = sum(
+                1
+                for s in studies
+                if getattr(s.status, "value", str(s.status))
+                == "fulltext_incomplete"
             )
             final_included = prisma_stats.get(
                 "final_included",
@@ -199,6 +222,7 @@ def run(
             print(f"Studies from search: {total_identified}")
             print(f"Studies screened with abstract: {abstract_screened}")
             print(f"Studies screened with full text: {fulltext_screened}")
+            print(f"Full-text incomplete: {fulltext_incomplete}")
             print(f"Final included studies: {final_included}")
             print(f"Coordinate parsing: {coordinate_summary}")
             print(f"Annotation: {annotation_summary}")

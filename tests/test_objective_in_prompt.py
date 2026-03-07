@@ -81,6 +81,8 @@ def test_objective_in_fulltext_prompt():
         # Verify objective is in the prompt
         assert objective in prompt
         assert "META-ANALYSIS OBJECTIVE:" in prompt
+        assert "fulltext_incomplete" in prompt
+        assert "Missing supplemental material is acceptable." in prompt
 
 
 def test_screener_with_objective():

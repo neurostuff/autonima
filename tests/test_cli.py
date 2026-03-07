@@ -108,3 +108,47 @@ def test_create_sample_config_outputs_canonical_template():
         .joinpath("sample_config.yml")
         .read_text(encoding="utf-8")
     )
+
+
+def test_run_passes_force_reextract_incomplete_fulltext_flag(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "config.yml"
+    config_path.write_text("search: {}\n", encoding="utf-8")
+
+    sample_config = ConfigManager().create_sample_config()
+
+    def fake_load_from_file(self, path):
+        assert path == str(config_path)
+        return sample_config
+
+    monkeypatch.setattr(ConfigManager, "load_from_file", fake_load_from_file)
+
+    captured = {}
+
+    class DummyResults:
+        execution_stats = {}
+        studies = []
+        errors = []
+
+    async def fake_run_pipeline_from_config(
+        config, num_workers=1, force_reextract_incomplete_fulltext=False
+    ):
+        captured["num_workers"] = num_workers
+        captured["force_reextract_incomplete_fulltext"] = (
+            force_reextract_incomplete_fulltext
+        )
+        return DummyResults()
+
+    monkeypatch.setattr(
+        "autonima.cli._get_run_pipeline_from_config",
+        lambda: fake_run_pipeline_from_config,
+    )
+
+    result = CliRunner().invoke(
+        run,
+        [str(config_path), "--force-reextract-incomplete-fulltext"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["force_reextract_incomplete_fulltext"] is True

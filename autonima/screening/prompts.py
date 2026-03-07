@@ -160,17 +160,17 @@ EXCLUSION CRITERIA:
         # Check if confidence reporting is enabled
         if confidence_reporting:
             confidence_instruction = (
-                "8. Provide a confidence score (0.0-1.0) reflecting your "
+                "9. Provide a confidence score (0.0-1.0) reflecting your "
                 "certainty\n"
             )
             reason_instruction = (
-                "9. Give a detailed reason (max 200 words) explaining your "
+                "10. Give a detailed reason (max 200 words) explaining your "
                 "decision"
             )
         else:
             confidence_instruction = ""
             reason_instruction = (
-                "8. Give a detailed reason (max 200 words) explaining your "
+                "9. Give a detailed reason (max 200 words) explaining your "
                 "decision"
             )
         
@@ -188,13 +188,21 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 5. Pay special attention to study design, methods, participants, and outcomes
 6. If the study meets all criteria, INCLUDE it
 7. If ANY criterion is not met, EXCLUDE it
+8. Determine whether the provided "full text" is actually complete.
+   Set fulltext_incomplete=true when content is incomplete and only provides
+   title/abstract/metadata/references or another truncated subset.
+   Consider full text complete only when core article content is present
+   (e.g., introduction/background, methods, results, and discussion).
+   Missing supplemental material is acceptable.
 {confidence_instruction}{reason_instruction}
 {additional_instructions_text}
 
 IMPORTANT: In your response, you must specify which specific criteria IDs apply to this study.
 - For included studies: List the inclusion criteria IDs that are satisfied (e.g., ["I1", "I2"])
 - For excluded studies: List the exclusion criteria IDs that apply (e.g., ["E1"])
-Respond with the exact JSON format specified, including the inclusion_criteria_applied and exclusion_criteria_applied fields.
+When fulltext_incomplete=true, this flag takes precedence in downstream logic.
+Respond with the exact JSON format specified, including fulltext_incomplete,
+inclusion_criteria_applied, and exclusion_criteria_applied fields.
 """.strip()
 
         prompt = f"""

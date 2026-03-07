@@ -14,6 +14,7 @@ For file locations and folder structure, see the [Outputs](./outputs.md) guide.
 | Why was a study excluded at full-text stage? | `outputs/fulltext_screening_results.json` | `decision`, `reason`, confidence, and applied criteria IDs. |
 | What are the final included studies? | `outputs/final_results.json` | `studies` section (final included only). |
 | Which studies had no full text? | `outputs/unavailable_fulltexts.txt` | PMIDs that still have no retrievable full text. |
+| Which studies had incomplete full text? | `outputs/incomplete_fulltext.txt` | PMIDs screened as `fulltext_incomplete`. |
 | What did annotation produce? | `outputs/annotation_results.json` | Per-analysis `annotation_name`, `include`, and `reasoning`. |
 | Are coordinates parsed and ready for NiMADS/meta? | `outputs/coordinate_parsing_results.json` + `outputs/nimads_studyset.json` | Parsed analyses/tables and generated NiMADS payloads. |
 
@@ -26,6 +27,7 @@ Screening and study records use stage-specific statuses:
 - `excluded_abstract`: excluded at abstract screening
 - `included_fulltext`: passed full-text screening (final included set)
 - `excluded_fulltext`: excluded at full-text screening
+- `fulltext_incomplete`: full text was present but incomplete/truncated for eligibility decisions
 - `retrieval_failed`: retrieval failed
 - `screening_failed`: screening call failed
 

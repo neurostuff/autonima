@@ -18,5 +18,6 @@ class FullTextScreeningOutput(BaseModel):
     decision: Literal["INCLUDED", "EXCLUDED"]
     confidence: float
     reason: str
+    fulltext_incomplete: bool = False
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []

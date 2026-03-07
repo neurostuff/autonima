@@ -51,7 +51,12 @@ class AutonimaPipeline:
     5. Output generation with PRISMA compliance
     """
 
-    def __init__(self, config: PipelineConfig, num_workers: int = 1):
+    def __init__(
+        self,
+        config: PipelineConfig,
+        num_workers: int = 1,
+        force_reextract_incomplete_fulltext: bool = False
+    ):
         """
         Initialize the pipeline with configuration.
 
@@ -60,6 +65,9 @@ class AutonimaPipeline:
         """
         self.config = config
         self.num_workers = num_workers
+        self.force_reextract_incomplete_fulltext = (
+            force_reextract_incomplete_fulltext
+        )
         self.results = PipelineResult(
             config=config,
             started_at=datetime.now()
@@ -92,7 +100,10 @@ class AutonimaPipeline:
         self._screener = LLMScreener(
             self.config.screening,
             output_dir=self.config.output.directory,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            force_reextract_incomplete_fulltext=(
+                self.force_reextract_incomplete_fulltext
+            )
         )
         
         # Initialize retrieval engine
@@ -901,6 +912,10 @@ class AutonimaPipeline:
             s for s in self.results.studies
             if s.status == StudyStatus.EXCLUDED_FULLTEXT
         ]
+        incomplete_fulltext = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.FULLTEXT_INCOMPLETE
+        ]
         abstract_screened = [
             s for s in self.results.studies
             if s.status != StudyStatus.PENDING
@@ -910,6 +925,7 @@ class AutonimaPipeline:
             if s.status in {
                 StudyStatus.INCLUDED_FULLTEXT,
                 StudyStatus.EXCLUDED_FULLTEXT,
+                StudyStatus.FULLTEXT_INCOMPLETE,
             }
         ]
 
@@ -919,6 +935,7 @@ class AutonimaPipeline:
             "abstract_excluded": len(excluded_abstract),
             "fulltext_assessed": len(fulltext_assessed),
             "fulltext_excluded": len(excluded_fulltext),
+            "fulltext_incomplete": len(incomplete_fulltext),
             "final_included": len(included_studies)
         }
 
@@ -930,10 +947,17 @@ class AutonimaPipeline:
 
         # Save final results with only included studies
         output_dir = Path(self.config.output.directory)
-        final_results_file = output_dir / "outputs" / "final_results.json"
+        outputs_dir = output_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        final_results_file = outputs_dir / "final_results.json"
         with open(final_results_file, 'w') as f:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
+
+        incomplete_pmids_file = outputs_dir / "incomplete_fulltext.txt"
+        with open(incomplete_pmids_file, 'w') as f:
+            for study in incomplete_fulltext:
+                f.write(f"{study.pmid}\n")
 
     async def _generate_nimads_output(self):
         """Generate NiMADS output for studies with parsed analyses."""
@@ -1092,7 +1116,8 @@ class AutonimaPipeline:
 async def run_pipeline_from_config(
     config_path: str = None,
     config: PipelineConfig = None,
-    num_workers: int = 1
+    num_workers: int = 1,
+    force_reextract_incomplete_fulltext: bool = False
 ) -> PipelineResult:
     """
     Run pipeline from configuration file or config object.
@@ -1100,6 +1125,8 @@ async def run_pipeline_from_config(
     Args:
         config_path: Path to YAML configuration file
         config: Pipeline configuration object
+        force_reextract_incomplete_fulltext: Re-run full-text screening for
+            cached fulltext_incomplete studies
 
     Returns:
         Pipeline results
@@ -1110,5 +1137,11 @@ async def run_pipeline_from_config(
         config_manager = ConfigManager()
         config = config_manager.load_from_file(config_path)
 
-    pipeline = AutonimaPipeline(config, num_workers=num_workers)
+    pipeline = AutonimaPipeline(
+        config,
+        num_workers=num_workers,
+        force_reextract_incomplete_fulltext=(
+            force_reextract_incomplete_fulltext
+        ),
+    )
     return await pipeline.run()

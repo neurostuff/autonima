@@ -24,6 +24,7 @@ projects/cue_reactivity/default/
 │   ├── fulltext_retrieval_results.json
 │   ├── fulltext_screening_results.json
 │   ├── final_results.json
+│   ├── incomplete_fulltext.txt
 │   ├── criteria_mapping.json
 │   ├── coordinate_parsing_results.json
 │   ├── nimads_studyset.json
@@ -61,6 +62,10 @@ Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-orien
 ## `outputs/final_results.json`
 
 - final included/excluded status and execution outputs
+
+## `outputs/incomplete_fulltext.txt`
+
+- PMIDs where full-text screening returned `fulltext_incomplete`
 
 ## `outputs/criteria_mapping.json`
 

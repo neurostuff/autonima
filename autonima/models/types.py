@@ -16,6 +16,7 @@ class StudyStatus(Enum):
     EXCLUDED_ABSTRACT = "excluded_abstract"
     INCLUDED_FULLTEXT = "included_fulltext"
     EXCLUDED_FULLTEXT = "excluded_fulltext"
+    FULLTEXT_INCOMPLETE = "fulltext_incomplete"
     RETRIEVAL_FAILED = "retrieval_failed"
     SCREENING_FAILED = "screening_failed"
     # Backward-compatible aliases used in tests and older outputs.
