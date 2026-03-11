@@ -356,13 +356,15 @@ def validate(config: str, output_folder: str | None, debug: bool):
               type=click.Path(exists=True, dir_okay=False),
               default=None,
               help='Path to text file with study IDs/PMIDs to include (one per line)')
+@click.option('--run-reports', is_flag=True,
+              help='Generate NiMARE HTML reports (disabled by default to reduce memory use)')
 @click.option('--fail-fast', is_flag=True,
               help='Stop at the first failing annotation column')
 @click.option('--debug', is_flag=True,
               help='Enable debug mode; fail fast and enter post-mortem debugging on errors')
 def meta(output_folder: str, estimator: str, estimator_args: str,
          corrector: str, corrector_args: str, include_ids: str,
-         fail_fast: bool, debug: bool):
+         run_reports: bool, fail_fast: bool, debug: bool):
     """
     Run meta-analyses on Autonima output using NiMARE.
 
@@ -378,6 +380,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
         --corrector              Corrector to use (fdr, montecarlo, bonferroni)
         --corrector-args         JSON string of arguments for the corrector
         --include-ids            Path to newline-delimited study IDs/PMIDs for post-hoc filtering
+        --run-reports            Generate NiMARE HTML reports (default: off)
         --fail-fast              Stop on the first failing annotation column
         --debug                  Enable fail-fast post-mortem debugging (ipdb/pdb)
 
@@ -424,6 +427,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
             include_ids=include_ids,
             fail_fast=(fail_fast or debug),
             debug=debug,
+            generate_reports=run_reports,
         )
         
         print(f"Completed meta-analyses for {len(results)} columns")

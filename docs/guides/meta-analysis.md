@@ -39,6 +39,8 @@ autonima meta projects/cue_reactivity/default/outputs
   JSON string of corrector arguments
 - `--include-ids`
   Newline-delimited study IDs or PMIDs to include
+- `--run-reports`
+  Generate NiMARE HTML reports (default: disabled to reduce memory use)
 - `--fail-fast`
   Stop on the first failing annotation column
 - `--debug`
@@ -63,7 +65,8 @@ Meta-analysis results are written under:
 This directory contains:
 
 - one folder per boolean annotation column
-- NiMARE reports and statistical images
+- statistical images and result artifacts
+- NiMARE reports only when `--run-reports` is enabled
 - summary artifacts for each analysis set
 
 ## Common Failure Modes

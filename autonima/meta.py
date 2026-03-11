@@ -197,6 +197,7 @@ def run_meta_analysis_for_column(
     corrector_name="fdr",
     corrector_args=None,
     include_ids=None,
+    generate_reports=False,
 ):
     """Run meta-analysis for a specific annotation column."""
     del annotation  # kept for backward compatibility with existing call sites
@@ -276,7 +277,8 @@ def run_meta_analysis_for_column(
     )
 
     meta_results = workflow.fit(first_dataset)
-    run_reports(meta_results, str(output_dir))
+    if generate_reports:
+        run_reports(meta_results, str(output_dir))
 
     return meta_results
 
@@ -294,6 +296,7 @@ def run_meta_analyses_from_files(
     columns=None,
     fail_fast=False,
     debug=False,
+    generate_reports=False,
 ):
     """
     Run meta-analyses from explicit studyset + annotation file paths.
@@ -315,6 +318,8 @@ def run_meta_analyses_from_files(
         If True, re-raise on the first column-level exception instead of continuing.
     debug : bool
         If True and fail_fast is enabled, enter post-mortem debugging on error.
+    generate_reports : bool
+        If True, run NiMARE HTML report generation for each completed column.
     """
     include_ids_set = _normalize_include_ids(include_ids)
 
@@ -356,6 +361,7 @@ def run_meta_analyses_from_files(
                 corrector_name,
                 corrector_args,
                 include_ids=include_ids_set,
+                generate_reports=generate_reports,
             )
             if meta_results is not None:
                 results[column] = meta_results
@@ -383,6 +389,7 @@ def run_meta_analyses(
     columns=None,
     fail_fast=False,
     debug=False,
+    generate_reports=False,
 ):
     """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
     output_folder = Path(output_folder) / "outputs"
@@ -404,6 +411,7 @@ def run_meta_analyses(
         columns=columns,
         fail_fast=fail_fast,
         debug=debug,
+        generate_reports=generate_reports,
     )
 
 
@@ -459,6 +467,11 @@ def main():
         action="store_true",
         help="Enable post-mortem debugging (prefers ipdb) when used with --fail-fast",
     )
+    parser.add_argument(
+        "--run-reports",
+        action="store_true",
+        help="Generate NiMARE HTML reports (disabled by default to reduce memory use)",
+    )
 
     args = parser.parse_args()
 
@@ -482,6 +495,7 @@ def main():
         include_ids=args.include_ids,
         fail_fast=args.fail_fast,
         debug=args.debug,
+        generate_reports=args.run_reports,
     )
     print(f"Completed meta-analyses for {len(results)} columns")
 
