@@ -176,12 +176,14 @@ def _analysis_has_valid_coordinates(analysis) -> bool:
 
 def _post_mortem_debugger():
     """Launch post-mortem debugging, preferring ipdb when available."""
+    import sys
+
     try:
         import ipdb as debugger
     except ImportError:
         import pdb as debugger
 
-    debugger.post_mortem()
+    debugger.post_mortem(sys.exc_info()[2])
 
 
 def run_meta_analysis_for_column(
