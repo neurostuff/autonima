@@ -120,6 +120,7 @@ class PubGetRetriever(BaseRetriever):
                 cached_studies.append(study)
                 # Don't change status - just mark as available
                 study.fulltext_available = True
+                study.full_text_source = "pubget"
             else:
                 studies_to_download.append(study)
                 
@@ -449,6 +450,7 @@ class PubGetRetriever(BaseRetriever):
             if study.pmcid in retrieved_pmcid:
                 study.fulltext_available = True
                 study.retrieved_at = datetime.now()
+                study.full_text_source = "pubget"
             # If not retrieved, fulltext_available remains False (default)
         
         return studies

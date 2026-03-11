@@ -107,7 +107,10 @@ class Study:
     screened_at: Optional[datetime] = None
     pmcid: Optional[str] = None
     full_text_path: Optional[str] = None
+    full_text_source: Optional[str] = None
     fulltext_available: bool = False  # Whether full text is available
+    retrieval_in_scope: bool = False
+    in_included_set: Optional[bool] = None
     coordinate_space: Optional[str] = None
     activation_tables: List[ActivationTable] = field(default_factory=list)
     analyses: List[Analysis] = field(default_factory=list)
@@ -163,7 +166,10 @@ class Study:
                 self.screened_at.isoformat() if self.screened_at else None
             ),
             "full_text_path": self.full_text_path,
+            "full_text_source": self.full_text_source,
             "fulltext_available": self.fulltext_available,
+            "retrieval_in_scope": self.retrieval_in_scope,
+            "in_included_set": self.in_included_set,
             "coordinate_space": self.coordinate_space,
             "activation_tables": [
                 {

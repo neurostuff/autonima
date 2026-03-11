@@ -6,7 +6,7 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 import concurrent.futures
 from tqdm import tqdm
 
@@ -283,6 +283,12 @@ class AutonimaPipeline:
             ]
             scope = "included only"
 
+        for study in studies_to_process:
+            study.retrieval_in_scope = True
+            study.in_included_set = (
+                study.status == StudyStatus.INCLUDED_ABSTRACT
+            )
+
         pmids_set = set(
             [int(s.pmid) for s in studies_to_process if s.pmid.isdigit()]
         )
@@ -320,6 +326,13 @@ class AutonimaPipeline:
                     len(full_text_sources),
                 )
 
+                source_name = (
+                    full_text_config.get("source_name")
+                    or full_text_config.get("name")
+                    or full_text_config.get("root_path")
+                    or f"full_text_source_{i + 1}"
+                )
+
                 # Map PMIDs to text files in source
                 text_paths, analyses, tables = _map_pmids_to_text(
                     **full_text_config,
@@ -332,6 +345,7 @@ class AutonimaPipeline:
                 for study in studies_to_retrieve[:]:
                     if int(study.pmid) in text_paths:
                         study.full_text_path = str(text_paths[int(study.pmid)])
+                        study.full_text_source = str(source_name)
                         study.fulltext_available = True
                         source_matches.append(study)
                         studies_from_user_sources.append(study)
@@ -372,6 +386,10 @@ class AutonimaPipeline:
         )
 
         # Fetch PMCIDs for studies that will use PubGet (those without full_text_path)
+        for study in studies_to_retrieve:
+            if not study.full_text_source:
+                study.full_text_source = "pubget"
+
         studies_needing_pmcid = [
             s for s in studies_to_retrieve if not s.pmcid
         ]
@@ -447,12 +465,6 @@ class AutonimaPipeline:
             if not study.fulltext_available
         ]
         unavailable_count = len(unavailable_studies)
-
-        # Save .txt file with pmids of unavailable full texts
-        unavailable_pmids_file = output_dir / "outputs" / "unavailable_fulltexts.txt"
-        with open(unavailable_pmids_file, 'w') as f:
-            for study in unavailable_studies:
-                f.write(f"{study.pmid}\n")
 
         logger.info(
             "Retrieval completed: %s texts available, %s missing full text",
@@ -896,6 +908,69 @@ class AutonimaPipeline:
 
         logger.debug("Saved final results and statistics")
 
+    def _resolve_full_text_path_for_report(
+        self, study, output_dir: Path, missing_type: str
+    ) -> str:
+        """Resolve a full-text path reference for missing-fulltext reporting."""
+        if study.full_text_path:
+            return study.full_text_path
+
+        if missing_type == "incomplete" and study.pmcid:
+            return (
+                str(output_dir / "retrieval" / "pubget_data" / "text.csv")
+                + f" [pmcid={study.pmcid}]"
+            )
+
+        return ""
+
+    def _build_missing_fulltext_rows(
+        self, output_dir: Path
+    ) -> List[Dict[str, Any]]:
+        """Build consolidated rows for unavailable and incomplete full texts."""
+        unavailable_fulltext = [
+            s
+            for s in self.results.studies
+            if (
+                s.retrieval_in_scope
+                and not s.fulltext_available
+                and s.status != StudyStatus.FULLTEXT_INCOMPLETE
+            )
+        ]
+        incomplete_fulltext = [
+            s
+            for s in self.results.studies
+            if s.status == StudyStatus.FULLTEXT_INCOMPLETE
+        ]
+
+        rows: List[Dict[str, Any]] = []
+        for missing_type, studies in (
+            ("unavailable", unavailable_fulltext),
+            ("incomplete", incomplete_fulltext),
+        ):
+            for study in studies:
+                rows.append(
+                    {
+                        "pmid": study.pmid,
+                        "type": missing_type,
+                        "source": study.full_text_source or "",
+                        "full_text_path": self._resolve_full_text_path_for_report(
+                            study=study,
+                            output_dir=output_dir,
+                            missing_type=missing_type,
+                        ),
+                        "in_included_set": (
+                            study.in_included_set
+                            if study.in_included_set is not None
+                            else (
+                                study.status == StudyStatus.INCLUDED_ABSTRACT
+                            )
+                        ),
+                    }
+                )
+
+        rows.sort(key=lambda row: (row["type"], str(row["pmid"])))
+        return rows
+
     async def _generate_basic_outputs(self):
         """Generate basic outputs and statistics."""
         # Calculate PRISMA statistics
@@ -954,35 +1029,27 @@ class AutonimaPipeline:
             import json
             json.dump(self.results.to_dict(final_studies_only=True), f, indent=2)
 
-        incomplete_pmids_file = outputs_dir / "incomplete_fulltext.txt"
-        with open(incomplete_pmids_file, 'w') as f:
-            for study in incomplete_fulltext:
-                f.write(f"{study.pmid}\n")
-
-        incomplete_csv_file = outputs_dir / "incomplete_fulltext.csv"
-        with open(incomplete_csv_file, "w", newline="") as f:
+        missing_fulltexts_file = outputs_dir / "missing_fulltexts.csv"
+        missing_fulltext_rows = self._build_missing_fulltext_rows(output_dir)
+        with open(missing_fulltexts_file, "w", newline="") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["pmid", "full_text_path"]
+                f,
+                fieldnames=[
+                    "pmid",
+                    "type",
+                    "source",
+                    "full_text_path",
+                    "in_included_set",
+                ],
             )
             writer.writeheader()
-            for study in incomplete_fulltext:
-                if study.full_text_path:
-                    full_text_path = study.full_text_path
-                elif study.pmcid:
-                    full_text_path = (
-                        str(
-                            output_dir
-                            / "retrieval"
-                            / "pubget_data"
-                            / "text.csv"
-                        )
-                        + f" [pmcid={study.pmcid}]"
-                    )
-                else:
-                    full_text_path = ""
-                writer.writerow(
-                    {"pmid": study.pmid, "full_text_path": full_text_path}
-                )
+            writer.writerows(missing_fulltext_rows)
+
+        # Compatibility output for scripts that consume one-PMID-per-line text.
+        missing_fulltexts_txt_file = outputs_dir / "missing_fulltexts.txt"
+        with open(missing_fulltexts_txt_file, "w") as f:
+            for row in missing_fulltext_rows:
+                f.write(f"{row['pmid']}\n")
 
     async def _generate_nimads_output(self):
         """Generate NiMADS output for studies with parsed analyses."""
