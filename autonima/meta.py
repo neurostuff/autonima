@@ -1,6 +1,7 @@
 """Meta-analysis functionality for Autonima."""
 
 import argparse
+import math
 import os
 from pathlib import Path
 import json
@@ -156,6 +157,33 @@ def _analysis_ids_for_column(annotation_data, column):
     ]
 
 
+def _analysis_has_valid_coordinates(analysis) -> bool:
+    """Return True when an analysis has at least one finite (x, y, z) point."""
+    points = getattr(analysis, "points", None) or []
+    if not points:
+        return False
+
+    for point in points:
+        coords = (getattr(point, "x", None), getattr(point, "y", None), getattr(point, "z", None))
+        if all(
+            isinstance(value, (int, float)) and math.isfinite(float(value))
+            for value in coords
+        ):
+            return True
+
+    return False
+
+
+def _post_mortem_debugger():
+    """Launch post-mortem debugging, preferring ipdb when available."""
+    try:
+        import ipdb as debugger
+    except ImportError:
+        import pdb as debugger
+
+    debugger.post_mortem()
+
+
 def run_meta_analysis_for_column(
     studyset,
     annotation,
@@ -202,6 +230,29 @@ def run_meta_analysis_for_column(
             return None
         first_studyset = first_studyset.slice(analyses=filtered_analysis_ids)
 
+    valid_analysis_ids = [
+        analysis.id
+        for study in first_studyset.studies
+        for analysis in study.analyses
+        if _analysis_has_valid_coordinates(analysis)
+    ]
+    valid_analysis_id_set = set(valid_analysis_ids)
+    skipped_without_valid_coords = sum(
+        1
+        for study in first_studyset.studies
+        for analysis in study.analyses
+        if analysis.id not in valid_analysis_id_set
+    )
+    if skipped_without_valid_coords:
+        print(
+            f"Skipping {skipped_without_valid_coords} analyses without valid coordinates "
+            f"for column {column}."
+        )
+    if not valid_analysis_ids:
+        print(f"No analyses with valid coordinates remain for column {column}. Skipping.")
+        return None
+    first_studyset = first_studyset.slice(analyses=valid_analysis_ids)
+
     for study in first_studyset.studies:
         study.name = study.id
         for analysis in study.analyses:
@@ -239,6 +290,8 @@ def run_meta_analyses_from_files(
     include_ids=None,
     skip_existing=False,
     columns=None,
+    fail_fast=False,
+    debug=False,
 ):
     """
     Run meta-analyses from explicit studyset + annotation file paths.
@@ -256,6 +309,10 @@ def run_meta_analyses_from_files(
         If True, skip columns whose output directories already exist and are non-empty.
     columns : optional list
         If provided, only these annotation columns are considered.
+    fail_fast : bool
+        If True, re-raise on the first column-level exception instead of continuing.
+    debug : bool
+        If True and fail_fast is enabled, enter post-mortem debugging on error.
     """
     include_ids_set = _normalize_include_ids(include_ids)
 
@@ -305,6 +362,10 @@ def run_meta_analyses_from_files(
             import traceback
 
             traceback.print_exc()
+            if fail_fast:
+                if debug:
+                    _post_mortem_debugger()
+                raise
 
     return results
 
@@ -318,6 +379,8 @@ def run_meta_analyses(
     include_ids=None,
     skip_existing=False,
     columns=None,
+    fail_fast=False,
+    debug=False,
 ):
     """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
     output_folder = Path(output_folder) / "outputs"
@@ -337,6 +400,8 @@ def run_meta_analyses(
         include_ids=include_ids,
         skip_existing=skip_existing,
         columns=columns,
+        fail_fast=fail_fast,
+        debug=debug,
     )
 
 
@@ -382,6 +447,16 @@ def main():
         default=None,
         help="Path to text file with study IDs/PMIDs to include (one per line)",
     )
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Stop at the first failing annotation column instead of continuing",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable post-mortem debugging (prefers ipdb) when used with --fail-fast",
+    )
 
     args = parser.parse_args()
 
@@ -403,6 +478,8 @@ def main():
         corrector_name=args.corrector,
         corrector_args=corrector_args,
         include_ids=args.include_ids,
+        fail_fast=args.fail_fast,
+        debug=args.debug,
     )
     print(f"Completed meta-analyses for {len(results)} columns")
 

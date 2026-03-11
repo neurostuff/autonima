@@ -80,6 +80,8 @@ autonima meta projects/cue_reactivity/default/outputs
 ```
 
 Optional parameters let you change the estimator, corrector, and include-ID filtering.
+For large jobs, use `--fail-fast` (or `--debug`, which implies fail-fast) to stop on the
+first failing column instead of continuing.
 
 ## Common Failure Modes
 

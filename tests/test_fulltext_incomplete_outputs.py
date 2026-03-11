@@ -1,6 +1,7 @@
 """Tests for fulltext_incomplete output propagation."""
 
 import asyncio
+import csv
 import json
 
 from autonima.config import ConfigManager
@@ -8,7 +9,11 @@ from autonima.models.types import Study, StudyStatus
 from autonima.pipeline import AutonimaPipeline
 
 
-def _make_study(pmid: str, status: StudyStatus) -> Study:
+def _make_study(
+    pmid: str,
+    status: StudyStatus,
+    full_text_path: str | None = None,
+) -> Study:
     return Study(
         pmid=pmid,
         title=f"Study {pmid}",
@@ -17,6 +22,7 @@ def _make_study(pmid: str, status: StudyStatus) -> Study:
         journal="Journal",
         publication_date="2023",
         status=status,
+        full_text_path=full_text_path,
     )
 
 
@@ -29,7 +35,11 @@ def test_generate_basic_outputs_tracks_fulltext_incomplete(tmp_path):
     pipeline.results.studies = [
         _make_study("PMID_INCLUDED", StudyStatus.INCLUDED_FULLTEXT),
         _make_study("PMID_EXCLUDED", StudyStatus.EXCLUDED_FULLTEXT),
-        _make_study("PMID_INCOMPLETE", StudyStatus.FULLTEXT_INCOMPLETE),
+        _make_study(
+            "PMID_INCOMPLETE",
+            StudyStatus.FULLTEXT_INCOMPLETE,
+            full_text_path="/tmp/incomplete_fulltext.txt",
+        ),
     ]
 
     asyncio.run(pipeline._generate_basic_outputs())
@@ -43,6 +53,17 @@ def test_generate_basic_outputs_tracks_fulltext_incomplete(tmp_path):
     incomplete_file = tmp_path / "outputs" / "incomplete_fulltext.txt"
     assert incomplete_file.exists()
     assert incomplete_file.read_text().strip() == "PMID_INCOMPLETE"
+
+    incomplete_csv_file = tmp_path / "outputs" / "incomplete_fulltext.csv"
+    assert incomplete_csv_file.exists()
+    with open(incomplete_csv_file, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows == [
+        {
+            "pmid": "PMID_INCOMPLETE",
+            "full_text_path": "/tmp/incomplete_fulltext.txt",
+        }
+    ]
 
     final_results = json.loads(
         (tmp_path / "outputs" / "final_results.json").read_text()

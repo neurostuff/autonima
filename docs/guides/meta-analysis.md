@@ -39,6 +39,10 @@ autonima meta projects/cue_reactivity/default/outputs
   JSON string of corrector arguments
 - `--include-ids`
   Newline-delimited study IDs or PMIDs to include
+- `--fail-fast`
+  Stop on the first failing annotation column
+- `--debug`
+  Fail fast and enter post-mortem debugging (`ipdb` if installed, else `pdb`)
 
 Example:
 

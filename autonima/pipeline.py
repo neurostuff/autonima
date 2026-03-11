@@ -959,6 +959,31 @@ class AutonimaPipeline:
             for study in incomplete_fulltext:
                 f.write(f"{study.pmid}\n")
 
+        incomplete_csv_file = outputs_dir / "incomplete_fulltext.csv"
+        with open(incomplete_csv_file, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["pmid", "full_text_path"]
+            )
+            writer.writeheader()
+            for study in incomplete_fulltext:
+                if study.full_text_path:
+                    full_text_path = study.full_text_path
+                elif study.pmcid:
+                    full_text_path = (
+                        str(
+                            output_dir
+                            / "retrieval"
+                            / "pubget_data"
+                            / "text.csv"
+                        )
+                        + f" [pmcid={study.pmcid}]"
+                    )
+                else:
+                    full_text_path = ""
+                writer.writerow(
+                    {"pmid": study.pmid, "full_text_path": full_text_path}
+                )
+
     async def _generate_nimads_output(self):
         """Generate NiMADS output for studies with parsed analyses."""
         # Determine which studies to export based on export_excluded_studies
