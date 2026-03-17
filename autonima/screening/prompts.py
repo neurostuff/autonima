@@ -79,17 +79,27 @@ IMPORTANT GUIDELINES:
         instructions = f"""
 INSTRUCTIONS FOR ABSTRACT SCREENING:
 1. Ensure the study addresses the review objective
-2. Carefully evaluate the abstract against each criterion
-3. If ANY exclusion criterion is clearly met, EXCLUDE the study
+2. Carefully evaluate the abstract against each inclusion and exclusion criterion
+3. Apply this decision rule:
+   - EXCLUDE if ANY exclusion criterion is clearly met, OR if one or more
+     inclusion criteria are clearly not met.
+   - INCLUDE for full-text review when exclusion criteria are not met and
+     inclusion status is uncertain from abstract-only evidence.
 4. If the abstract provides INSUFFICIENT information to determine inclusion,
    INCLUDE for full-text review
 5. Only EXCLUDE if you are highly confident based on the abstract alone
 {confidence_instruction}{reason_instruction}
 {additional_instructions_text}
 
-IMPORTANT: In your response, you must specify which specific criteria IDs apply to this study.
-- For included studies: List the inclusion criteria IDs that are satisfied (e.g., ["I1", "I2"])
-- For excluded studies: List the exclusion criteria IDs that apply (e.g., ["E1"])
+IMPORTANT: In your response, you must fully encode criteria coverage using IDs.
+- inclusion_criteria_applied: include ALL inclusion criteria IDs that are satisfied.
+- exclusion_criteria_applied: include ALL exclusion criteria IDs that are met.
+- Always populate BOTH arrays for every decision (included or excluded). Use []
+  only when none apply.
+- For excluded studies, the reason must explicitly name:
+  (a) exclusion IDs met (if any),
+  (b) inclusion IDs met, and
+  (c) inclusion IDs not met or not demonstrated.
 Respond with the exact JSON format specified, including the inclusion_criteria_applied and exclusion_criteria_applied fields.
 """.strip()
 
@@ -187,7 +197,7 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 4. Check that NO exclusion criteria are violated
 5. Pay special attention to study design, methods, participants, and outcomes
 6. If the study meets all criteria, INCLUDE it
-7. If ANY criterion is not met, EXCLUDE it
+7. EXCLUDE if ANY exclusion criterion is met OR if ANY inclusion criterion is not met
 8. Determine whether the provided "full text" is actually complete.
    Set fulltext_incomplete=true when content is incomplete and only provides
    title/abstract/metadata/references or another truncated subset.
@@ -197,9 +207,15 @@ INSTRUCTIONS FOR FULL-TEXT SCREENING:
 {confidence_instruction}{reason_instruction}
 {additional_instructions_text}
 
-IMPORTANT: In your response, you must specify which specific criteria IDs apply to this study.
-- For included studies: List the inclusion criteria IDs that are satisfied (e.g., ["I1", "I2"])
-- For excluded studies: List the exclusion criteria IDs that apply (e.g., ["E1"])
+IMPORTANT: In your response, you must fully encode criteria coverage using IDs.
+- inclusion_criteria_applied: include ALL inclusion criteria IDs that are satisfied.
+- exclusion_criteria_applied: include ALL exclusion criteria IDs that are met.
+- Always populate BOTH arrays for every decision (included or excluded). Use []
+  only when none apply.
+- For excluded studies, the reason must explicitly name:
+  (a) exclusion IDs met (if any),
+  (b) inclusion IDs met, and
+  (c) inclusion IDs not met.
 When fulltext_incomplete=true, this flag takes precedence in downstream logic.
 Respond with the exact JSON format specified, including fulltext_incomplete,
 inclusion_criteria_applied, and exclusion_criteria_applied fields.
