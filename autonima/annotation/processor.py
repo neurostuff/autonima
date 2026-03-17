@@ -38,6 +38,7 @@ class AnnotationProcessor:
         self,
         included_studies: List[Study],
         all_studies: List[Study] = None,
+        all_abstract_studies: List[Study] = None,
         output_dir: str = None
     ) -> List[AnnotationDecision]:
         """
@@ -45,8 +46,11 @@ class AnnotationProcessor:
         
         Args:
             included_studies: List of INCLUDED studies with parsed analyses
-            all_studies: Optional list of ALL studies (INCLUDED + EXCLUDED)
-                        with parsed analyses for the all_studies annotation
+            all_studies: Optional list of all studies from search with parsed
+                analyses for the all_studies annotation
+            all_abstract_studies: Optional list of studies included after
+                abstract screening, with parsed analyses for the all_abstract
+                annotation
             output_dir: Output directory for caching results
             
         Returns:
@@ -55,55 +59,80 @@ class AnnotationProcessor:
         # Load existing cached results
         existing_cached_results = self._load_cached_results(output_dir) or []
         
-        if not included_studies:
-            logger.info(
-                "No INCLUDED studies with analyses found for annotation"
-            )
+        if (
+            not included_studies
+            and not all_studies
+            and not all_abstract_studies
+        ):
+            logger.info("No studies with analyses found for annotation")
             return existing_cached_results
-        
-        logger.info(
-            f"Processing {len(included_studies)} INCLUDED studies with "
-            "analyses for annotation"
-        )
+
+        if included_studies:
+            logger.info(
+                f"Processing {len(included_studies)} INCLUDED studies with "
+                "analyses for annotation"
+            )
 
         if output_dir:
             for study in included_studies:
                 if not study.full_text_output_dir:
                     study.full_text_output_dir = output_dir
-            if all_studies:
-                for study in all_studies:
-                    if not study.full_text_output_dir:
-                        study.full_text_output_dir = output_dir
+            for study in all_studies or []:
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = output_dir
+            for study in all_abstract_studies or []:
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = output_dir
         
         # Process all analysis-annotation combinations incrementally by study
         all_decisions = []
-        
-        # Process the "all_analyses" annotation for INCLUDED studies
-        if self.config.create_all_included_annotation:
-            all_analyses_decisions = self._create_all_analyses_annotations_by_study(
-                included_studies,
-                annotation_name="all_analyses",
-                output_dir=output_dir,
-                existing_results=existing_cached_results
-            )
-            all_decisions.extend(all_analyses_decisions)
-        
-        # Process the "all_studies" annotation for ALL studies if enabled
-        if self.config.create_all_from_search_annotation and all_studies:
-            logger.info(
-                f"Creating 'all_studies' annotation for "
-                f"{len(all_studies)} studies (INCLUDED + EXCLUDED)"
-            )
-            all_studies_decisions = self._create_all_analyses_annotations_by_study(
-                all_studies,
-                annotation_name="all_studies",
-                output_dir=output_dir,
-                existing_results=existing_cached_results
-            )
-            all_decisions.extend(all_studies_decisions)
+
+        # Process system annotations from search/screening/full-text inclusion.
+        if self.config.create_all_included_annotations:
+            if all_studies:
+                logger.info(
+                    f"Creating 'all_studies' annotation for "
+                    f"{len(all_studies)} studies from search"
+                )
+                all_studies_decisions = (
+                    self._create_all_analyses_annotations_by_study(
+                        all_studies,
+                        annotation_name="all_studies",
+                        output_dir=output_dir,
+                        existing_results=existing_cached_results
+                    )
+                )
+                all_decisions.extend(all_studies_decisions)
+
+            if all_abstract_studies:
+                logger.info(
+                    f"Creating 'all_abstract' annotation for "
+                    f"{len(all_abstract_studies)} "
+                    "abstract-screened studies"
+                )
+                all_abstract_decisions = (
+                    self._create_all_analyses_annotations_by_study(
+                        all_abstract_studies,
+                        annotation_name="all_abstract",
+                        output_dir=output_dir,
+                        existing_results=existing_cached_results
+                    )
+                )
+                all_decisions.extend(all_abstract_decisions)
+
+            if included_studies:
+                all_analyses_decisions = (
+                    self._create_all_analyses_annotations_by_study(
+                        included_studies,
+                        annotation_name="all_analyses",
+                        output_dir=output_dir,
+                        existing_results=existing_cached_results
+                    )
+                )
+                all_decisions.extend(all_analyses_decisions)
         
         # Process custom annotations on INCLUDED studies only
-        if self.config.annotations:
+        if self.config.annotations and included_studies:
             custom_decisions = self._process_custom_annotations_by_study(
                 included_studies,
                 self.config.model,
@@ -691,7 +720,11 @@ class AnnotationProcessor:
                 updated_annotation_names = {
                     decision.annotation_name for decision in study_decisions
                 }
-                keep_system_annotations = {"all_analyses", "all_studies"}
+                keep_system_annotations = {
+                    "all_analyses",
+                    "all_studies",
+                    "all_abstract",
+                }
                 has_custom_updates = any(
                     name not in keep_system_annotations
                     for name in updated_annotation_names

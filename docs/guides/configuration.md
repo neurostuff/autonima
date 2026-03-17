@@ -205,9 +205,7 @@ Common fields:
 - `prompt_type`
   Type: string
   Values: `single_analysis`, `multi_analysis`
-- `create_all_included_annotation`
-  Type: boolean
-- `create_all_from_search_annotation`
+- `create_all_included_annotations`
   Type: boolean
 - `metadata_fields`
   Type: list of strings

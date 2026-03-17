@@ -383,11 +383,8 @@ class PipelineConfig:
             },
             "annotation": {
                 "model": self.annotation.model,
-                "create_all_included_annotation": (
-                    self.annotation.create_all_included_annotation
-                ),
-                "create_all_from_search_annotation": (
-                    self.annotation.create_all_from_search_annotation
+                "create_all_included_annotations": (
+                    self.annotation.create_all_included_annotations
                 ),
                 "metadata_fields": self.annotation.metadata_fields,
                 "annotations": [

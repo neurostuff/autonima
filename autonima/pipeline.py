@@ -434,6 +434,19 @@ class AutonimaPipeline:
         # Save intermediary results
         output_dir = Path(self.config.output.directory)
         retrieval_results_file = output_dir / "outputs" / "fulltext_retrieval_results.json"
+
+        def _study_has_coordinates(study) -> bool:
+            """Return True when at least one valid coordinate point is present."""
+            for analysis in study.analyses or []:
+                for point in getattr(analysis, "points", []) or []:
+                    coordinates = getattr(point, "coordinates", None)
+                    if (
+                        isinstance(coordinates, list)
+                        and len(coordinates) == 3
+                    ):
+                        return True
+            return False
+
         retrieval_data = {
             "studies_with_fulltext": [
                 {
@@ -446,7 +459,8 @@ class AutonimaPipeline:
                     ),
                     "status": study.status.value,
                     "full_text_path": study.full_text_path,
-                    "fulltext_available": study.fulltext_available
+                    "fulltext_available": study.fulltext_available,
+                    "coordinates_found": _study_has_coordinates(study),
                 }
                 for study in self.results.studies
                 if study.fulltext_available or study.pmcid
@@ -608,6 +622,11 @@ class AutonimaPipeline:
                 "tables_processed": 0,
             }
             return
+        
+        logger.info(
+            f"Starting coordinate parsing for {len(table_jobs)} tables "
+            f"from {len(studies_with_tables)}"
+        )
  
         # Process tables with or without parallelization
         if self.num_workers <= 1 or len(table_jobs) <= 1:
@@ -689,17 +708,27 @@ class AutonimaPipeline:
             if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
         ]
         
-        # Get ALL studies if create_all_from_search_annotation is enabled
+        # Get studies for system-wide annotations when enabled.
         all_studies = None
+        all_abstract_studies = None
         if getattr(
-            self.config.annotation, 'create_all_from_search_annotation', False
+            self.config.annotation, 'create_all_included_annotations', True
         ):
             all_studies = [
                 s for s in self.results.studies
                 if s.analyses
             ]
+            # "all_abstract" includes studies not excluded at abstract stage.
+            all_abstract_studies = [
+                s for s in all_studies
+                if s.status != StudyStatus.EXCLUDED_ABSTRACT
+            ]
         
-        if not included_studies and not all_studies:
+        if (
+            not included_studies
+            and not all_studies
+            and not all_abstract_studies
+        ):
             logger.debug("No studies with parsed analyses found for annotation")
             self.results.execution_stats["annotation"] = {
                 "enabled": True,
@@ -766,6 +795,7 @@ class AutonimaPipeline:
         annotation_results = processor.process_studies(
             included_studies=included_studies,
             all_studies=all_studies,
+            all_abstract_studies=all_abstract_studies,
             output_dir=self.config.output.directory
         )
         

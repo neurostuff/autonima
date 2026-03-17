@@ -11,7 +11,7 @@ from autonima.models.types import Study
 from autonima.coordinates.schema import Analysis
 
 
-def create_mock_study(pmid, num_analyses=2):
+def create_mock_study(pmid, num_analyses=2, status="INCLUDED_FULLTEXT"):
     """Create a mock study with analyses for testing."""
     # Create Analysis objects
     analyses = []
@@ -31,7 +31,7 @@ def create_mock_study(pmid, num_analyses=2):
         authors=["Test Author"],
         journal="Test Journal",
         publication_date="2023-01-01",
-        status="INCLUDED_FULLTEXT",
+        status=status,
         analyses=analyses
     )
     return study
@@ -42,7 +42,7 @@ def test_study_based_caching_all_analyses_annotation():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create annotation config
         config = AnnotationConfig(
-            create_all_included_annotation=True,
+            create_all_included_annotations=True,
             annotations=[]
         )
         
@@ -124,7 +124,7 @@ def test_study_based_caching_custom_annotations():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create annotation config with custom annotations
         config = AnnotationConfig(
-            create_all_included_annotation=False,
+            create_all_included_annotations=False,
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -198,7 +198,7 @@ def test_study_based_caching_mixed_annotations():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create annotation config with both types
         config = AnnotationConfig(
-            create_all_included_annotation=True,
+            create_all_included_annotations=True,
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -268,7 +268,7 @@ def test_partial_cache_replacement():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create annotation config
         config = AnnotationConfig(
-            create_all_included_annotation=True,
+            create_all_included_annotations=True,
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -327,7 +327,7 @@ def test_partial_cache_replacement():
             
             # Now modify the config to test cache replacement
             config2 = AnnotationConfig(
-                create_all_included_annotation=True,
+                create_all_included_annotations=True,
                 annotations=[
                     AnnotationCriteriaConfig(
                         name="test_annotation_v2",  # Different annotation name
@@ -358,10 +358,64 @@ def test_partial_cache_replacement():
             assert len(old_custom_results) == 0  # Should be replaced
 
 
+def test_create_all_included_annotations_generates_system_annotations():
+    """Test that system annotations produce all_studies and all_abstract."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config = AnnotationConfig(
+            create_all_included_annotations=True,
+            annotations=[]
+        )
+
+        processor = AnnotationProcessor(config)
+
+        excluded_abstract = create_mock_study(
+            "10001", num_analyses=1, status="EXCLUDED_ABSTRACT"
+        )
+        included_abstract = create_mock_study(
+            "10002", num_analyses=1, status="INCLUDED_ABSTRACT"
+        )
+        excluded_fulltext = create_mock_study(
+            "10003", num_analyses=1, status="EXCLUDED_FULLTEXT"
+        )
+
+        results = processor.process_studies(
+            included_studies=[included_abstract],
+            all_studies=[
+                excluded_abstract,
+                included_abstract,
+                excluded_fulltext,
+            ],
+            all_abstract_studies=[
+                included_abstract,
+                excluded_fulltext,
+            ],
+            output_dir=temp_dir,
+        )
+
+        all_studies_results = [
+            r for r in results if r.annotation_name == "all_studies"
+        ]
+        all_abstract_results = [
+            r for r in results
+            if r.annotation_name == "all_abstract"
+        ]
+
+        assert len(all_studies_results) == 3
+        assert len(all_abstract_results) == 2
+
+        all_studies_study_ids = {r.study_id for r in all_studies_results}
+        all_abstract_study_ids = {
+            r.study_id for r in all_abstract_results
+        }
+        assert all_studies_study_ids == {"10001", "10002", "10003"}
+        assert all_abstract_study_ids == {"10002", "10003"}
+
+
 if __name__ == "__main__":
     # Run the tests
     test_study_based_caching_all_analyses_annotation()
     test_study_based_caching_custom_annotations()
     test_study_based_caching_mixed_annotations()
     test_partial_cache_replacement()
+    test_create_all_included_annotations_generates_system_annotations()
     print("All tests passed!")

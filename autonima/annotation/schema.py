@@ -19,10 +19,11 @@ class AnnotationCriteriaConfig(BaseModel):
 class AnnotationConfig(BaseModel):
     """Configuration for the annotation phase."""
     model: str = "gpt-4o-mini"
-    # Create "all_analyses" annotation with all analyses from INCLUDED studies
-    create_all_included_annotation: bool = True
-    # Create "all_studies" annotation from INCLUDED and EXCLUDED studies
-    create_all_from_search_annotation: bool = False
+    # Create system annotations:
+    # - "all_studies" (all studies with parsed analyses)
+    # - "all_abstract" (studies included after abstract screening)
+    # - "all_analyses" (studies included after full-text screening)
+    create_all_included_annotations: bool = True
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
     # Options: "single_analysis" (per-analysis) or

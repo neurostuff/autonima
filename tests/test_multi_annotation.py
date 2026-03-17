@@ -52,7 +52,7 @@ def test_annotation_processor_multi_decision():
     """Test that annotation processor can handle multiple annotations."""
     # Create annotation config with multiple annotations
     config = AnnotationConfig(
-        create_all_included_annotation=True,
+        create_all_included_annotations=True,
         annotations=[
             AnnotationCriteriaConfig(
                 name="emotion",

@@ -111,8 +111,7 @@ annotation:
   model: "gpt-4o-mini"
   # Options: "single_analysis" or "multi_analysis".
   prompt_type: "single_analysis"
-  create_all_included_annotation: true
-  create_all_from_search_annotation: false
+  create_all_included_annotations: true
   # metadata_fields:
   #   - "analysis_name"
   #   - "analysis_description"

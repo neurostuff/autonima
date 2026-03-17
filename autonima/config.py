@@ -345,21 +345,32 @@ class ConfigManager:
                 for criteria_dict in annotation_dict['annotations']:
                     criteria = AnnotationCriteriaConfig(**criteria_dict)
                     annotations.append(criteria)
+
+            legacy_keys = [
+                key for key in (
+                    'create_all_included_annotation',
+                    'create_all_studies_annotations',
+                    'create_all_from_search_annotation',
+                )
+                if key in annotation_dict
+            ]
+            if legacy_keys:
+                legacy_list = ", ".join(legacy_keys)
+                raise ConfigurationError(
+                    "Deprecated annotation config key(s): "
+                    f"{legacy_list}. Use "
+                    "'create_all_included_annotations' only."
+                )
             
             # Get annotation configuration values
-            create_all_included = annotation_dict.get(
-                'create_all_included_annotation', True
-            )
-            
-            create_all_from_search = annotation_dict.get(
-                'create_all_from_search_annotation', False
+            create_all_included_annotations = annotation_dict.get(
+                'create_all_included_annotations', True
             )
             
             # Create annotation config
             annotation_config = AnnotationConfig(
                 model=annotation_dict.get('model', 'gpt-4o-mini'),
-                create_all_included_annotation=create_all_included,
-                create_all_from_search_annotation=create_all_from_search,
+                create_all_included_annotations=create_all_included_annotations,
                 annotations=annotations,
                 enabled=annotation_dict.get('enabled', True),
                 prompt_type=annotation_dict.get('prompt_type', 'single_analysis'),
