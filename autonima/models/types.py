@@ -255,7 +255,7 @@ class SearchConfig:
     """Configuration for the search phase."""
     database: str = "pubmed"
     query: str = ""
-    max_results: int = 1000
+    max_results: Optional[int] = None
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     email: Optional[str] = None  # Required for NCBI API
