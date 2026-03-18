@@ -162,7 +162,7 @@ class ConfigManager:
             if not config.search.query.strip():
                 raise ConfigurationError("Search query cannot be empty when not using PMIDs list/file")
 
-        if config.search.max_results <= 0:
+        if config.search.max_results is not None and config.search.max_results <= 0:
             raise ConfigurationError("max_results must be positive")
 
         if config.search.database not in ['pubmed', 'pmc']:

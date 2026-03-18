@@ -222,6 +222,9 @@ class PubMedSearch(SearchEngine):
         logger.debug(f"Executing search with query: {query}")
         
         try:
+            if self.config.max_results is None:
+                self.config.max_results = 10000  # Default max results if not set
+                logger.debug("Max results not set in config, defaulting to 10000")
             # Use Entrez.esearch to search PubMed
             handle = Entrez.esearch(
                 db="pubmed",
