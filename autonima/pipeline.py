@@ -6,7 +6,7 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Literal, cast
 import concurrent.futures
 from tqdm import tqdm
 
@@ -28,6 +28,9 @@ from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
 
 logger = logging.getLogger(__name__)
+
+RunStopStage = Literal["search", "abstract", "full"]
+VALID_RUN_STOP_STAGES = {"search", "abstract", "full"}
 
 
 def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
@@ -114,13 +117,41 @@ class AutonimaPipeline:
         from .utils.criteria import save_criteria_mapping
         save_criteria_mapping(self.config, self.config.output.directory)
 
-    async def run(self) -> PipelineResult:
+    def _complete_run(self, completed_stage: RunStopStage) -> PipelineResult:
+        """Finalize run metadata and return results."""
+        self.results.execution_stats["completed_stage"] = completed_stage
+        self.results.completed_at = datetime.now()
+        duration = self.results.completed_at - self.results.started_at
+        if completed_stage == "full":
+            logger.info(f"Pipeline completed in {duration}")
+        else:
+            logger.info(
+                "Pipeline stage-limited run completed at '%s' in %s",
+                completed_stage,
+                duration,
+            )
+        return self.results
+
+    async def run(self, stop_after_stage: RunStopStage = "full") -> PipelineResult:
         """
         Execute the complete systematic review pipeline.
+
+        Args:
+            stop_after_stage: Stop pipeline after this stage.
 
         Returns:
             PipelineResult containing all results and metadata
         """
+        normalized_stage = str(stop_after_stage).strip().lower()
+        if normalized_stage not in VALID_RUN_STOP_STAGES:
+            valid_stages = ", ".join(sorted(VALID_RUN_STOP_STAGES))
+            raise ValueError(
+                f"Invalid stop_after_stage '{stop_after_stage}'. "
+                f"Expected one of: {valid_stages}"
+            )
+        stop_stage = cast(RunStopStage, normalized_stage)
+        self.results.execution_stats["stop_after_stage"] = stop_stage
+
         # Get objective from screening configuration
         abstract_objective = self.config.screening.abstract.get('objective')
         fulltext_objective = self.config.screening.fulltext.get('objective')
@@ -130,9 +161,13 @@ class AutonimaPipeline:
         try:
             # Phase 1: Literature Search
             await self._execute_search_phase()
+            if stop_stage == "search":
+                return self._complete_run("search")
 
             # Phase 2: Abstract Screening
             await self._execute_abstract_screening()
+            if stop_stage == "abstract":
+                return self._complete_run("abstract")
 
             # Phase 3: Full-text Retrieval
             await self._execute_retrieval_phase()
@@ -150,11 +185,7 @@ class AutonimaPipeline:
             await self._execute_output_phase()
 
             # Complete pipeline
-            self.results.completed_at = datetime.now()
-            duration = self.results.completed_at - self.results.started_at
-            logger.info(f"Pipeline completed in {duration}")
-
-            return self.results
+            return self._complete_run("full")
 
         except Exception as e:
             log_error_with_debug(logger, f"Pipeline failed: {e}")
@@ -1238,6 +1269,7 @@ class AutonimaPipeline:
 async def run_pipeline_from_config(
     config_path: str = None,
     config: PipelineConfig = None,
+    stop_after_stage: RunStopStage = "full",
     num_workers: int = 1,
     force_reextract_incomplete_fulltext: bool = False
 ) -> PipelineResult:
@@ -1247,6 +1279,7 @@ async def run_pipeline_from_config(
     Args:
         config_path: Path to YAML configuration file
         config: Pipeline configuration object
+        stop_after_stage: Stop pipeline after this stage
         force_reextract_incomplete_fulltext: Re-run full-text screening for
             cached fulltext_incomplete studies
 
@@ -1266,4 +1299,4 @@ async def run_pipeline_from_config(
             force_reextract_incomplete_fulltext
         ),
     )
-    return await pipeline.run()
+    return await pipeline.run(stop_after_stage=stop_after_stage)

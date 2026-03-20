@@ -5,7 +5,13 @@ import sys
 
 from click.testing import CliRunner
 
-from autonima.cli import create_sample_config, run, validate
+from autonima.cli import (
+    create_sample_config,
+    run,
+    run_abstract,
+    run_search,
+    validate,
+)
 from autonima.config import ConfigManager
 
 
@@ -68,6 +74,46 @@ def test_validate_keeps_explicit_output_dir(tmp_path, monkeypatch):
     assert f"✓ Output directory: {explicit_output}" in result.output
 
 
+def test_run_search_uses_config_stem_as_default_output_dir(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "search_only.yaml"
+    config_path.write_text("search: {}\n", encoding="utf-8")
+
+    sample_config = ConfigManager().create_sample_config()
+
+    def fake_load_from_file(self, path):
+        assert path == str(config_path)
+        return sample_config
+
+    monkeypatch.setattr(ConfigManager, "load_from_file", fake_load_from_file)
+
+    result = CliRunner().invoke(run_search, [str(config_path), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert sample_config.output.directory == str(config_path.with_suffix(""))
+
+
+def test_run_abstract_uses_config_stem_as_default_output_dir(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "abstract_only.yaml"
+    config_path.write_text("search: {}\n", encoding="utf-8")
+
+    sample_config = ConfigManager().create_sample_config()
+
+    def fake_load_from_file(self, path):
+        assert path == str(config_path)
+        return sample_config
+
+    monkeypatch.setattr(ConfigManager, "load_from_file", fake_load_from_file)
+
+    result = CliRunner().invoke(run_abstract, [str(config_path), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert sample_config.output.directory == str(config_path.with_suffix(""))
+
+
 def test_importing_cli_does_not_load_heavy_pipeline_modules():
     env = os.environ.copy()
     repo_root = os.path.dirname(os.path.dirname(__file__))
@@ -127,13 +173,17 @@ def test_run_passes_force_reextract_incomplete_fulltext_flag(
     captured = {}
 
     class DummyResults:
-        execution_stats = {}
+        execution_stats = {"completed_stage": "full"}
         studies = []
         errors = []
 
     async def fake_run_pipeline_from_config(
-        config, num_workers=1, force_reextract_incomplete_fulltext=False
+        config,
+        stop_after_stage="full",
+        num_workers=1,
+        force_reextract_incomplete_fulltext=False,
     ):
+        captured["stop_after_stage"] = stop_after_stage
         captured["num_workers"] = num_workers
         captured["force_reextract_incomplete_fulltext"] = (
             force_reextract_incomplete_fulltext
@@ -151,4 +201,91 @@ def test_run_passes_force_reextract_incomplete_fulltext_flag(
     )
 
     assert result.exit_code == 0
+    assert captured["stop_after_stage"] == "full"
     assert captured["force_reextract_incomplete_fulltext"] is True
+
+
+def test_run_search_passes_search_stop_after_stage(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yml"
+    config_path.write_text("search: {}\n", encoding="utf-8")
+    sample_config = ConfigManager().create_sample_config()
+
+    def fake_load_from_file(self, path):
+        assert path == str(config_path)
+        return sample_config
+
+    monkeypatch.setattr(ConfigManager, "load_from_file", fake_load_from_file)
+
+    captured = {}
+
+    class DummyResults:
+        execution_stats = {"completed_stage": "search"}
+        studies = []
+        errors = []
+
+    async def fake_run_pipeline_from_config(
+        config,
+        stop_after_stage="full",
+        num_workers=1,
+        force_reextract_incomplete_fulltext=False,
+    ):
+        captured["stop_after_stage"] = stop_after_stage
+        captured["num_workers"] = num_workers
+        captured["force_reextract_incomplete_fulltext"] = (
+            force_reextract_incomplete_fulltext
+        )
+        return DummyResults()
+
+    monkeypatch.setattr(
+        "autonima.cli._get_run_pipeline_from_config",
+        lambda: fake_run_pipeline_from_config,
+    )
+
+    result = CliRunner().invoke(run_search, [str(config_path)])
+
+    assert result.exit_code == 0
+    assert captured["stop_after_stage"] == "search"
+    assert captured["force_reextract_incomplete_fulltext"] is False
+
+
+def test_run_abstract_passes_abstract_stop_after_stage(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yml"
+    config_path.write_text("search: {}\n", encoding="utf-8")
+    sample_config = ConfigManager().create_sample_config()
+
+    def fake_load_from_file(self, path):
+        assert path == str(config_path)
+        return sample_config
+
+    monkeypatch.setattr(ConfigManager, "load_from_file", fake_load_from_file)
+
+    captured = {}
+
+    class DummyResults:
+        execution_stats = {"completed_stage": "abstract"}
+        studies = []
+        errors = []
+
+    async def fake_run_pipeline_from_config(
+        config,
+        stop_after_stage="full",
+        num_workers=1,
+        force_reextract_incomplete_fulltext=False,
+    ):
+        captured["stop_after_stage"] = stop_after_stage
+        captured["num_workers"] = num_workers
+        captured["force_reextract_incomplete_fulltext"] = (
+            force_reextract_incomplete_fulltext
+        )
+        return DummyResults()
+
+    monkeypatch.setattr(
+        "autonima.cli._get_run_pipeline_from_config",
+        lambda: fake_run_pipeline_from_config,
+    )
+
+    result = CliRunner().invoke(run_abstract, [str(config_path)])
+
+    assert result.exit_code == 0
+    assert captured["stop_after_stage"] == "abstract"
+    assert captured["force_reextract_incomplete_fulltext"] is False

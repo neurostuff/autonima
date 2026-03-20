@@ -31,7 +31,8 @@ The documentation here is focused on how to run the CLI and how to author a work
 
 ## Important Notes
 
-- `run` and `validate` use positional arguments: `autonima run CONFIG [OUTPUT_FOLDER]`.
+- `run`, `run-search`, `run-abstract`, and `validate` use positional arguments:
+  `autonima <command> CONFIG [OUTPUT_FOLDER]`.
 - If you omit `OUTPUT_FOLDER`, the CLI defaults to a sibling directory derived from the config file stem.
   Example: `projects/cue_reactivity/default.yaml` becomes `projects/cue_reactivity/default/`.
 - The config file still needs a non-empty `output.directory` field because configuration validation currently requires it.

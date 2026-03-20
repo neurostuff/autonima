@@ -1,10 +1,12 @@
 # CLI Usage
 
-Autonima exposes four main commands:
+Autonima exposes six main commands:
 
 - `autonima create-sample-config`
 - `autonima validate CONFIG [OUTPUT_FOLDER]`
 - `autonima run CONFIG [OUTPUT_FOLDER]`
+- `autonima run-search CONFIG [OUTPUT_FOLDER]`
+- `autonima run-abstract CONFIG [OUTPUT_FOLDER]`
 - `autonima meta OUTPUT_FOLDER`
 
 See the [CLI reference](../reference/cli.md) for generated argument and option details.
@@ -54,6 +56,38 @@ Useful options:
 - `--debug` for post-mortem debugging on errors
 - `-j` / `--num-workers` to control parallel screening workers
 - `--force-reextract-incomplete-fulltext` to re-run full-text screening for cached `fulltext_incomplete` studies using current files
+
+## Run Search Only
+
+```bash
+autonima run-search config.yaml
+```
+
+This runs only the search stage and writes search artifacts. It does not run abstract screening or any downstream phase.
+
+Useful options:
+
+- `--dry-run` to validate without running
+- `-v` / `--verbose` for more logging
+- `--debug` for post-mortem debugging on errors
+- `-j` / `--num-workers` to keep a consistent run interface
+
+## Run Through Abstract Screening
+
+```bash
+autonima run-abstract config.yaml
+```
+
+This runs search plus abstract screening, then stops before full-text retrieval.
+
+`run-abstract` always reruns upstream stages for the current invocation; it does not reuse cached search results as an input shortcut.
+
+Useful options:
+
+- `--dry-run` to validate without running
+- `-v` / `--verbose` for more logging
+- `--debug` for post-mortem debugging on errors
+- `-j` / `--num-workers` to control abstract-screening parallelism
 
 ## Omitted Output Folder
 

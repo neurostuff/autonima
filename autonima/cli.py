@@ -4,6 +4,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
+from typing import Literal
 
 import click
 
@@ -55,6 +56,197 @@ def _resolve_output_folder(
     if output_folder:
         return output_folder
     return str(config_path.with_suffix(""))
+
+
+def _print_pipeline_summary(
+    results,
+    pipeline_config,
+    requested_stop_after_stage: Literal["search", "abstract", "full"],
+) -> None:
+    """Print a stage-aware run summary."""
+    stats = results.execution_stats
+    completed_stage = stats.get("completed_stage", requested_stop_after_stage)
+    studies = results.studies
+    prisma_stats = stats.get("prisma_stats", {})
+    total_identified = stats.get(
+        "studies_found",
+        prisma_stats.get("total_identified", len(studies)),
+    )
+
+    print("\n" + "=" * 60)
+    if completed_stage == "full":
+        print("AUTONIMA PIPELINE COMPLETED")
+    else:
+        print(
+            "AUTONIMA PIPELINE COMPLETED "
+            f"(THROUGH {str(completed_stage).upper()} STAGE)"
+        )
+    print("=" * 60)
+    print(f"Studies from search: {total_identified}")
+
+    if completed_stage in {"abstract", "full"}:
+        abstract_screened = sum(
+            1
+            for s in studies
+            if getattr(s.status, "value", str(s.status)) != "pending"
+        )
+        included_after_abstract = sum(
+            1
+            for s in studies
+            if getattr(s.status, "value", str(s.status))
+            in {
+                "included_abstract",
+                "included_fulltext",
+                "excluded_fulltext",
+                "fulltext_incomplete",
+            }
+        )
+        excluded_at_abstract = sum(
+            1
+            for s in studies
+            if getattr(s.status, "value", str(s.status))
+            == "excluded_abstract"
+        )
+
+        print(f"Studies screened with abstract: {abstract_screened}")
+        print(f"Included after abstract: {included_after_abstract}")
+        print(f"Excluded at abstract: {excluded_at_abstract}")
+
+    if completed_stage == "full":
+        fulltext_screened = sum(
+            1
+            for s in studies
+            if getattr(s.status, "value", str(s.status)) in {
+                "included_fulltext",
+                "excluded_fulltext",
+                "fulltext_incomplete",
+            }
+        )
+        fulltext_incomplete = sum(
+            1
+            for s in studies
+            if getattr(s.status, "value", str(s.status))
+            == "fulltext_incomplete"
+        )
+        final_included = prisma_stats.get(
+            "final_included",
+            sum(
+                1
+                for s in studies
+                if getattr(s.status, "value", str(s.status))
+                == "included_fulltext"
+            ),
+        )
+
+        parsing_stats = stats.get("coordinate_parsing", {})
+        parsing_enabled = parsing_stats.get(
+            "enabled",
+            getattr(pipeline_config.parsing, "parse_coordinates", False),
+        )
+        if parsing_enabled:
+            coordinate_summary = (
+                "enabled"
+                f" ({parsing_stats.get('tables_processed', 0)} tables,"
+                f" {parsing_stats.get('studies_with_tables', 0)} studies)"
+            )
+        else:
+            coordinate_summary = "disabled"
+
+        annotation_stats = stats.get("annotation", {})
+        annotation_enabled = annotation_stats.get(
+            "enabled",
+            getattr(pipeline_config.annotation, "enabled", True),
+        )
+        if annotation_enabled:
+            annotation_summary = (
+                "enabled"
+                f" ({annotation_stats.get('decisions', 0)} decisions)"
+            )
+        else:
+            annotation_summary = "disabled"
+
+        print(f"Studies screened with full text: {fulltext_screened}")
+        print(f"Full-text incomplete: {fulltext_incomplete}")
+        print(f"Final included studies: {final_included}")
+        print(f"Coordinate parsing: {coordinate_summary}")
+        print(f"Annotation: {annotation_summary}")
+
+    if results.errors:
+        print(f"\nErrors encountered: {len(results.errors)}")
+        for error in results.errors:
+            print(f"  - {error}")
+
+
+def _run_pipeline_command(
+    config: str,
+    output_folder: str | None,
+    verbose: bool,
+    dry_run: bool,
+    debug: bool,
+    num_workers: int,
+    stop_after_stage: Literal["search", "abstract", "full"] = "full",
+    force_reextract_incomplete_fulltext: bool = False,
+) -> None:
+    """Run pipeline commands that share config loading and execution logic."""
+    _configure_run_logging(verbose)
+    if verbose:
+        logger.info("Verbose logging enabled")
+
+    set_debug_mode(debug)
+    ConfigManager, ConfigurationError = _get_config_dependencies()
+
+    config_path = Path(config)
+    if not config_path.exists():
+        log_error_with_debug(
+            logger, f"Configuration file not found: {config_path}"
+        )
+        sys.exit(1)
+
+    try:
+        logger.debug(f"Loading configuration from: {config_path}")
+        config_manager = ConfigManager()
+        pipeline_config = config_manager.load_from_file(str(config_path))
+
+        pipeline_config.output.directory = _resolve_output_folder(
+            config_path, output_folder
+        )
+
+        if dry_run:
+            logger.info("Dry run completed successfully")
+            logger.info("Configuration is valid")
+            return
+
+        async def execute_pipeline():
+            run_pipeline_from_config = _get_run_pipeline_from_config()
+            results = await run_pipeline_from_config(
+                config=pipeline_config,
+                stop_after_stage=stop_after_stage,
+                num_workers=num_workers,
+                force_reextract_incomplete_fulltext=(
+                    force_reextract_incomplete_fulltext
+                ),
+            )
+            _print_pipeline_summary(
+                results=results,
+                pipeline_config=pipeline_config,
+                requested_stop_after_stage=stop_after_stage,
+            )
+            return results
+
+        asyncio.run(execute_pipeline())
+
+    except ConfigurationError as e:
+        log_error_with_debug(logger, f"Configuration error: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
+        sys.exit(1)
+    except Exception as e:
+        log_error_with_debug(logger, f"Pipeline execution failed: {e}")
+        if debug:
+            import pdb
+            pdb.post_mortem()
+        sys.exit(1)
 
 
 @click.command()
@@ -111,143 +303,95 @@ def run(
         autonima run config.yaml results --verbose
         autonima run config.yaml --dry-run
     """
-    _configure_run_logging(verbose)
-    if verbose:
-        logger.info("Verbose logging enabled")
-    
-    # Set debug mode globally
-    set_debug_mode(debug)
-    ConfigManager, ConfigurationError = _get_config_dependencies()
+    _run_pipeline_command(
+        config=config,
+        output_folder=output_folder,
+        verbose=verbose,
+        dry_run=dry_run,
+        debug=debug,
+        num_workers=num_workers,
+        stop_after_stage="full",
+        force_reextract_incomplete_fulltext=(
+            force_reextract_incomplete_fulltext
+        ),
+    )
 
-    config_path = Path(config)
-    if not config_path.exists():
-        log_error_with_debug(
-            logger, f"Configuration file not found: {config_path}"
-        )
-        sys.exit(1)
 
-    try:
-        # Load and validate configuration
-        logger.debug(f"Loading configuration from: {config_path}")
-        config_manager = ConfigManager()
-        pipeline_config = config_manager.load_from_file(str(config_path))
+@click.command()
+@click.argument('config', type=click.Path(exists=True))
+@click.argument('output_folder', required=False, type=click.Path())
+@click.option('--verbose', '-v', is_flag=True,
+              help='Enable verbose logging')
+@click.option('--dry-run', is_flag=True,
+              help='Validate configuration without running pipeline')
+@click.option('--debug', is_flag=True,
+              help='Enable debug mode with post-mortem debugging on errors')
+@click.option('--num-workers', '-j', type=int, default=1,
+              help='Number of parallel workers for screening (default: 1)')
+def run_search(
+    config: str,
+    output_folder: str | None,
+    verbose: bool,
+    dry_run: bool,
+    debug: bool,
+    num_workers: int,
+):
+    """
+    Run Autonima through the search stage only.
 
-        # Default to a sibling directory named after the config file stem.
-        pipeline_config.output.directory = _resolve_output_folder(
-            config_path, output_folder
-        )
+    This command executes:
+    1. Literature search via PubMed
 
-        if dry_run:
-            logger.info("Dry run completed successfully")
-            logger.info("Configuration is valid")
-            return
+    It stops before abstract screening and downstream stages.
+    """
+    _run_pipeline_command(
+        config=config,
+        output_folder=output_folder,
+        verbose=verbose,
+        dry_run=dry_run,
+        debug=debug,
+        num_workers=num_workers,
+        stop_after_stage="search",
+    )
 
-        async def execute_pipeline():
-            run_pipeline_from_config = _get_run_pipeline_from_config()
-            results = await run_pipeline_from_config(
-                config=pipeline_config,
-                num_workers=num_workers,
-                force_reextract_incomplete_fulltext=(
-                    force_reextract_incomplete_fulltext
-                ),
-            )
 
-            # Print summary
-            stats = results.execution_stats
-            prisma_stats = stats.get('prisma_stats', {})
+@click.command()
+@click.argument('config', type=click.Path(exists=True))
+@click.argument('output_folder', required=False, type=click.Path())
+@click.option('--verbose', '-v', is_flag=True,
+              help='Enable verbose logging')
+@click.option('--dry-run', is_flag=True,
+              help='Validate configuration without running pipeline')
+@click.option('--debug', is_flag=True,
+              help='Enable debug mode with post-mortem debugging on errors')
+@click.option('--num-workers', '-j', type=int, default=1,
+              help='Number of parallel workers for screening (default: 1)')
+def run_abstract(
+    config: str,
+    output_folder: str | None,
+    verbose: bool,
+    dry_run: bool,
+    debug: bool,
+    num_workers: int,
+):
+    """
+    Run Autonima through abstract screening.
 
-            print("\n" + "="*60)
-            print("AUTONIMA PIPELINE COMPLETED")
-            print("="*60)
+    This command executes:
+    1. Literature search via PubMed
+    2. Abstract screening with LLMs
 
-            studies = results.studies
-            total_identified = prisma_stats.get("total_identified", len(studies))
-            abstract_screened = sum(
-                1
-                for s in studies
-                if getattr(s.status, "value", str(s.status)) != "pending"
-            )
-            fulltext_screened = sum(
-                1
-                for s in studies
-                if getattr(s.status, "value", str(s.status)) in {
-                    "included_fulltext",
-                    "excluded_fulltext",
-                    "fulltext_incomplete",
-                }
-            )
-            fulltext_incomplete = sum(
-                1
-                for s in studies
-                if getattr(s.status, "value", str(s.status))
-                == "fulltext_incomplete"
-            )
-            final_included = prisma_stats.get(
-                "final_included",
-                sum(
-                    1
-                    for s in studies
-                    if getattr(s.status, "value", str(s.status))
-                    == "included_fulltext"
-                )
-            )
-
-            parsing_stats = stats.get("coordinate_parsing", {})
-            parsing_enabled = parsing_stats.get(
-                "enabled",
-                getattr(pipeline_config.parsing, "parse_coordinates", False),
-            )
-            if parsing_enabled:
-                coordinate_summary = (
-                    "enabled"
-                    f" ({parsing_stats.get('tables_processed', 0)} tables,"
-                    f" {parsing_stats.get('studies_with_tables', 0)} studies)"
-                )
-            else:
-                coordinate_summary = "disabled"
-
-            annotation_stats = stats.get("annotation", {})
-            annotation_enabled = annotation_stats.get(
-                "enabled",
-                getattr(pipeline_config.annotation, "enabled", True),
-            )
-            if annotation_enabled:
-                annotation_summary = (
-                    "enabled"
-                    f" ({annotation_stats.get('decisions', 0)} decisions)"
-                )
-            else:
-                annotation_summary = "disabled"
-
-            print(f"Studies from search: {total_identified}")
-            print(f"Studies screened with abstract: {abstract_screened}")
-            print(f"Studies screened with full text: {fulltext_screened}")
-            print(f"Full-text incomplete: {fulltext_incomplete}")
-            print(f"Final included studies: {final_included}")
-            print(f"Coordinate parsing: {coordinate_summary}")
-            print(f"Annotation: {annotation_summary}")
-
-            if results.errors:
-                print(f"\nErrors encountered: {len(results.errors)}")
-                for error in results.errors:
-                    print(f"  - {error}")
-            return results
-
-        # Run the async pipeline
-        asyncio.run(execute_pipeline())
-
-    except ConfigurationError as e:
-        log_error_with_debug(logger, f"Configuration error: {e}")
-        if debug:
-            import pdb
-            pdb.post_mortem()
-        sys.exit(1)
-    except Exception as e:
-        log_error_with_debug(logger, f"Pipeline execution failed: {e}")
-        if debug:
-            import pdb
-            pdb.post_mortem()
-        sys.exit(1)
+    It stops before full-text retrieval and downstream stages.
+    """
+    _run_pipeline_command(
+        config=config,
+        output_folder=output_folder,
+        verbose=verbose,
+        dry_run=dry_run,
+        debug=debug,
+        num_workers=num_workers,
+        stop_after_stage="abstract",
+    )
 
 
 @click.command()
@@ -468,6 +612,8 @@ def cli():
 
 
 cli.add_command(run)
+cli.add_command(run_search)
+cli.add_command(run_abstract)
 cli.add_command(validate)
 cli.add_command(create_sample_config)
 cli.add_command(meta)

@@ -44,6 +44,17 @@ Or with an explicit output folder:
 autonima run config.yaml runs/my_review
 ```
 
+For stage-limited pilot runs:
+
+```bash
+autonima run-search config.yaml
+autonima run-abstract config.yaml
+```
+
+- `run-search` executes only literature search.
+- `run-abstract` executes search plus abstract screening, then stops before retrieval.
+- `run-abstract` reruns upstream stages for each invocation (no cache-only abstract mode).
+
 ## Default Output Folder
 
 If you omit `OUTPUT_FOLDER`, the CLI derives it from the config filename:
