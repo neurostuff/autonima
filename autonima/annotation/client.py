@@ -172,7 +172,7 @@ class AnnotationClient:
         criteria_list: List[AnnotationCriteriaConfig],
         metadata_fields: List[str],
         model: str = "gpt-4o-mini",
-        prompt_type: str = "single_analysis",
+        prompt_type: str = "multi_analysis",
     ) -> List[AnnotationDecision]:
         """
         Make decisions about whether an analysis should be included in multiple annotations.

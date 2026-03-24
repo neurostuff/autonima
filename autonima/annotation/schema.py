@@ -28,7 +28,7 @@ class AnnotationConfig(BaseModel):
     enabled: bool = True
     # Options: "single_analysis" (per-analysis) or
     # "multi_analysis" (whole study)
-    prompt_type: str = "single_analysis"
+    prompt_type: str = "multi_analysis"
     metadata_fields: List[str] = [
         "analysis_name",
         "analysis_description",
