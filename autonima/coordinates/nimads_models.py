@@ -340,16 +340,32 @@ def create_annotations_from_results(
     """
     if not annotation_results:
         return []
-    
+
+    # Keep annotations aligned to the exported NiMADS studyset.
+    # This avoids emitting notes for analyses that were filtered out
+    # (e.g., excluded studies when export_excluded_studies is false).
+    studyset_analysis_ids = {
+        analysis.id
+        for study in studyset.studies
+        for analysis in study.analyses
+    }
+
     # Group annotation results by annotation name and analysis_id
     annotations_by_name = {}
-    all_analysis_ids = set()
+    annotation_names = set()
     
     for result in annotation_results:
+        annotation_names.add(result.annotation_name)
+        if result.analysis_id not in studyset_analysis_ids:
+            continue
         if result.annotation_name not in annotations_by_name:
             annotations_by_name[result.annotation_name] = {}
         annotations_by_name[result.annotation_name][result.analysis_id] = result.include
-        all_analysis_ids.add(result.analysis_id)
+    
+    # Ensure all annotation columns are represented in note_keys, even if
+    # some analyses were filtered out.
+    for annotation_name in annotation_names:
+        annotations_by_name.setdefault(annotation_name, {})
     
     # Create note_keys with all annotation names as boolean columns
     note_keys = {}
@@ -366,8 +382,8 @@ def create_annotations_from_results(
         studyset_id=studyset_id
     )
     
-    # Create notes for each analysis with all annotation decisions
-    for analysis_id in sorted(all_analysis_ids):
+    # Create notes for each exported analysis with all annotation decisions.
+    for analysis_id in sorted(studyset_analysis_ids):
         note_data = {}
         
         # For each annotation type, check if this analysis was included

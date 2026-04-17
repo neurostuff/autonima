@@ -60,6 +60,7 @@ tests/test_multi_annotation.py
 tests/test_objective_in_prompt.py
 tests/test_parallel_screening.py
 tests/test_pipeline_retrieval.py
+tests/test_pipeline_stage_cutoff.py
 tests/test_pubmed.py
 tests/test_retrieval.py
 tests/test_screening.py
