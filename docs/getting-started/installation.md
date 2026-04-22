@@ -22,8 +22,8 @@ pip install -e .[llm]
 
 Environment variables:
 
-- `OPENAI_API_KEY` for the default OpenAI-compatible path
-- `OPENROUTER_API_KEY` when using an OpenRouter base URL in the LLM client path
+- `OPENAI_API_KEY` for authentication
+- `OPENAI_API_GATEWAY` (optional) to override the OpenAI SDK gateway/base URL
 
 ### Meta-Analysis Support
 

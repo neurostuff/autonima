@@ -17,18 +17,15 @@ class GenericLLMClient:
         """Initialize the generic LLM client.
         
         Args:
-            api_key: API key. If not provided, will use appropriate environment 
-                     variable based on the base_url.
+            api_key: API key. If not provided, OPENAI_API_KEY is used.
             base_url: Base URL for the API. If not provided, defaults to 
-                      OpenAI's API.
+                      OpenAI's API, or OPENAI_API_GATEWAY when set.
         """
-        self.base_url = base_url or None
+        gateway_base_url = os.getenv("OPENAI_API_GATEWAY")
+        self.base_url = base_url or gateway_base_url or None
         
-        # Determine the appropriate API key based on the base URL
         if api_key:
             self.api_key = api_key
-        elif self.base_url and "openrouter" in self.base_url:
-            self.api_key = os.getenv("OPENROUTER_API_KEY")
         else:
             self.api_key = os.getenv("OPENAI_API_KEY")
         

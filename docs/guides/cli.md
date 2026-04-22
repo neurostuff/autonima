@@ -139,7 +139,7 @@ autonima validate config.yaml
 LLM-backed workflows require API credentials:
 
 - `OPENAI_API_KEY`
-- or `OPENROUTER_API_KEY` when using an OpenRouter path in the OpenAI-compatible client
+- optional `OPENAI_API_GATEWAY` to override the OpenAI SDK gateway/base URL
 
 ## Missing Meta Dependencies
 
