@@ -80,7 +80,11 @@ setup(
             "mkdocs-material>=9.5",
             "mkdocs-click>=0.8",
             "pymdown-extensions>=10.0",
-        ]
+        ],
+        "ui": [
+            "fastapi>=0.115",
+            "uvicorn>=0.30",
+        ],
     },
     entry_points={
         "console_scripts": [
@@ -91,6 +95,7 @@ setup(
     package_data={
         "autonima": ["py.typed"],
         "autonima.templates": ["*.yml"],
+        "autonima.webui": ["static/*.html", "static/*.css", "static/*.jsx"],
     },
     keywords=[
         "systematic-review",

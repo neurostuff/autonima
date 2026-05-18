@@ -742,9 +742,10 @@ class AutonimaPipeline:
         # Get studies for system-wide annotations when enabled.
         all_studies = None
         all_abstract_studies = None
+        load_excluded = getattr(self.config.retrieval, 'load_excluded', False)
         if getattr(
             self.config.annotation, 'create_all_included_annotations', True
-        ):
+        ) and load_excluded:
             all_studies = [
                 s for s in self.results.studies
                 if s.analyses
@@ -754,6 +755,13 @@ class AutonimaPipeline:
                 s for s in all_studies
                 if s.status != StudyStatus.EXCLUDED_ABSTRACT
             ]
+        elif getattr(
+            self.config.annotation, 'create_all_included_annotations', True
+        ):
+            logger.info(
+                "Skipping 'all_studies' and 'all_abstract' annotations "
+                "because retrieval.load_excluded is false"
+            )
         
         if (
             not included_studies

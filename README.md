@@ -20,6 +20,7 @@ Useful extras:
 pip install -e .[llm]          # screening and other LLM-backed workflows
 pip install -e .[meta]         # `autonima meta`
 pip install -e .[readability]  # enhanced HTML extraction
+pip install -e .[ui]           # `autonima ui` local web app
 pip install -e .[docs]         # local docs build
 ```
 
@@ -58,6 +59,12 @@ Run meta-analysis on the generated NiMADS outputs:
 
 ```bash
 autonima meta runs/my_review/outputs
+```
+
+Launch the local web UI:
+
+```bash
+autonima ui --workspace .
 ```
 
 ## Minimal Config Example

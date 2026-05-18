@@ -6,6 +6,10 @@
 # - the repository example config
 # - the user documentation
 
+# Optional global defaults applied when stage-level values are omitted.
+# defaults:
+#   model: "gpt-5-mini-2025-08-07"
+
 search:
   database: "pubmed"
   # Option 1: Specify a search query.

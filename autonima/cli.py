@@ -604,6 +604,69 @@ def create_sample_config():
         log_error_with_debug(logger, f"Failed to create sample config: {e}")
 
 
+@click.command()
+@click.option(
+    "--workspace",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=None,
+    help="Workspace root directory for .autonima-ui state",
+)
+@click.option(
+    "--host",
+    type=str,
+    default="127.0.0.1",
+    show_default=True,
+    help="Host interface to bind the web app",
+)
+@click.option(
+    "--port",
+    type=int,
+    default=8765,
+    show_default=True,
+    help="Port to bind the web app",
+)
+@click.option(
+    "--open/--no-open",
+    "open_browser",
+    default=True,
+    show_default=True,
+    help="Open the app in a browser after launch",
+)
+def ui(
+    workspace: Path | None,
+    host: str,
+    port: int,
+    open_browser: bool,
+):
+    """
+    Launch the local Autonima web UI.
+
+    This command starts a localhost FastAPI + React web app for:
+    - project management
+    - YAML spec creation and validation
+    - interactive run orchestration with live progress and logs
+    - secrets setup via ~/.autonima.env
+    """
+    try:
+        from .webui import run_ui_server
+
+        run_ui_server(
+            workspace=str(workspace) if workspace else None,
+            host=host,
+            port=port,
+            open_browser=open_browser,
+        )
+    except ImportError as e:
+        log_error_with_debug(
+            logger,
+            str(e)
+        )
+        sys.exit(1)
+    except Exception as e:
+        log_error_with_debug(logger, f"Failed to launch web UI: {e}")
+        sys.exit(1)
+
+
 # CLI group would be used with actual click
 @click.group()
 def cli():
@@ -617,6 +680,7 @@ cli.add_command(run_abstract)
 cli.add_command(validate)
 cli.add_command(create_sample_config)
 cli.add_command(meta)
+cli.add_command(ui)
 
 
 def main():
