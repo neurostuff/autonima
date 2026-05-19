@@ -81,7 +81,8 @@ class PubMedSearch(SearchEngine):
 
             # Load existing search results for caching
             cached_studies = self._load_cached_search_results()
-            cached_pmids = {study.pmid for study in cached_studies}
+            cached_by_pmid = {study.pmid: study for study in cached_studies}
+            cached_pmids = set(cached_by_pmid)
             
             # Identify PMIDs that need to be fetched
             new_pmids = [pmid for pmid in pmids if pmid not in cached_pmids]
@@ -99,8 +100,15 @@ class PubMedSearch(SearchEngine):
                     f"Successfully retrieved {len(new_studies)} new studies"
                 )
 
-            # Combine cached and new studies
-            studies = cached_studies + new_studies
+            # Combine only records requested by the current search/list. This
+            # preserves metadata caching without letting stale studies from an
+            # older broader query flow into the current execution.
+            new_by_pmid = {study.pmid: study for study in new_studies}
+            studies = [
+                cached_by_pmid.get(pmid) or new_by_pmid[pmid]
+                for pmid in pmids
+                if pmid in cached_by_pmid or pmid in new_by_pmid
+            ]
 
             return studies
 

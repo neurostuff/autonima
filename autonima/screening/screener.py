@@ -15,6 +15,7 @@ from .prompts import PromptLibrary
 from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
+from ..execution import stable_hash
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,67 @@ class LLMScreener(ScreeningEngine):
             else self.config.fulltext
         )
 
+    def _study_input_hash(self, study: Study, screening_type: str) -> str:
+        """Hash the study input used for a cached screening decision."""
+        payload: Dict[str, Any] = {
+            "pmid": study.pmid,
+            "title": study.title,
+        }
+        if screening_type == "abstract":
+            payload.update(
+                {
+                    "abstract": study.abstract,
+                    "journal": study.journal,
+                    "publication_date": study.publication_date,
+                    "doi": study.doi,
+                }
+            )
+        else:
+            payload.update(
+                {
+                    "full_text_path": study.full_text_path,
+                    "pmcid": study.pmcid,
+                    "fulltext_available": study.fulltext_available,
+                }
+            )
+            try:
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = str(self.result_dir)
+                payload["full_text_hash"] = stable_hash(study.full_text)
+            except Exception:
+                payload["full_text_hash"] = None
+        return stable_hash(payload)
+
+    def _screening_cache_signature(
+        self,
+        study: Study,
+        screening_type: str,
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build a per-study signature for cache reuse validation."""
+        model = config.get(
+            "model",
+            "gpt-4o-mini" if screening_type == "abstract" else "gpt-4",
+        )
+        return {
+            "schema_version": 1,
+            "stage": screening_type,
+            "stage_hash": stable_hash(config),
+            "study_input_hash": self._study_input_hash(study, screening_type),
+            "model": model,
+        }
+
+    def _cached_signature_matches(
+        self,
+        existing_result: Dict[str, Any],
+        expected_signature: Dict[str, Any],
+    ) -> bool:
+        """Return True for valid signed caches; allow legacy unsigned caches."""
+        cached_signature = existing_result.get("cache_signature")
+        if not cached_signature:
+            return True
+        return cached_signature == expected_signature
+
     def _get_status_for_decision(
         self,
         screening_type: str,
@@ -343,7 +405,12 @@ class LLMScreener(ScreeningEngine):
             model_used=model,
             screening_type=screening_type,
             inclusion_criteria_applied=inclusion_criteria_applied or [],
-            exclusion_criteria_applied=exclusion_criteria_applied or []
+            exclusion_criteria_applied=exclusion_criteria_applied or [],
+            cache_signature=self._screening_cache_signature(
+                study,
+                screening_type,
+                self._get_screening_config(screening_type),
+            ),
         )
 
     def _screen_single_study(
@@ -536,6 +603,17 @@ class LLMScreener(ScreeningEngine):
         for study in screenable_studies:
             if study.pmid in existing_results_dict:
                 existing_result = existing_results_dict[study.pmid]
+                expected_signature = self._screening_cache_signature(
+                    study,
+                    screening_type,
+                    config,
+                )
+                if not self._cached_signature_matches(
+                    existing_result,
+                    expected_signature,
+                ):
+                    studies_to_screen.append(study)
+                    continue
                 
                 # Normalize cached decisions to the current screening stage.
                 old_decision = str(existing_result["decision"]).strip().lower()

@@ -1,6 +1,7 @@
 """Command-line interface for Autonima."""
 
 import asyncio
+import inspect
 import logging
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Literal
 import click
 
 from .utils import set_debug_mode, log_error_with_debug
+from .execution import CACHE_POLICIES, CLEAR_CACHE_STAGES
 
 # Set up logging
 logging.basicConfig(
@@ -186,6 +188,9 @@ def _run_pipeline_command(
     num_workers: int,
     stop_after_stage: Literal["search", "abstract", "full"] = "full",
     force_reextract_incomplete_fulltext: bool = False,
+    cache_policy: str = "auto",
+    clear_cache: tuple[str, ...] = (),
+    copy_valid_cache_from: str | None = None,
 ) -> None:
     """Run pipeline commands that share config loading and execution logic."""
     _configure_run_logging(verbose)
@@ -218,14 +223,28 @@ def _run_pipeline_command(
 
         async def execute_pipeline():
             run_pipeline_from_config = _get_run_pipeline_from_config()
-            results = await run_pipeline_from_config(
-                config=pipeline_config,
-                stop_after_stage=stop_after_stage,
-                num_workers=num_workers,
-                force_reextract_incomplete_fulltext=(
+            kwargs = {
+                "config": pipeline_config,
+                "stop_after_stage": stop_after_stage,
+                "num_workers": num_workers,
+                "force_reextract_incomplete_fulltext": (
                     force_reextract_incomplete_fulltext
                 ),
-            )
+                "cache_policy": cache_policy,
+                "clear_cache": list(clear_cache),
+                "copy_valid_cache_from": copy_valid_cache_from,
+            }
+            signature = inspect.signature(run_pipeline_from_config)
+            if not any(
+                parameter.kind == inspect.Parameter.VAR_KEYWORD
+                for parameter in signature.parameters.values()
+            ):
+                kwargs = {
+                    key: value
+                    for key, value in kwargs.items()
+                    if key in signature.parameters
+                }
+            results = await run_pipeline_from_config(**kwargs)
             _print_pipeline_summary(
                 results=results,
                 pipeline_config=pipeline_config,
@@ -268,6 +287,25 @@ def _run_pipeline_command(
         "fulltext_incomplete using current full-text files."
     ),
 )
+@click.option(
+    "--cache-policy",
+    type=click.Choice(sorted(CACHE_POLICIES)),
+    default="auto",
+    show_default=True,
+    help="How Autonima should treat existing cache artifacts.",
+)
+@click.option(
+    "--clear-cache",
+    type=click.Choice(sorted(CLEAR_CACHE_STAGES)),
+    multiple=True,
+    help="Delete selected stage cache before running. Repeat for multiple stages.",
+)
+@click.option(
+    "--copy-valid-cache-from",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    default=None,
+    help="Copy signature-matching cache artifacts from another output folder.",
+)
 def run(
     config: str,
     output_folder: str | None,
@@ -276,6 +314,9 @@ def run(
     debug: bool,
     num_workers: int,
     force_reextract_incomplete_fulltext: bool,
+    cache_policy: str,
+    clear_cache: tuple[str, ...],
+    copy_valid_cache_from: str | None,
 ):
     """
     Run the Autonima systematic review pipeline.
@@ -314,6 +355,9 @@ def run(
         force_reextract_incomplete_fulltext=(
             force_reextract_incomplete_fulltext
         ),
+        cache_policy=cache_policy,
+        clear_cache=clear_cache,
+        copy_valid_cache_from=copy_valid_cache_from,
     )
 
 
@@ -328,6 +372,25 @@ def run(
               help='Enable debug mode with post-mortem debugging on errors')
 @click.option('--num-workers', '-j', type=int, default=1,
               help='Number of parallel workers for screening (default: 1)')
+@click.option(
+    "--cache-policy",
+    type=click.Choice(sorted(CACHE_POLICIES)),
+    default="auto",
+    show_default=True,
+    help="How Autonima should treat existing cache artifacts.",
+)
+@click.option(
+    "--clear-cache",
+    type=click.Choice(sorted(CLEAR_CACHE_STAGES)),
+    multiple=True,
+    help="Delete selected stage cache before running. Repeat for multiple stages.",
+)
+@click.option(
+    "--copy-valid-cache-from",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    default=None,
+    help="Copy signature-matching cache artifacts from another output folder.",
+)
 def run_search(
     config: str,
     output_folder: str | None,
@@ -335,6 +398,9 @@ def run_search(
     dry_run: bool,
     debug: bool,
     num_workers: int,
+    cache_policy: str,
+    clear_cache: tuple[str, ...],
+    copy_valid_cache_from: str | None,
 ):
     """
     Run Autonima through the search stage only.
@@ -352,6 +418,9 @@ def run_search(
         debug=debug,
         num_workers=num_workers,
         stop_after_stage="search",
+        cache_policy=cache_policy,
+        clear_cache=clear_cache,
+        copy_valid_cache_from=copy_valid_cache_from,
     )
 
 
@@ -366,6 +435,25 @@ def run_search(
               help='Enable debug mode with post-mortem debugging on errors')
 @click.option('--num-workers', '-j', type=int, default=1,
               help='Number of parallel workers for screening (default: 1)')
+@click.option(
+    "--cache-policy",
+    type=click.Choice(sorted(CACHE_POLICIES)),
+    default="auto",
+    show_default=True,
+    help="How Autonima should treat existing cache artifacts.",
+)
+@click.option(
+    "--clear-cache",
+    type=click.Choice(sorted(CLEAR_CACHE_STAGES)),
+    multiple=True,
+    help="Delete selected stage cache before running. Repeat for multiple stages.",
+)
+@click.option(
+    "--copy-valid-cache-from",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    default=None,
+    help="Copy signature-matching cache artifacts from another output folder.",
+)
 def run_abstract(
     config: str,
     output_folder: str | None,
@@ -373,6 +461,9 @@ def run_abstract(
     dry_run: bool,
     debug: bool,
     num_workers: int,
+    cache_policy: str,
+    clear_cache: tuple[str, ...],
+    copy_valid_cache_from: str | None,
 ):
     """
     Run Autonima through abstract screening.
@@ -391,6 +482,9 @@ def run_abstract(
         debug=debug,
         num_workers=num_workers,
         stop_after_stage="abstract",
+        cache_policy=cache_policy,
+        clear_cache=clear_cache,
+        copy_valid_cache_from=copy_valid_cache_from,
     )
 
 

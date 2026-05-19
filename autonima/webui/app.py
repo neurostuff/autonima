@@ -100,6 +100,10 @@ def create_app(
         num_workers: int = 1
         force_reextract_incomplete_fulltext: bool = False
         apply_default_email: bool = True
+        cache_policy: str = "auto"
+        clear_cache: list[str] = Field(default_factory=list)
+        copy_valid_cache_from: Optional[str] = None
+        execution_mode: str = "auto_new_on_change"
 
     class MetaRunRequest(BaseModel):
         output_folder: str
@@ -442,6 +446,10 @@ def create_app(
                 num_workers=payload.num_workers,
                 force_reextract_incomplete_fulltext=payload.force_reextract_incomplete_fulltext,
                 apply_default_email=payload.apply_default_email,
+                cache_policy=payload.cache_policy,
+                clear_cache=payload.clear_cache,
+                copy_valid_cache_from=payload.copy_valid_cache_from,
+                execution_mode=payload.execution_mode,
             )
             return metadata
         except Exception as exc:

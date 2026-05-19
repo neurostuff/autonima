@@ -14,6 +14,9 @@ from uuid import uuid4
 
 import yaml
 
+from autonima.config import ConfigManager
+from autonima.execution import preview_execution_changes
+
 from .progress import build_stage_status
 from .state import WorkspaceState, utc_now_iso
 
@@ -94,6 +97,9 @@ class RunManager:
         debug: bool,
         num_workers: int,
         force_reextract_incomplete_fulltext: bool,
+        cache_policy: str,
+        clear_cache: List[str],
+        copy_valid_cache_from: Optional[str],
     ) -> List[str]:
         cmd = [sys.executable, "-m", "autonima", mode, str(config_path)]
         if output_folder:
@@ -108,7 +114,40 @@ class RunManager:
             cmd.extend(["--num-workers", str(num_workers)])
         if force_reextract_incomplete_fulltext and mode == "run":
             cmd.append("--force-reextract-incomplete-fulltext")
+        if cache_policy:
+            cmd.extend(["--cache-policy", cache_policy])
+        for stage in clear_cache or []:
+            cmd.extend(["--clear-cache", stage])
+        if copy_valid_cache_from:
+            cmd.extend(["--copy-valid-cache-from", copy_valid_cache_from])
         return cmd
+
+    def _maybe_create_execution_output(
+        self,
+        runtime_config_path: Path,
+        resolved_output: Path,
+        execution_mode: str,
+    ) -> tuple[Path, Optional[str], Dict[str, Any]]:
+        """Default UI behavior: branch to a new output when signatures changed."""
+        if execution_mode != "auto_new_on_change":
+            return resolved_output, None, {}
+        try:
+            config = ConfigManager().load_from_file(runtime_config_path)
+            config.output.directory = str(resolved_output)
+            preview = preview_execution_changes(config, resolved_output)
+        except Exception:
+            return resolved_output, None, {}
+
+        if not preview.get("changed_stages"):
+            return resolved_output, None, preview
+
+        execution_name = (
+            time.strftime("%Y%m%d-%H%M%S")
+            + "-"
+            + str(preview.get("stage_hashes", {}).get("output", ""))[:8]
+        )
+        branched_output = resolved_output / "executions" / execution_name
+        return branched_output, str(resolved_output), preview
 
     def _build_meta_command(
         self,
@@ -259,6 +298,10 @@ class RunManager:
         num_workers: int,
         force_reextract_incomplete_fulltext: bool,
         apply_default_email: bool,
+        cache_policy: str = "auto",
+        clear_cache: Optional[List[str]] = None,
+        copy_valid_cache_from: Optional[str] = None,
+        execution_mode: str = "auto_new_on_change",
     ) -> Dict[str, Any]:
         run_id = str(uuid4())
         config_path = Path(project["config_path"]).expanduser().resolve()
@@ -272,6 +315,18 @@ class RunManager:
         )
 
         resolved_output = self._resolve_output_folder(config_path, output_folder)
+        cache_preview: Dict[str, Any] = {}
+        branched_from: Optional[str] = None
+        if not output_folder:
+            resolved_output, branched_from, cache_preview = (
+                self._maybe_create_execution_output(
+                    runtime_config_path,
+                    resolved_output,
+                    execution_mode,
+                )
+            )
+            if branched_from and not copy_valid_cache_from:
+                copy_valid_cache_from = branched_from
         metadata = self._base_metadata(
             run_id=run_id,
             project_id=project["id"],
@@ -289,7 +344,13 @@ class RunManager:
             debug=debug,
             num_workers=num_workers,
             force_reextract_incomplete_fulltext=force_reextract_incomplete_fulltext,
+            cache_policy=cache_policy,
+            clear_cache=clear_cache or [],
+            copy_valid_cache_from=copy_valid_cache_from,
         )
+        metadata["cache_preview"] = cache_preview
+        metadata["branched_from_output_folder"] = branched_from
+        metadata["execution_mode"] = execution_mode
 
         env = os.environ.copy()
         env.update({k: v for k, v in secrets.items() if v})

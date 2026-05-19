@@ -146,8 +146,15 @@ class AnnotationProcessor:
             self._save_results_by_study(all_decisions, output_dir, existing_cached_results)
         self.annotation_results = all_decisions
         
-        # Return all cached results (existing + new)
-        return self._load_cached_results(output_dir) or []
+        # Return only results eligible for this execution. Cached decisions
+        # for studies that no longer pass current screening can remain on disk
+        # for reuse, but must not flow into current outputs.
+        return self._filter_cached_results_for_current_run(
+            self._load_cached_results(output_dir) or [],
+            included_studies=included_studies or [],
+            all_studies=all_studies or [],
+            all_abstract_studies=all_abstract_studies or [],
+        )
     
     def _create_all_analyses_annotations(
         self,
@@ -402,6 +409,33 @@ class AnnotationProcessor:
                 studies_with_complete_results.add(study_id)
         
         return studies_with_complete_results
+
+    def _filter_cached_results_for_current_run(
+        self,
+        results: List[AnnotationDecision],
+        included_studies: List[Study],
+        all_studies: List[Study],
+        all_abstract_studies: List[Study],
+    ) -> List[AnnotationDecision]:
+        """Filter cached annotation decisions to the current eligibility graph."""
+        included_ids = {study.pmid for study in included_studies}
+        all_ids = {study.pmid for study in all_studies}
+        abstract_ids = {study.pmid for study in all_abstract_studies}
+        custom_names = {annotation.name for annotation in self.config.annotations}
+
+        filtered: List[AnnotationDecision] = []
+        for result in results:
+            name = result.annotation_name
+            if name == "all_studies" and result.study_id in all_ids:
+                filtered.append(result)
+            elif name == "all_abstract" and result.study_id in abstract_ids:
+                filtered.append(result)
+            elif name == "all_analyses" and result.study_id in included_ids:
+                filtered.append(result)
+            elif name in custom_names and result.study_id in included_ids:
+                filtered.append(result)
+
+        return filtered
     
     def _get_annotations_with_complete_results_for_study(
         self,

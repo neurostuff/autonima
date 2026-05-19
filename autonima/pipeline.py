@@ -26,6 +26,7 @@ from .retrieval.utils import (
     )
 from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
+from .execution import complete_execution_manifest, prepare_execution
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,10 @@ class AutonimaPipeline:
         self,
         config: PipelineConfig,
         num_workers: int = 1,
-        force_reextract_incomplete_fulltext: bool = False
+        force_reextract_incomplete_fulltext: bool = False,
+        cache_policy: str = "auto",
+        clear_cache: List[str] | None = None,
+        copy_valid_cache_from: str | None = None,
     ):
         """
         Initialize the pipeline with configuration.
@@ -71,6 +75,9 @@ class AutonimaPipeline:
         self.force_reextract_incomplete_fulltext = (
             force_reextract_incomplete_fulltext
         )
+        self.cache_policy = cache_policy
+        self.clear_cache = clear_cache or []
+        self.copy_valid_cache_from = copy_valid_cache_from
         self.results = PipelineResult(
             config=config,
             started_at=datetime.now()
@@ -83,6 +90,15 @@ class AutonimaPipeline:
         # Ensure output directory exists
         output_dir = Path(self.config.output.directory)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.execution_manifest = prepare_execution(
+            self.config,
+            output_dir,
+            cache_policy=self.cache_policy,
+            clear_cache=self.clear_cache,
+            copy_valid_cache_from=self.copy_valid_cache_from,
+        )
+        self.stage_hashes = self.execution_manifest.get("stage_hashes", {})
 
         # Initialize components
         self._setup_components()
@@ -130,6 +146,12 @@ class AutonimaPipeline:
                 completed_stage,
                 duration,
             )
+        complete_execution_manifest(
+            Path(self.config.output.directory),
+            status="completed",
+            completed_stage=completed_stage,
+            errors=self.results.errors,
+        )
         return self.results
 
     async def run(self, stop_after_stage: RunStopStage = "full") -> PipelineResult:
@@ -190,6 +212,11 @@ class AutonimaPipeline:
         except Exception as e:
             log_error_with_debug(logger, f"Pipeline failed: {e}")
             self.results.errors.append(str(e))
+            complete_execution_manifest(
+                Path(self.config.output.directory),
+                status="failed",
+                errors=self.results.errors,
+            )
             raise
 
     async def _execute_search_phase(self):
@@ -220,7 +247,12 @@ class AutonimaPipeline:
         search_results_file = output_dir / "search_results.json"
         search_data = {
             "studies": [study.to_dict() for study in studies],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "cache_signature": {
+                "schema_version": 1,
+                "stage": "search",
+                "stage_hash": self.stage_hashes.get("search"),
+            },
         }
         with open(search_results_file, 'w') as f:
             import json
@@ -277,7 +309,12 @@ class AutonimaPipeline:
             "screening_results": [
                 result.to_dict() for result in screening_results
             ],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "cache_signature": {
+                "schema_version": 1,
+                "stage": "abstract",
+                "stage_hash": self.stage_hashes.get("abstract"),
+            },
         }
         _atomic_write_json(screening_results_file, screening_data)
 
@@ -496,7 +533,12 @@ class AutonimaPipeline:
                 for study in self.results.studies
                 if study.fulltext_available or study.pmcid
             ],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "cache_signature": {
+                "schema_version": 1,
+                "stage": "retrieval",
+                "stage_hash": self.stage_hashes.get("retrieval"),
+            },
         }
         with open(retrieval_results_file, 'w') as f:
             json.dump(retrieval_data, f, indent=2)
@@ -579,7 +621,12 @@ class AutonimaPipeline:
             "screening_results": [
                 result.to_dict() for result in screening_results
             ],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "cache_signature": {
+                "schema_version": 1,
+                "stage": "fulltext",
+                "stage_hash": self.stage_hashes.get("fulltext"),
+            },
         }
         _atomic_write_json(
             fulltext_screening_results_file, fulltext_screening_data
@@ -861,6 +908,17 @@ class AutonimaPipeline:
             import json
             with open(coordinate_cache_file, 'r') as f:
                 cached_data = json.load(f)
+
+            cache_signature = cached_data.get("cache_signature") or {}
+            cached_stage_hash = cache_signature.get("stage_hash")
+            if (
+                cached_stage_hash
+                and cached_stage_hash != self.stage_hashes.get("parsing")
+            ):
+                logger.info(
+                    "Skipping stale coordinate parsing cache for current parsing signature"
+                )
+                return
             
             # Apply cached results to studies
             cached_studies = {study_data['pmid']: study_data for study_data in cached_data.get('studies', [])}
@@ -945,7 +1003,12 @@ class AutonimaPipeline:
                     }
                     for study in studies_with_analyses
                 ],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "cache_signature": {
+                    "schema_version": 1,
+                    "stage": "parsing",
+                    "stage_hash": self.stage_hashes.get("parsing"),
+                },
             }
             
             # Save to file
@@ -1279,7 +1342,10 @@ async def run_pipeline_from_config(
     config: PipelineConfig = None,
     stop_after_stage: RunStopStage = "full",
     num_workers: int = 1,
-    force_reextract_incomplete_fulltext: bool = False
+    force_reextract_incomplete_fulltext: bool = False,
+    cache_policy: str = "auto",
+    clear_cache: List[str] | None = None,
+    copy_valid_cache_from: str | None = None,
 ) -> PipelineResult:
     """
     Run pipeline from configuration file or config object.
@@ -1306,5 +1372,8 @@ async def run_pipeline_from_config(
         force_reextract_incomplete_fulltext=(
             force_reextract_incomplete_fulltext
         ),
+        cache_policy=cache_policy,
+        clear_cache=clear_cache,
+        copy_valid_cache_from=copy_valid_cache_from,
     )
     return await pipeline.run(stop_after_stage=stop_after_stage)

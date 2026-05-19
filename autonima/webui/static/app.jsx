@@ -444,6 +444,10 @@ function App() {
     num_workers: 1,
     force_reextract_incomplete_fulltext: false,
     apply_default_email: true,
+    cache_policy: "auto",
+    clear_cache: [],
+    copy_valid_cache_from: "",
+    execution_mode: "auto_new_on_change",
   });
 
   const [metaForm, setMetaForm] = useState({
@@ -1995,6 +1999,8 @@ function App() {
       const payload = {
         ...runForm,
         output_folder: runForm.output_folder || null,
+        copy_valid_cache_from: runForm.copy_valid_cache_from || null,
+        clear_cache: runForm.clear_cache || [],
       };
       const run = await api(`/api/projects/${selectedProjectId}/runs`, {
         method: "POST",
@@ -2006,7 +2012,12 @@ function App() {
       logOffsetRef.current = 0;
       setLogOffset(0);
       await refreshRuns();
-      setStatusMsg({ type: "ok", text: "Run started." });
+      setStatusMsg({
+        type: "ok",
+        text: run.branched_from_output_folder
+          ? "Run started in a new execution folder with valid cache copied forward."
+          : "Run started.",
+      });
     } catch (err) {
       setStatusMsg({ type: "error", text: err.message });
     }
@@ -3410,6 +3421,58 @@ function App() {
                           <span className="mono">{selectedOutputFolder}</span>
                         </div>
                       ) : null}
+                      <div className="grid-3" style={{ marginTop: 10 }}>
+                        <div>
+                          <label>Execution Behavior</label>
+                          <select
+                            value={runForm.execution_mode}
+                            onChange={(e) => setRunForm((prev) => ({ ...prev, execution_mode: e.target.value }))}
+                          >
+                            <option value="auto_new_on_change">New folder when spec changed</option>
+                            <option value="in_place">Run in selected output folder</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label>Cache Policy</label>
+                          <select
+                            value={runForm.cache_policy}
+                            onChange={(e) => setRunForm((prev) => ({ ...prev, cache_policy: e.target.value }))}
+                          >
+                            <option value="auto">auto</option>
+                            <option value="ignore">ignore</option>
+                            <option value="trust-legacy">trust-legacy</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label>Copy Valid Cache From</label>
+                          <input
+                            className="mono"
+                            value={runForm.copy_valid_cache_from}
+                            onChange={(e) => setRunForm((prev) => ({ ...prev, copy_valid_cache_from: e.target.value }))}
+                            placeholder="/path/to/previous/output"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid-3" style={{ marginTop: 10 }}>
+                        {[
+                          ["abstract", "Clear Abstract"],
+                          ["fulltext", "Clear Full Text"],
+                          ["annotation", "Clear Annotation"],
+                        ].map(([stage, label]) => (
+                          <div key={stage}>
+                            {renderToggleControl(
+                              label,
+                              runForm.clear_cache.includes(stage),
+                              (value) => setRunForm((prev) => ({
+                                ...prev,
+                                clear_cache: value
+                                  ? [...new Set([...(prev.clear_cache || []), stage])]
+                                  : (prev.clear_cache || []).filter((item) => item !== stage),
+                              }))
+                            )}
+                          </div>
+                        ))}
+                      </div>
                       <div className="grid-3" style={{ marginTop: 10 }}>
                         {[
                           ["verbose", "Verbose"],
