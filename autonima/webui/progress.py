@@ -51,6 +51,53 @@ def infer_stage_from_logs(log_lines: List[str]) -> str | None:
     return current_stage
 
 
+def extract_log_stage_flow(log_lines: List[str]) -> Dict[str, Any]:
+    """Extract stages reached/completed during the current process logs."""
+    reached = set()
+    completed = set()
+
+    for raw_line in log_lines:
+        line = str(raw_line or "").strip()
+        if not line:
+            continue
+        text = line.lower()
+
+        inferred = infer_stage_from_logs([line])
+        if inferred:
+            reached.add(inferred)
+
+        if "found" in text and "potential studies from search" in text:
+            reached.add("search")
+            completed.add("search")
+        elif "abstract screening:" in text and "eligible" in text:
+            reached.add("abstract")
+            completed.add("abstract")
+        elif "retrieval completed" in text:
+            reached.add("retrieval")
+            completed.add("retrieval")
+        elif "full-text screening:" in text and "eligible" in text:
+            reached.add("fulltext")
+            completed.add("fulltext")
+        elif "coordinate parsing" in text and (
+            "completed" in text or "saved" in text or "skipping" in text
+        ):
+            reached.add("parsing")
+            completed.add("parsing")
+        elif "annotation phase completed" in text or "saved" in text and "annotation results" in text:
+            reached.add("annotation")
+            completed.add("annotation")
+        elif "nimads export completed" in text or "pipeline completed" in text:
+            reached.add("output")
+            completed.add("output")
+
+    completed_ordered = [stage for stage in STAGES if stage in completed]
+    reached_ordered = [stage for stage in STAGES if stage in reached or stage in completed]
+    return {
+        "reached_stages": reached_ordered,
+        "completed_stages": completed_ordered,
+    }
+
+
 def extract_log_issues(log_lines: List[str], max_items: int = 25) -> Dict[str, Any]:
     """Extract warning/error log lines for dedicated UI display."""
     errors: List[str] = []
@@ -188,6 +235,76 @@ def _read_missing_fulltexts(outputs_dir: Path | None) -> Dict[str, Any]:
     return missing_payload
 
 
+def _progress_from_execution_file(
+    progress_data: Dict[str, Any],
+    *,
+    run_status: str,
+    log_lines: List[str],
+    nimads_available: bool,
+    nimads_export_logged: bool,
+    nimads_studyset_path: Path | None,
+    missing_fulltexts: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Build UI progress payload from authoritative execution_progress.json."""
+    stage_items = progress_data.get("stages", [])
+    by_stage = {
+        str(item.get("stage")): item
+        for item in stage_items
+        if isinstance(item, dict) and item.get("stage")
+    }
+    timeline = []
+    counters: Dict[str, Any] = {}
+    for stage in STAGES:
+        item = by_stage.get(stage) or {}
+        status = str(item.get("status") or "pending")
+        timeline.append(
+            {
+                "stage": stage,
+                "status": status,
+                "source": item.get("source") or "unknown",
+                "started_at": item.get("started_at"),
+                "completed_at": item.get("completed_at"),
+                "error": item.get("error"),
+            }
+        )
+        stage_counters = item.get("counters")
+        if isinstance(stage_counters, dict) and stage_counters:
+            counters[stage] = stage_counters
+
+    current_stage = progress_data.get("current_stage")
+    stage_flow = {
+        "reached_stages": [
+            item["stage"]
+            for item in timeline
+            if item["status"] in {"running", "completed", "skipped", "failed"}
+        ],
+        "completed_stages": [
+            item["stage"]
+            for item in timeline
+            if item["status"] in {"completed", "skipped"}
+        ],
+    }
+    live_progress = (
+        extract_live_progress(log_lines, str(current_stage) if current_stage else None)
+        if run_status in {"running", "canceling"}
+        else None
+    )
+    return {
+        "timeline": timeline,
+        "counters": counters,
+        "current_stage": current_stage,
+        "reached_stages": stage_flow["reached_stages"],
+        "completed_stages": stage_flow["completed_stages"],
+        "live_progress": live_progress,
+        "log_issues": extract_log_issues(log_lines),
+        "nimads_available": nimads_available,
+        "nimads_export_logged": nimads_export_logged,
+        "nimads_studyset_path": str(nimads_studyset_path) if nimads_available else None,
+        "missing_fulltexts": missing_fulltexts,
+        "execution_progress_available": True,
+    }
+
+
 def build_stage_status(
     run_status: str,
     output_folder: str | None,
@@ -207,6 +324,22 @@ def build_stage_status(
         "nimads export completed" in str(line or "").lower()
         for line in log_lines
     )
+
+    progress_data = (
+        _safe_read_json(outputs_dir / "execution_progress.json")
+        if outputs_dir and outputs_dir.exists()
+        else None
+    )
+    if isinstance(progress_data, dict):
+        return _progress_from_execution_file(
+            progress_data,
+            run_status=run_status,
+            log_lines=log_lines,
+            nimads_available=nimads_available,
+            nimads_export_logged=nimads_export_logged,
+            nimads_studyset_path=nimads_studyset_path,
+            missing_fulltexts=missing_fulltexts,
+        )
 
     if outputs_dir and outputs_dir.exists():
         search_data = _safe_read_json(outputs_dir / "search_results.json")
@@ -326,6 +459,7 @@ def build_stage_status(
                     stages["parsing"]["status"] = "completed"
 
     current_stage = infer_stage_from_logs(log_lines)
+    stage_flow = extract_log_stage_flow(log_lines)
     live_progress = (
         extract_live_progress(log_lines, current_stage)
         if run_status in {"running", "canceling"}
@@ -357,6 +491,8 @@ def build_stage_status(
         "timeline": [{"stage": stage, **stages[stage]} for stage in STAGES],
         "counters": counters,
         "current_stage": current_stage,
+        "reached_stages": stage_flow["reached_stages"],
+        "completed_stages": stage_flow["completed_stages"],
         "live_progress": live_progress,
         "log_issues": extract_log_issues(log_lines),
         "nimads_available": nimads_available,

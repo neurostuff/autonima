@@ -26,7 +26,13 @@ from .retrieval.utils import (
     )
 from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
-from .execution import complete_execution_manifest, prepare_execution
+from .execution import (
+    complete_execution_manifest,
+    complete_execution_progress,
+    initialize_execution_progress,
+    prepare_execution,
+    update_execution_progress_stage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +105,159 @@ class AutonimaPipeline:
             copy_valid_cache_from=self.copy_valid_cache_from,
         )
         self.stage_hashes = self.execution_manifest.get("stage_hashes", {})
+        initialize_execution_progress(output_dir, self.execution_manifest)
 
         # Initialize components
         self._setup_components()
+
+    @property
+    def _output_dir(self) -> Path:
+        return Path(self.config.output.directory)
+
+    def _update_progress_stage(
+        self,
+        stage: str,
+        *,
+        status: str,
+        source: str = "fresh",
+        counters: Dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> None:
+        update_execution_progress_stage(
+            self._output_dir,
+            stage,
+            status=status,
+            source=source,
+            counters=counters,
+            error=error,
+        )
+
+    async def _run_progress_stage(self, stage: str, func) -> None:
+        self._update_progress_stage(stage, status="running", source="fresh")
+        try:
+            await func()
+        except Exception as exc:
+            self._update_progress_stage(
+                stage,
+                status="failed",
+                source="fresh",
+                counters=self._stage_counters(stage),
+                error=str(exc),
+            )
+            raise
+
+        counters = self._stage_counters(stage)
+        source = "not_applicable" if counters.get("status") in {"Off", "Skipped"} else "fresh"
+        status = "skipped" if counters.get("status") in {"Off", "Skipped"} else "completed"
+        self._update_progress_stage(
+            stage,
+            status=status,
+            source=source,
+            counters=counters,
+        )
+
+    def _stage_counters(self, stage: str) -> Dict[str, Any]:
+        if stage == "search":
+            return {
+                "studies_found": len(self.results.studies),
+            }
+        if stage == "abstract":
+            abstract_results = self.results.abstract_screening_results
+            if abstract_results:
+                included = sum(
+                    1 for result in abstract_results
+                    if "included" in str(result.decision).lower()
+                )
+                excluded = sum(
+                    1 for result in abstract_results
+                    if "excluded" in str(result.decision).lower()
+                )
+                return {
+                    "screened": len(abstract_results),
+                    "included": included,
+                    "excluded": excluded,
+                }
+            return {
+                "screened": len([s for s in self.results.studies if s.status != StudyStatus.PENDING]),
+                "included": len([s for s in self.results.studies if s.status == StudyStatus.INCLUDED_ABSTRACT]),
+                "excluded": len([s for s in self.results.studies if s.status == StudyStatus.EXCLUDED_ABSTRACT]),
+            }
+        if stage == "retrieval":
+            stats = self.results.execution_stats.get("retrieval", {})
+            if isinstance(stats, dict) and stats:
+                return {
+                    "fulltext_candidates": stats.get("total_considered", 0),
+                    "available": stats.get("retrieved_or_cached", 0),
+                    "missing": stats.get("missing_full_text", 0),
+                }
+            return {}
+        if stage == "fulltext":
+            fulltext_results = self.results.fulltext_screening_results
+            included = sum(
+                1 for result in fulltext_results
+                if "included" in str(result.decision).lower()
+            )
+            excluded = sum(
+                1 for result in fulltext_results
+                if "excluded" in str(result.decision).lower()
+            )
+            incomplete = sum(
+                1 for result in fulltext_results
+                if "incomplete" in str(result.decision).lower()
+            )
+            return {
+                "screened": len(fulltext_results),
+                "included": included,
+                "excluded": excluded,
+                "incomplete": incomplete,
+            }
+        if stage == "parsing":
+            stats = self.results.execution_stats.get("coordinate_parsing", {})
+            if isinstance(stats, dict) and stats.get("enabled") is False:
+                return {"status": "Off"}
+            studies_with_analyses = [
+                study for study in self.results.studies
+                if study.status == StudyStatus.INCLUDED_FULLTEXT and study.analyses
+            ]
+            analyses = sum(len(study.analyses or []) for study in studies_with_analyses)
+            coordinates = sum(
+                len(getattr(analysis, "points", []) or [])
+                for study in studies_with_analyses
+                for analysis in study.analyses or []
+            )
+            return {
+                "studies": len(studies_with_analyses),
+                "analyses": analyses,
+                "coordinates": coordinates,
+            }
+        if stage == "annotation":
+            stats = self.results.execution_stats.get("annotation", {})
+            if isinstance(stats, dict) and stats.get("enabled") is False:
+                return {"status": "Off"}
+            output_file = self._output_dir / "outputs" / "annotation_results.json"
+            annotation_count = 0
+            if output_file.exists():
+                try:
+                    rows = json.loads(output_file.read_text(encoding="utf-8"))
+                    annotation_count = len({
+                        str(row.get("annotation_name", "")).strip()
+                        for row in rows
+                        if isinstance(row, dict) and str(row.get("annotation_name", "")).strip()
+                    }) if isinstance(rows, list) else 0
+                except Exception:
+                    annotation_count = 0
+            return {
+                "decisions": stats.get("decisions", 0) if isinstance(stats, dict) else 0,
+                "annotations": annotation_count,
+            }
+        if stage == "output":
+            stats = self.results.execution_stats.get("prisma_stats", {})
+            counters = dict(stats) if isinstance(stats, dict) else {}
+            counters["nimads_available"] = (
+                self._output_dir / "outputs" / "nimads_studyset.json"
+            ).exists()
+            return counters
+        return {}
 
     def _setup_components(self):
         """Initialize pipeline components based on configuration."""
@@ -152,6 +308,10 @@ class AutonimaPipeline:
             completed_stage=completed_stage,
             errors=self.results.errors,
         )
+        complete_execution_progress(
+            Path(self.config.output.directory),
+            status="completed",
+        )
         return self.results
 
     async def run(self, stop_after_stage: RunStopStage = "full") -> PipelineResult:
@@ -182,29 +342,29 @@ class AutonimaPipeline:
 
         try:
             # Phase 1: Literature Search
-            await self._execute_search_phase()
+            await self._run_progress_stage("search", self._execute_search_phase)
             if stop_stage == "search":
                 return self._complete_run("search")
 
             # Phase 2: Abstract Screening
-            await self._execute_abstract_screening()
+            await self._run_progress_stage("abstract", self._execute_abstract_screening)
             if stop_stage == "abstract":
                 return self._complete_run("abstract")
 
             # Phase 3: Full-text Retrieval
-            await self._execute_retrieval_phase()
+            await self._run_progress_stage("retrieval", self._execute_retrieval_phase)
 
             # Phase 4: Full-text Screening
-            await self._execute_fulltext_screening()
+            await self._run_progress_stage("fulltext", self._execute_fulltext_screening)
  
             # Phase 5: Coordinate Parsing
-            await self._execute_coordinate_parsing()
+            await self._run_progress_stage("parsing", self._execute_coordinate_parsing)
  
             # Phase 6: Analysis Annotation
-            await self._execute_annotation_phase()
+            await self._run_progress_stage("annotation", self._execute_annotation_phase)
  
             # Phase 7: Generate Outputs
-            await self._execute_output_phase()
+            await self._run_progress_stage("output", self._execute_output_phase)
 
             # Complete pipeline
             return self._complete_run("full")
@@ -216,6 +376,11 @@ class AutonimaPipeline:
                 Path(self.config.output.directory),
                 status="failed",
                 errors=self.results.errors,
+            )
+            complete_execution_progress(
+                Path(self.config.output.directory),
+                status="failed",
+                error=str(e),
             )
             raise
 

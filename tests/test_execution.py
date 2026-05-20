@@ -3,11 +3,14 @@ from pathlib import Path
 
 from autonima.config import ConfigManager
 from autonima.execution import (
+    initialize_execution_progress,
+    load_execution_progress,
     load_execution_manifest,
     prepare_execution,
     preview_execution_changes,
     stage_hashes,
     stable_hash,
+    update_execution_progress_stage,
 )
 from autonima.models.types import ScreeningConfig, Study
 from autonima.screening.screener import LLMScreener
@@ -91,6 +94,64 @@ def test_prepare_execution_invalidates_changed_fulltext_cache(tmp_path):
     assert fulltext_cache.exists() is False
     assert abstract_cache.exists() is True
     assert any(item["stage"] == "fulltext" for item in manifest["invalidated"])
+
+
+def test_execution_progress_initializes_cache_and_invalidated_stages(tmp_path):
+    config = _config("first")
+    config.output.directory = str(tmp_path)
+    prepare_execution(config, tmp_path)
+
+    outputs = tmp_path / "outputs"
+    (outputs / "search_results.json").write_text(
+        '{"studies": [{"pmid": "1"}, {"pmid": "2"}]}',
+        encoding="utf-8",
+    )
+    (outputs / "fulltext_screening_results.json").write_text(
+        '{"screening_results": []}',
+        encoding="utf-8",
+    )
+
+    changed_config = _config("second")
+    changed_config.output.directory = str(tmp_path)
+    manifest = prepare_execution(changed_config, tmp_path)
+    progress = initialize_execution_progress(tmp_path, manifest)
+    statuses = {item["stage"]: item for item in progress["stages"]}
+
+    assert statuses["search"]["status"] == "completed"
+    assert statuses["search"]["source"] == "cache"
+    assert statuses["search"]["counters"]["studies_found"] == 2
+    assert statuses["fulltext"]["status"] == "pending"
+    assert "fulltext" in progress["cache"]["invalidated_stages"]
+
+
+def test_execution_progress_stage_updates_are_atomic_and_reloadable(tmp_path):
+    config = _config()
+    config.output.directory = str(tmp_path)
+    manifest = prepare_execution(config, tmp_path)
+    initialize_execution_progress(tmp_path, manifest)
+
+    update_execution_progress_stage(
+        tmp_path,
+        "abstract",
+        status="running",
+        source="fresh",
+    )
+    update_execution_progress_stage(
+        tmp_path,
+        "abstract",
+        status="completed",
+        source="fresh",
+        counters={"screened": 3, "included": 2, "excluded": 1},
+    )
+
+    progress = load_execution_progress(tmp_path)
+    abstract = {
+        item["stage"]: item
+        for item in progress["stages"]
+    }["abstract"]
+    assert abstract["status"] == "completed"
+    assert abstract["source"] == "fresh"
+    assert abstract["counters"]["included"] == 2
 
 
 def test_fulltext_study_hash_ignores_path_when_content_matches(tmp_path):

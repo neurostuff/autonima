@@ -43,6 +43,20 @@ STAGE_ARTIFACTS: Dict[str, List[str]] = {
     ],
 }
 
+EXECUTION_PROGRESS_STATUSES = {
+    "pending",
+    "running",
+    "completed",
+    "skipped",
+    "failed",
+}
+EXECUTION_PROGRESS_SOURCES = {
+    "fresh",
+    "cache",
+    "not_applicable",
+    "unknown",
+}
+
 
 def utc_now_iso() -> str:
     """Return a stable UTC timestamp string."""
@@ -181,6 +195,22 @@ def manifest_path(output_dir: Path) -> Path:
     return output_dir / "outputs" / "execution_manifest.json"
 
 
+def execution_progress_path(output_dir: Path) -> Path:
+    return output_dir / "outputs" / "execution_progress.json"
+
+
+def load_execution_progress(output_dir: Path) -> Optional[Dict[str, Any]]:
+    """Load the execution progress file if present."""
+    path = execution_progress_path(output_dir)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Failed to load execution progress %s: %s", path, exc)
+        return None
+
+
 def load_execution_manifest(output_dir: Path) -> Optional[Dict[str, Any]]:
     """Load the execution manifest if present."""
     path = manifest_path(output_dir)
@@ -205,6 +235,109 @@ def _load_legacy_config_hashes(output_dir: Path) -> Optional[Dict[str, str]]:
     except Exception as exc:
         logger.warning("Failed to inspect legacy final_results config: %s", exc)
     return None
+
+
+def _safe_read_json(path: Path) -> Any:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _count_screening_decisions(results: Any) -> Dict[str, int]:
+    screened = len(results) if isinstance(results, list) else 0
+    included = 0
+    excluded = 0
+    incomplete = 0
+    for item in results if isinstance(results, list) else []:
+        decision = str(item.get("decision", "")).lower() if isinstance(item, dict) else ""
+        if "included" in decision:
+            included += 1
+        elif "incomplete" in decision:
+            incomplete += 1
+        else:
+            excluded += 1
+    payload = {
+        "screened": screened,
+        "included": included,
+        "excluded": excluded,
+    }
+    if incomplete:
+        payload["incomplete"] = incomplete
+    return payload
+
+
+def _read_stage_counters(output_dir: Path, stage: str) -> Dict[str, Any]:
+    """Read lightweight summary counters from existing stage artifacts."""
+    outputs_dir = output_dir / "outputs"
+    if stage == "search":
+        data = _safe_read_json(outputs_dir / "search_results.json")
+        if isinstance(data, dict):
+            studies = data.get("studies", [])
+            return {"studies_found": len(studies) if isinstance(studies, list) else 0}
+    if stage == "abstract":
+        data = _safe_read_json(outputs_dir / "abstract_screening_results.json")
+        if isinstance(data, dict):
+            return _count_screening_decisions(data.get("screening_results", []))
+    if stage == "retrieval":
+        data = _safe_read_json(outputs_dir / "fulltext_retrieval_results.json")
+        if isinstance(data, dict):
+            rows = data.get("studies_with_fulltext", [])
+            available = [
+                row for row in rows
+                if isinstance(row, dict) and row.get("fulltext_available")
+            ] if isinstance(rows, list) else []
+            return {
+                "fulltext_candidates": len(rows) if isinstance(rows, list) else 0,
+                "available": len(available),
+            }
+    if stage == "fulltext":
+        data = _safe_read_json(outputs_dir / "fulltext_screening_results.json")
+        if isinstance(data, dict):
+            counters = _count_screening_decisions(data.get("screening_results", []))
+            counters.setdefault("incomplete", 0)
+            return counters
+    if stage == "parsing":
+        data = _safe_read_json(outputs_dir / "coordinate_parsing_results.json")
+        if isinstance(data, dict):
+            studies = data.get("studies", [])
+            analyses_count = 0
+            coordinates_count = 0
+            for study in studies if isinstance(studies, list) else []:
+                analyses = study.get("analyses", []) if isinstance(study, dict) else []
+                if not isinstance(analyses, list):
+                    continue
+                analyses_count += len(analyses)
+                for analysis in analyses:
+                    points = analysis.get("points", []) if isinstance(analysis, dict) else []
+                    if isinstance(points, list):
+                        coordinates_count += len(points)
+            return {
+                "studies": len(studies) if isinstance(studies, list) else 0,
+                "analyses": analyses_count,
+                "coordinates": coordinates_count,
+            }
+    if stage == "annotation":
+        data = _safe_read_json(outputs_dir / "annotation_results.json")
+        if isinstance(data, list):
+            annotation_names = {
+                str(item.get("annotation_name", "")).strip()
+                for item in data
+                if isinstance(item, dict) and str(item.get("annotation_name", "")).strip()
+            }
+            return {"decisions": len(data), "annotations": len(annotation_names)}
+    if stage == "output":
+        data = _safe_read_json(outputs_dir / "final_results.json")
+        if isinstance(data, dict):
+            stats = data.get("execution_stats", {})
+            counters = stats.get("prisma_stats", {})
+            if isinstance(counters, dict):
+                payload = dict(counters)
+                payload["nimads_available"] = (outputs_dir / "nimads_studyset.json").exists()
+                return payload
+    return {}
 
 
 def _expand_clear_stages(stages: Iterable[str]) -> List[str]:
@@ -441,6 +574,162 @@ def write_execution_manifest(output_dir: Path, manifest: Dict[str, Any]) -> Path
     tmp.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
     tmp.replace(path)
     return path
+
+
+def write_execution_progress(output_dir: Path, progress: Dict[str, Any]) -> Path:
+    """Persist execution progress atomically."""
+    path = execution_progress_path(output_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(progress, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def _stage_status_template(stage: str) -> Dict[str, Any]:
+    return {
+        "stage": stage,
+        "status": "pending",
+        "source": "unknown",
+        "started_at": None,
+        "completed_at": None,
+        "error": None,
+        "counters": {},
+    }
+
+
+def _invalidated_stage_names(manifest: Dict[str, Any]) -> List[str]:
+    invalidated = {
+        str(item.get("stage", "")).strip()
+        for item in manifest.get("invalidated", [])
+        if isinstance(item, dict) and item.get("stage")
+    }
+    invalidated.update(_stages_to_invalidate(manifest.get("changed_stages", [])))
+    return sorted(invalidated, key=list(STAGE_ARTIFACTS).index)
+
+
+def initialize_execution_progress(output_dir: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """Create the authoritative progress file for a new execution."""
+    output_dir = output_dir.expanduser().resolve()
+    outputs_dir = output_dir / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+
+    invalidated = set(_invalidated_stage_names(manifest))
+    copied = {
+        str(item.get("stage", "")).strip()
+        for item in manifest.get("copied_cache", [])
+        if isinstance(item, dict) and item.get("stage")
+    }
+
+    stages: List[Dict[str, Any]] = []
+    for stage in STAGE_ARTIFACTS:
+        item = _stage_status_template(stage)
+        has_artifact = any((outputs_dir / filename).exists() for filename in STAGE_ARTIFACTS[stage])
+        if stage not in invalidated and (stage in copied or has_artifact):
+            item.update(
+                {
+                    "status": "completed",
+                    "source": "cache",
+                    "completed_at": utc_now_iso(),
+                    "counters": _read_stage_counters(output_dir, stage),
+                }
+            )
+        stages.append(item)
+
+    progress = {
+        "schema_version": 1,
+        "execution_id": manifest.get("execution_id"),
+        "status": "running",
+        "current_stage": None,
+        "started_at": utc_now_iso(),
+        "updated_at": utc_now_iso(),
+        "completed_at": None,
+        "cache": {
+            "changed_stages": manifest.get("changed_stages", []),
+            "invalidated_stages": sorted(invalidated, key=list(STAGE_ARTIFACTS).index),
+        },
+        "stages": stages,
+    }
+    write_execution_progress(output_dir, progress)
+    return progress
+
+
+def update_execution_progress_stage(
+    output_dir: Path,
+    stage: str,
+    *,
+    status: str,
+    source: str = "fresh",
+    counters: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update one stage in the authoritative execution progress file."""
+    stage = str(stage).strip().lower()
+    if stage not in STAGE_ARTIFACTS:
+        raise ValueError(f"Unknown execution stage: {stage}")
+    if status not in EXECUTION_PROGRESS_STATUSES:
+        raise ValueError(f"Unknown execution progress status: {status}")
+    if source not in EXECUTION_PROGRESS_SOURCES:
+        raise ValueError(f"Unknown execution progress source: {source}")
+
+    output_dir = output_dir.expanduser().resolve()
+    progress = load_execution_progress(output_dir)
+    if not progress:
+        manifest = load_execution_manifest(output_dir) or {}
+        progress = initialize_execution_progress(output_dir, manifest)
+
+    now = utc_now_iso()
+    stage_items = progress.setdefault(
+        "stages",
+        [_stage_status_template(item) for item in STAGE_ARTIFACTS],
+    )
+    by_stage = {
+        str(item.get("stage")): item
+        for item in stage_items
+        if isinstance(item, dict) and item.get("stage")
+    }
+    item = by_stage.get(stage)
+    if item is None:
+        item = _stage_status_template(stage)
+        stage_items.append(item)
+
+    item["status"] = status
+    item["source"] = source
+    item["error"] = error
+    if status == "running" and not item.get("started_at"):
+        item["started_at"] = now
+    if status in {"completed", "skipped", "failed"}:
+        item["completed_at"] = now
+    if counters is not None:
+        item["counters"] = counters
+    elif status in {"completed", "skipped"} and not item.get("counters"):
+        item["counters"] = _read_stage_counters(output_dir, stage)
+
+    progress["status"] = "failed" if status == "failed" else "running"
+    progress["current_stage"] = stage if status == "running" else None
+    progress["updated_at"] = now
+    write_execution_progress(output_dir, progress)
+    return progress
+
+
+def complete_execution_progress(
+    output_dir: Path,
+    *,
+    status: str,
+    error: Optional[str] = None,
+) -> None:
+    """Mark execution progress globally complete/failed/canceled."""
+    output_dir = output_dir.expanduser().resolve()
+    progress = load_execution_progress(output_dir)
+    if not progress:
+        return
+    progress["status"] = status
+    progress["current_stage"] = None
+    progress["updated_at"] = utc_now_iso()
+    progress["completed_at"] = utc_now_iso()
+    if error:
+        progress["error"] = error
+    write_execution_progress(output_dir, progress)
 
 
 def complete_execution_manifest(

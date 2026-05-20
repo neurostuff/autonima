@@ -15,7 +15,7 @@ from uuid import uuid4
 import yaml
 
 from autonima.config import ConfigManager
-from autonima.execution import preview_execution_changes
+from autonima.execution import complete_execution_progress, preview_execution_changes
 
 from .progress import build_stage_status
 from .state import WorkspaceState, utc_now_iso
@@ -45,6 +45,35 @@ class RunManager:
         self.secrets_provider = secrets_provider
         self._managed: Dict[str, ManagedRun] = {}
         self._lock = threading.Lock()
+
+    def _reconcile_stale_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Mark persisted active-looking runs as canceled when no process exists."""
+        status = str(metadata.get("status") or "").lower()
+        if status not in {"queued", "running", "canceling"}:
+            return metadata
+
+        updated = dict(metadata)
+        now = utc_now_iso()
+        updated["status"] = "canceled"
+        updated["completed_at"] = updated.get("completed_at") or now
+        updated["stale_recovered_at"] = now
+        updated["status_message"] = (
+            "Run process is no longer active; marked canceled after app restart."
+        )
+        self.state.save_run_metadata(str(updated["id"]), updated)
+
+        output_folder = updated.get("output_folder")
+        if output_folder:
+            try:
+                complete_execution_progress(
+                    Path(output_folder),
+                    status="canceled",
+                    error=updated["status_message"],
+                )
+            except Exception:
+                pass
+
+        return updated
 
     def _resolve_output_folder(self, config_path: Path, output_folder: Optional[str]) -> Path:
         if output_folder:
@@ -441,7 +470,7 @@ class RunManager:
             metadata = self.state.load_run_metadata(run_id)
             if not metadata:
                 raise KeyError(f"Run not found: {run_id}")
-            return metadata
+            return self._reconcile_stale_metadata(metadata)
 
         if managed.process.poll() is not None:
             return managed.metadata
@@ -479,6 +508,7 @@ class RunManager:
             metadata = self.state.load_run_metadata(run_id)
             if not metadata:
                 raise KeyError(f"Run not found: {run_id}")
+            metadata = self._reconcile_stale_metadata(metadata)
             logs = []
 
         progress = build_stage_status(
@@ -502,6 +532,7 @@ class RunManager:
             metadata = self.state.load_run_metadata(run_id)
             if not metadata:
                 raise KeyError(f"Run not found: {run_id}")
+            metadata = self._reconcile_stale_metadata(metadata)
             lines = []
             status = metadata.get("status")
 

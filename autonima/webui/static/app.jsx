@@ -1011,9 +1011,41 @@ function App() {
     );
   }
 
-  function buildFunnelStages(counters, liveProgress = null, timeline = []) {
+  function buildFunnelStages(counters, liveProgress = null, timeline = [], progressMeta = {}) {
     const data = counters && typeof counters === "object" ? counters : {};
     const stages = [];
+    const stageOrder = ["search", "abstract", "retrieval", "fulltext", "parsing", "annotation", "output"];
+    const changedStages = Array.isArray(progressMeta?.cachePreview?.changed_stages)
+      ? progressMeta.cachePreview.changed_stages
+      : [];
+    const invalidatedStages = Array.isArray(progressMeta?.cachePreview?.invalidates)
+      ? progressMeta.cachePreview.invalidates
+      : [];
+    const resetResults = changedStages.length > 0 || invalidatedStages.length > 0;
+    const resetBoundaryStages = invalidatedStages.length ? invalidatedStages : changedStages;
+    const firstResetIndex = Math.min(
+      ...resetBoundaryStages
+        .map((stage) => stageOrder.indexOf(stage))
+        .filter((index) => index >= 0)
+    );
+    const hasResetBoundary = Number.isFinite(firstResetIndex);
+    const reachedStages = new Set(progressMeta?.reachedStages || []);
+    const completedStages = new Set(progressMeta?.completedStages || []);
+    const maxReachedIndex = Math.max(
+      -1,
+      ...(Array.from(reachedStages).map((stage) => stageOrder.indexOf(stage)).filter((index) => index >= 0))
+    );
+    const canDisplayStage = (stageId, completedAliases = []) => {
+      if (!resetResults) return true;
+      const index = stageOrder.indexOf(stageId);
+      if (hasResetBoundary && index >= 0 && index < firstResetIndex) {
+        return true;
+      }
+      if (liveProgress?.stage === stageId) return true;
+      if (completedStages.has(stageId)) return true;
+      if (completedAliases.some((stage) => completedStages.has(stage))) return true;
+      return index >= 0 && maxReachedIndex > index;
+    };
     const timelineStatus = (stageId) => {
       const item = (timeline || []).find((stage) => stage.stage === stageId);
       return item?.status || "";
@@ -1025,14 +1057,34 @@ function App() {
         stages.push({ id, title, items: filteredItems, sideItems: filteredSideItems });
       }
     };
+    const hasStage = (stageId) => stages.some((stage) => stage.id === stageId);
+    const stageStatusValue = (stageId) => {
+      const status = String(timelineStatus(stageId) || "").toLowerCase();
+      if (status === "completed" || completedStages.has(stageId)) return "Done";
+      if (status === "running" || liveProgress?.stage === stageId || reachedStages.has(stageId)) return "Running";
+      if (status === "failed") return "Failed";
+      if (status === "canceled") return "Canceled";
+      return "Pending";
+    };
+    const addStatusStage = (id, title) => {
+      if (!resetResults || hasStage(id) || !canDisplayStage(id)) return;
+      const value = stageStatusValue(id);
+      addStage(id, title, [{
+        key: "status",
+        label: "Status",
+        value,
+        tone: value === "Done" ? "include" : value === "Pending" ? "incomplete" : "total",
+      }]);
+    };
 
-    if (data.search) {
+    if (data.search && canDisplayStage("search")) {
       addStage("search", "Search", [
         { key: "studies_found", label: "Found", value: data.search.studies_found, tone: "total" },
       ]);
     }
+    addStatusStage("search", "Search");
 
-    if (data.abstract) {
+    if (data.abstract && canDisplayStage("abstract")) {
       addStage("abstract", "Abstract Screening", [
         { key: "screened", label: "Screened", value: data.abstract.screened, tone: "total" },
         { key: "included", label: "Included", value: data.abstract.included, tone: "include" },
@@ -1040,8 +1092,9 @@ function App() {
         { key: "excluded", label: "Excluded", value: data.abstract.excluded, tone: "exclude" },
       ]);
     }
+    addStatusStage("abstract", "Abstract Screening");
 
-    if (data.fulltext) {
+    if (data.fulltext && canDisplayStage("fulltext")) {
       addStage("fulltext", "Full-Text Screening", [
         { key: "screened", label: "Screened", value: data.fulltext.screened, tone: "total" },
         { key: "included", label: "Included", value: data.fulltext.included, tone: "include" },
@@ -1050,6 +1103,7 @@ function App() {
         { key: "incomplete", label: "Incomplete", value: data.fulltext.incomplete, tone: "incomplete" },
       ]);
     }
+    addStatusStage("fulltext", "Full-Text Screening");
 
     let finalIncluded = null;
     if (data.output && typeof data.output === "object") {
@@ -1067,17 +1121,19 @@ function App() {
     if (finalIncluded === null && data.fulltext?.included !== undefined) {
       finalIncluded = data.fulltext.included;
     }
-    if (finalIncluded !== null) {
+    if (finalIncluded !== null && canDisplayStage("output", ["fulltext"])) {
       addStage("output", "Final Studies", [
         { key: "final_included", label: "Included", value: finalIncluded, tone: "include" },
       ]);
     }
+    addStatusStage("output", "Final Studies");
 
     const parsingStatus = timelineStatus("parsing");
-    const shouldShowParsing = Boolean(data.parsing)
-      || Boolean(data.annotation)
+    const shouldShowParsing = (Boolean(data.parsing) && canDisplayStage("parsing"))
+      || (Boolean(data.annotation) && canDisplayStage("parsing"))
       || liveProgress?.stage === "parsing"
-      || ["completed", "running", "failed", "canceled"].includes(String(parsingStatus || "").toLowerCase());
+      || (resetResults && canDisplayStage("parsing"))
+      || (!resetResults && ["completed", "running", "failed", "canceled"].includes(String(parsingStatus || "").toLowerCase()));
     if (shouldShowParsing) {
       const parsingItems = data.parsing
         ? Object.entries(data.parsing).map(([key, value]) => ({
@@ -1097,12 +1153,13 @@ function App() {
       addStage("parsing", "Coordinate Parsing", parsingItems);
     }
 
-    if (data.annotation) {
+    if (data.annotation && canDisplayStage("annotation")) {
       addStage("annotation", "Analysis annotations", [
         { key: "decisions", label: "Decisions", value: data.annotation.decisions, tone: "include" },
         { key: "annotations", label: "Annotations", value: data.annotation.annotations, tone: "total" },
       ]);
     }
+    addStatusStage("annotation", "Analysis annotations");
 
     if (liveProgress?.stage && liveProgress.total && !stages.some((stage) => stage.id === liveProgress.stage)) {
       const fallbackStages = {
@@ -1133,12 +1190,18 @@ function App() {
     return stages;
   }
 
-  function renderCounterFunnel(counters, liveProgress = null, timeline = []) {
-    const stages = buildFunnelStages(counters, liveProgress, timeline);
+  function renderCounterFunnel(counters, liveProgress = null, timeline = [], progressMeta = {}) {
+    const stages = buildFunnelStages(counters, liveProgress, timeline, progressMeta);
+    const hasReset = Boolean(
+      progressMeta?.cachePreview?.changed_stages?.length
+      || progressMeta?.cachePreview?.invalidates?.length
+    );
     if (!stages.length) {
       return (
         <div className="run-results-empty">
-          Results will appear here as Autonima writes stage outputs.
+          {hasReset
+            ? "Results were reset for this rerun and will appear as each stage is evaluated."
+            : "Results will appear here as Autonima writes stage outputs."}
         </div>
       );
     }
@@ -3931,7 +3994,12 @@ function App() {
                     {renderCounterFunnel(
                       currentExecutionRun.progress?.counters || {},
                       currentExecutionRun.progress?.live_progress || null,
-                      currentExecutionRun.progress?.timeline || []
+                      currentExecutionRun.progress?.timeline || [],
+                      {
+                        cachePreview: currentExecutionRun.cache_preview || {},
+                        reachedStages: currentExecutionRun.progress?.reached_stages || [],
+                        completedStages: currentExecutionRun.progress?.completed_stages || [],
+                      }
                     )}
 
                     {(currentExecutionRun.progress?.missing_fulltexts?.available) ? (

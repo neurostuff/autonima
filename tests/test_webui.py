@@ -124,6 +124,42 @@ def test_progress_aggregator_reads_output_files(tmp_path):
     assert progress["nimads_studyset_path"] == str(outputs_dir / "nimads_studyset.json")
 
 
+def test_progress_aggregator_prefers_execution_progress_file(tmp_path):
+    outputs_dir = tmp_path / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "search_results.json").write_text(
+        '{"studies": [{"pmid": "1"}, {"pmid": "2"}]}',
+        encoding="utf-8",
+    )
+    (outputs_dir / "execution_progress.json").write_text(
+        (
+            "{"
+            '"schema_version": 1,'
+            '"status": "running",'
+            '"current_stage": "abstract",'
+            '"stages": ['
+            '{"stage": "search", "status": "completed", "source": "cache", "counters": {"studies_found": 10}},'
+            '{"stage": "abstract", "status": "running", "source": "fresh", "counters": {}}'
+            "]"
+            "}"
+        ),
+        encoding="utf-8",
+    )
+
+    progress = build_stage_status(
+        run_status="running",
+        output_folder=str(tmp_path),
+        log_lines=[],
+    )
+
+    statuses = {item["stage"]: item["status"] for item in progress["timeline"]}
+    assert progress["execution_progress_available"] is True
+    assert statuses["search"] == "completed"
+    assert statuses["abstract"] == "running"
+    assert progress["current_stage"] == "abstract"
+    assert progress["counters"]["search"]["studies_found"] == 10
+
+
 def test_progress_aggregator_marks_parsing_complete_when_disabled(tmp_path):
     outputs_dir = tmp_path / "outputs"
     outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -248,6 +284,23 @@ def test_progress_aggregator_counts_coordinate_parsing_results(tmp_path):
     assert progress["counters"]["parsing"]["studies"] == 2
     assert progress["counters"]["parsing"]["analyses"] == 2
     assert progress["counters"]["parsing"]["coordinates"] == 3
+
+
+def test_progress_aggregator_tracks_current_run_stage_flow(tmp_path):
+    progress = build_stage_status(
+        run_status="running",
+        output_folder=str(tmp_path),
+        log_lines=[
+            "2026-01-01 10:00:00 - autonima.pipeline - INFO - Starting Autonima pipeline: demo",
+            "2026-01-01 10:00:01 - autonima.search.pubmed - INFO - Found 30 potential studies from search",
+            "2026-01-01 10:00:02 - autonima.screening.screener - INFO - Starting Abstract screening: 4 to screen, 0 cached",
+            "2026-01-01 10:00:03 - autonima.screening.screener - INFO - Abstract screening: 28 eligible, 15 included, 13 excluded, 0 incomplete, 0 failed",
+            "2026-01-01 10:00:04 - autonima.pipeline - INFO - Retrieval: starting for 15 studies (included only)",
+        ],
+    )
+
+    assert progress["reached_stages"] == ["search", "abstract", "retrieval"]
+    assert progress["completed_stages"] == ["search", "abstract"]
 
 
 def test_progress_aggregator_detects_missing_fulltexts_artifacts(tmp_path):
@@ -599,3 +652,47 @@ def test_meta_run_tracks_source_without_overwriting_screening_output(tmp_path, m
     assert metadata["source_output_folder"] == str(meta_source.resolve())
     assert updated_project["last_output_folder"] == str(screening_output)
     assert updated_project["last_meta_output_folder"] == str(meta_source.resolve())
+
+
+def test_run_manager_marks_stale_active_run_canceled_after_restart(tmp_path):
+    state = WorkspaceState(tmp_path)
+    manager = RunManager(state, secrets_provider=lambda: {})
+    run_id = "stale-run"
+    output_folder = tmp_path / "stale-output"
+    (output_folder / "outputs").mkdir(parents=True)
+    (output_folder / "outputs" / "execution_progress.json").write_text(
+        (
+            "{"
+            '"schema_version": 1,'
+            '"status": "running",'
+            '"current_stage": "abstract",'
+            '"stages": [{"stage": "abstract", "status": "running", "source": "fresh"}]'
+            "}"
+        ),
+        encoding="utf-8",
+    )
+    state.save_run_metadata(
+        run_id,
+        {
+            "id": run_id,
+            "project_id": "project-1",
+            "kind": "pipeline",
+            "mode": "run",
+            "status": "canceling",
+            "created_at": utc_now_iso(),
+            "output_folder": str(output_folder),
+        },
+    )
+
+    metadata = manager.get_run(run_id)
+    logs = manager.get_logs(run_id)
+
+    assert metadata["status"] == "canceled"
+    assert metadata["status_message"].startswith("Run process is no longer active")
+    assert logs["completed"] is True
+
+    progress_file = output_folder / "outputs" / "execution_progress.json"
+    assert '"status": "canceled"' in progress_file.read_text(encoding="utf-8")
+
+    canceled_again = manager.cancel_run(run_id)
+    assert canceled_again["status"] == "canceled"
