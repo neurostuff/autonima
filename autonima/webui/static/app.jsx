@@ -220,6 +220,42 @@ function newestRunsFirst(runsList) {
   return [...(runsList || [])].sort((a, b) => runTimestampValue(b) - runTimestampValue(a));
 }
 
+function runSourceLabel(run) {
+  if (!run) return "No NIMADS source";
+  const timestamp = run.created_at || run.started_at || "";
+  const date = timestamp ? new Date(timestamp) : null;
+  const dateLabel = date && Number.isFinite(date.getTime())
+    ? date.toLocaleString()
+    : "Screening run";
+  const folder = String(run.output_folder || "");
+  const folderLabel = folder
+    ? folder.split("/").filter(Boolean).slice(-2).join("/")
+    : run.id;
+  return `${dateLabel} · ${folderLabel}`;
+}
+
+function normalizePathKey(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function nimadsSourceKey(run) {
+  if (!run) return "";
+  const explicitPath = normalizePathKey(run.progress?.nimads_studyset_path);
+  if (explicitPath) return explicitPath;
+  const outputFolder = normalizePathKey(run.output_folder);
+  return outputFolder ? `${outputFolder}/outputs/nimads_studyset.json` : "";
+}
+
+function metaRunMatchesSource(metaRun, sourceRun) {
+  if (!metaRun || !sourceRun) return false;
+  if (metaRun.source_run_id && metaRun.source_run_id === sourceRun.id) {
+    return true;
+  }
+  const sourceOutputFolder = normalizePathKey(sourceRun.output_folder);
+  const metaSourceFolder = normalizePathKey(metaRun.source_output_folder || metaRun.output_folder);
+  return Boolean(sourceOutputFolder && metaSourceFolder && sourceOutputFolder === metaSourceFolder);
+}
+
 function formatCounterLabel(key) {
   return String(key || "")
     .replaceAll("_", " ")
@@ -375,6 +411,8 @@ function App() {
   const [metaArtifactsError, setMetaArtifactsError] = useState("");
   const [selectedMetaArtifactPath, setSelectedMetaArtifactPath] = useState("");
   const [selectedMetaArtifactGroup, setSelectedMetaArtifactGroup] = useState("");
+  const [selectedMetaSourceRunId, setSelectedMetaSourceRunId] = useState("");
+  const [metaSourceManuallySelected, setMetaSourceManuallySelected] = useState(false);
   const [logs, setLogs] = useState([]);
   const [logOffset, setLogOffset] = useState(0);
   const logOffsetRef = useRef(0);
@@ -472,7 +510,7 @@ function App() {
   );
   const isFirstBuildStep = buildStepIndex <= 0;
   const isLastBuildStep = buildStepIndex >= BUILD_STEPS.length - 1;
-  const eligibleMetaRun = useMemo(
+  const eligibleMetaSourceRuns = useMemo(
     () => {
       const candidates = [];
       if (selectedRun) candidates.push(selectedRun);
@@ -485,11 +523,7 @@ function App() {
       const completedRuns = candidates.filter(
         (run) => run?.status === "completed" && Boolean(run.output_folder)
       );
-      if (!completedRuns.length) {
-        return null;
-      }
-
-      const preferredCompletedScreeningRun = completedRuns.find((run) => {
+      const eligibleRuns = newestRunsFirst(completedRuns.filter((run) => {
         const outputStage = (run.progress?.timeline || []).find(
           (stage) => stage.stage === "output"
         );
@@ -499,14 +533,27 @@ function App() {
           run.progress?.nimads_available || run.progress?.nimads_export_logged
         );
         return isScreeningRun && outputStage?.status === "completed" && hasNimads;
-      });
-
-      return preferredCompletedScreeningRun || completedRuns[0];
+      }));
+      const latestBySource = new Map();
+      for (const run of eligibleRuns) {
+        const key = nimadsSourceKey(run) || run.id;
+        if (!latestBySource.has(key)) {
+          latestBySource.set(key, run);
+        }
+      }
+      return Array.from(latestBySource.values());
     },
     [runs, selectedRun]
   );
-  const metaAnalysisEnabled = Boolean(eligibleMetaRun);
-  const selectedOutputFolder = selectedRun?.output_folder || eligibleMetaRun?.output_folder || runForm.output_folder || "";
+  const selectedMetaSourceRun = useMemo(
+    () => eligibleMetaSourceRuns.find((run) => run.id === selectedMetaSourceRunId)
+      || eligibleMetaSourceRuns[0]
+      || null,
+    [eligibleMetaSourceRuns, selectedMetaSourceRunId]
+  );
+  const selectedMetaSourceOutputFolder = selectedMetaSourceRun?.output_folder || "";
+  const metaAnalysisEnabled = Boolean(selectedMetaSourceRun);
+  const selectedOutputFolder = selectedRun?.output_folder || selectedMetaSourceOutputFolder || runForm.output_folder || "";
   const activeScreeningRun = useMemo(
     () => {
       const candidates = [];
@@ -523,7 +570,8 @@ function App() {
     },
     [runs, selectedRun]
   );
-  const activeMetaRun = useMemo(
+  const screeningRunInProgress = Boolean(activeScreeningRun);
+  const activeMetaRunForSelectedSource = useMemo(
     () => {
       const candidates = [];
       if (selectedRun) candidates.push(selectedRun);
@@ -532,27 +580,39 @@ function App() {
           candidates.push(run);
         }
       }
-      return candidates.find((run) => {
+      return newestRunsFirst(candidates).find((run) => {
         const isMetaRun = run?.kind === "meta" || run?.mode === "meta";
-        return isMetaRun && isActiveRunStatus(run?.status);
+        if (!isMetaRun || !isActiveRunStatus(run?.status)) return false;
+        if (!selectedMetaSourceRun) return true;
+        return metaRunMatchesSource(run, selectedMetaSourceRun);
       }) || null;
     },
-    [runs, selectedRun]
+    [runs, selectedRun, selectedMetaSourceRun?.id, selectedMetaSourceOutputFolder]
   );
-  const screeningRunInProgress = Boolean(activeScreeningRun);
-  const metaRunInProgress = Boolean(activeMetaRun);
+  const metaRunInProgress = Boolean(activeMetaRunForSelectedSource);
   const runsForActiveTab = useMemo(
     () => newestRunsFirst(runs.filter((run) => {
       const isMetaRun = run?.kind === "meta" || run?.mode === "meta";
-      return runsSubTab === "meta" ? isMetaRun : !isMetaRun;
+      if (runsSubTab !== "meta") {
+        return !isMetaRun;
+      }
+      if (!isMetaRun) {
+        return false;
+      }
+      if (!selectedMetaSourceRun) {
+        return true;
+      }
+      return metaRunMatchesSource(run, selectedMetaSourceRun);
     })),
-    [runs, runsSubTab]
+    [runs, runsSubTab, selectedMetaSourceRun?.id, selectedMetaSourceOutputFolder]
   );
   const selectedRunForActiveTab = useMemo(
     () => runsForActiveTab.find((run) => run.id === selectedRunId) || null,
     [runsForActiveTab, selectedRunId]
   );
-  const activeRunForActiveTab = runsSubTab === "meta" ? activeMetaRun : activeScreeningRun;
+  const activeRunForActiveTab = runsSubTab === "meta"
+    ? activeMetaRunForSelectedSource
+    : activeScreeningRun;
   const currentExecutionRun = useMemo(
     () => activeRunForActiveTab || selectedRunForActiveTab || runsForActiveTab[0] || null,
     [activeRunForActiveTab, selectedRunForActiveTab, runsForActiveTab]
@@ -635,6 +695,8 @@ function App() {
 
   async function loadSpec(projectId) {
     if (!projectId) return;
+    setPubmedCount(null);
+    setPubmedCountBusy(false);
     const data = await api(`/api/projects/${projectId}/spec`);
     setSpecForm(data.form || {});
     setYamlText(data.yaml_text || "");
@@ -738,6 +800,8 @@ function App() {
 
   useEffect(() => {
     if (selectedProjectId) {
+      setSelectedMetaSourceRunId("");
+      setMetaSourceManuallySelected(false);
       setBuildStep("search");
       loadSpec(selectedProjectId).catch((err) => {
         setStatusMsg({ type: "error", text: err.message });
@@ -757,12 +821,31 @@ function App() {
   }, [editorTab, currentExecutionRun?.id, selectedRunId]);
 
   useEffect(() => {
-    if (!eligibleMetaRun?.output_folder) return;
+    if (!eligibleMetaSourceRuns.length) {
+      if (selectedMetaSourceRunId) {
+        setSelectedMetaSourceRunId("");
+      }
+      return;
+    }
+    const selectedStillExists = eligibleMetaSourceRuns.some((run) => run.id === selectedMetaSourceRunId);
+    if (!selectedStillExists || !metaSourceManuallySelected) {
+      const newestSourceId = eligibleMetaSourceRuns[0].id;
+      if (!selectedStillExists && metaSourceManuallySelected) {
+        setMetaSourceManuallySelected(false);
+      }
+      if (selectedMetaSourceRunId !== newestSourceId) {
+        setSelectedMetaSourceRunId(newestSourceId);
+      }
+    }
+  }, [eligibleMetaSourceRuns, metaSourceManuallySelected, selectedMetaSourceRunId]);
+
+  useEffect(() => {
+    if (!selectedMetaSourceOutputFolder) return;
     setMetaForm((prev) => {
-      if (prev.output_folder === eligibleMetaRun.output_folder) return prev;
-      return { ...prev, output_folder: eligibleMetaRun.output_folder };
+      if (prev.output_folder === selectedMetaSourceOutputFolder) return prev;
+      return { ...prev, output_folder: selectedMetaSourceOutputFolder };
     });
-  }, [eligibleMetaRun?.output_folder]);
+  }, [selectedMetaSourceOutputFolder]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -928,84 +1011,114 @@ function App() {
     );
   }
 
-  function buildFunnelStages(counters, liveProgress = null) {
+  function buildFunnelStages(counters, liveProgress = null, timeline = []) {
     const data = counters && typeof counters === "object" ? counters : {};
     const stages = [];
-    const addStage = (id, title, width, items) => {
+    const timelineStatus = (stageId) => {
+      const item = (timeline || []).find((stage) => stage.stage === stageId);
+      return item?.status || "";
+    };
+    const addStage = (id, title, items, sideItems = []) => {
       const filteredItems = items.filter((item) => item.value !== undefined && item.value !== null);
-      if (filteredItems.length) {
-        stages.push({ id, title, width, items: filteredItems });
+      const filteredSideItems = sideItems.filter((item) => item.value !== undefined && item.value !== null && Number(item.value) !== 0);
+      if (filteredItems.length || filteredSideItems.length) {
+        stages.push({ id, title, items: filteredItems, sideItems: filteredSideItems });
       }
     };
 
     if (data.search) {
-      addStage("search", "Search", 100, [
-        { key: "studies_found", label: "Studies found", value: data.search.studies_found, tone: "total" },
+      addStage("search", "Search", [
+        { key: "studies_found", label: "Found", value: data.search.studies_found, tone: "total" },
       ]);
     }
 
     if (data.abstract) {
-      addStage("abstract", "Abstract Screening", 86, [
+      addStage("abstract", "Abstract Screening", [
         { key: "screened", label: "Screened", value: data.abstract.screened, tone: "total" },
         { key: "included", label: "Included", value: data.abstract.included, tone: "include" },
+      ], [
         { key: "excluded", label: "Excluded", value: data.abstract.excluded, tone: "exclude" },
       ]);
     }
 
-    if (data.retrieval) {
-      addStage("retrieval", "Full Text Retrieval", 72, [
-        { key: "fulltext_candidates", label: "Full-text candidates", value: data.retrieval.fulltext_candidates, tone: "total" },
-      ]);
-    }
-
     if (data.fulltext) {
-      addStage("fulltext", "Full Text Screening", 58, [
+      addStage("fulltext", "Full-Text Screening", [
         { key: "screened", label: "Screened", value: data.fulltext.screened, tone: "total" },
         { key: "included", label: "Included", value: data.fulltext.included, tone: "include" },
+      ], [
         { key: "excluded", label: "Excluded", value: data.fulltext.excluded, tone: "exclude" },
         { key: "incomplete", label: "Incomplete", value: data.fulltext.incomplete, tone: "incomplete" },
       ]);
     }
 
-    if (data.annotation) {
-      addStage("annotation", "Annotation", 44, [
-        { key: "decisions", label: "Decisions", value: data.annotation.decisions, tone: "include" },
-      ]);
-    }
-
+    let finalIncluded = null;
     if (data.output && typeof data.output === "object") {
       const outputEntries = Object.entries(data.output);
-      const finalIncluded =
+      const finalIncludedEntry =
         outputEntries.find(([key]) => key === "final_included") ||
         outputEntries.find(([key]) => {
           const normalizedKey = String(key || "").toLowerCase();
           return normalizedKey.includes("final") && normalizedKey.includes("included");
         });
-      if (finalIncluded) {
-        addStage("output", "Final Output", 34, [
-          {
-            key: finalIncluded[0],
-            label: "Final included",
-            value: finalIncluded[1],
-            tone: "include",
-          },
-        ]);
+      if (finalIncludedEntry) {
+        finalIncluded = finalIncludedEntry[1];
       }
+    }
+    if (finalIncluded === null && data.fulltext?.included !== undefined) {
+      finalIncluded = data.fulltext.included;
+    }
+    if (finalIncluded !== null) {
+      addStage("output", "Final Studies", [
+        { key: "final_included", label: "Included", value: finalIncluded, tone: "include" },
+      ]);
+    }
+
+    const parsingStatus = timelineStatus("parsing");
+    const shouldShowParsing = Boolean(data.parsing)
+      || Boolean(data.annotation)
+      || liveProgress?.stage === "parsing"
+      || ["completed", "running", "failed", "canceled"].includes(String(parsingStatus || "").toLowerCase());
+    if (shouldShowParsing) {
+      const parsingItems = data.parsing
+        ? Object.entries(data.parsing).map(([key, value]) => ({
+            key,
+            label: formatCounterLabel(key),
+            value,
+            tone: key === "status" && String(value).toLowerCase() === "off" ? "incomplete" : "total",
+          }))
+        : [{
+            key: "status",
+            label: "Status",
+            value: String(parsingStatus || "Done").toLowerCase() === "completed"
+              ? "Done"
+              : formatCounterLabel(parsingStatus || "Done"),
+            tone: String(parsingStatus || "").toLowerCase() === "completed" ? "include" : "total",
+          }];
+      addStage("parsing", "Coordinate Parsing", parsingItems);
+    }
+
+    if (data.annotation) {
+      addStage("annotation", "Analysis annotations", [
+        { key: "decisions", label: "Decisions", value: data.annotation.decisions, tone: "include" },
+        { key: "annotations", label: "Annotations", value: data.annotation.annotations, tone: "total" },
+      ]);
     }
 
     if (liveProgress?.stage && liveProgress.total && !stages.some((stage) => stage.id === liveProgress.stage)) {
       const fallbackStages = {
-        abstract: ["Abstract Screening", 86],
-        fulltext: ["Full Text Screening", 58],
-        parsing: ["Parsing", 50],
-        annotation: ["Annotation", 44],
+        search: "Search",
+        abstract: "Abstract Screening",
+        retrieval: "Full-Text Screening",
+        fulltext: "Full-Text Screening",
+        parsing: "Coordinate parsing",
+        annotation: "Analysis annotations",
       };
-      const [title, width] = fallbackStages[liveProgress.stage] || [formatCounterLabel(liveProgress.stage), 64];
+      const title = fallbackStages[liveProgress.stage] || formatCounterLabel(liveProgress.stage);
       stages.push({
         id: liveProgress.stage,
         title,
-        width,
         items: [],
+        sideItems: [],
       });
     }
 
@@ -1020,8 +1133,8 @@ function App() {
     return stages;
   }
 
-  function renderCounterFunnel(counters, liveProgress = null) {
-    const stages = buildFunnelStages(counters, liveProgress);
+  function renderCounterFunnel(counters, liveProgress = null, timeline = []) {
+    const stages = buildFunnelStages(counters, liveProgress, timeline);
     if (!stages.length) {
       return (
         <div className="run-results-empty">
@@ -1034,32 +1147,58 @@ function App() {
       <div className="run-funnel">
         {stages.map((stage, index) => (
           <div className="run-funnel-stage-wrap" key={stage.id}>
-            <div className={`run-funnel-stage ${stage.id}`} style={{ width: `${stage.width}%` }}>
-              <div className="run-funnel-title">{stage.title}</div>
-              {stage.liveProgress ? (
-                <div className="run-funnel-live">
-                  <div className="run-funnel-live-top">
-                    <span>{stage.liveProgress.label || "Running"}</span>
-                    <strong>{stage.liveProgress.current} / {stage.liveProgress.total}</strong>
+            <div className="run-funnel-main-row">
+              <div className={`run-funnel-stage ${stage.id}`}>
+                <div className="run-funnel-title">{stage.title}</div>
+                {stage.liveProgress ? (
+                  <div className="run-funnel-live">
+                    <div className="run-funnel-live-top">
+                      <span>{stage.liveProgress.label || "Running"}</span>
+                      <strong>{stage.liveProgress.current} / {stage.liveProgress.total}</strong>
+                    </div>
+                    <div className="run-funnel-live-track" aria-label={`${stage.liveProgress.percent}% complete`}>
+                      <div
+                        className="run-funnel-live-fill"
+                        style={{ width: `${Math.max(0, Math.min(100, stage.liveProgress.percent || 0))}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="run-funnel-live-track" aria-label={`${stage.liveProgress.percent}% complete`}>
-                    <div
-                      className="run-funnel-live-fill"
-                      style={{ width: `${Math.max(0, Math.min(100, stage.liveProgress.percent || 0))}%` }}
-                    />
-                  </div>
+                ) : null}
+                <div className="run-funnel-metrics">
+                  {stage.items.map((item) => (
+                    <div className={`run-funnel-metric ${item.tone}`} key={item.key}>
+                      <span className="run-result-value">{item.value}</span>
+                      <span className="run-result-label">{item.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ) : null}
-              <div className="run-funnel-metrics">
-                {stage.items.map((item) => (
-                  <div className={`run-funnel-metric ${item.tone}`} key={item.key}>
-                    <span className="run-result-value">{item.value}</span>
-                    <span className="run-result-label">{item.label}</span>
-                  </div>
-                ))}
               </div>
+              {stage.sideItems?.length ? (
+                <>
+                  <div className="run-funnel-side-arrow">→</div>
+                  <div className="run-funnel-side-card">
+                    {stage.sideItems.map((item) => (
+                      <div className={`run-funnel-metric run-funnel-side-item ${item.tone}`} key={item.key}>
+                        <span className="run-result-value">{item.value}</span>
+                        <span className="run-result-label">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="run-funnel-side-arrow empty" />
+                  <div className="run-funnel-side-card empty" />
+                </>
+              )}
             </div>
-            {index < stages.length - 1 ? <div className="run-funnel-arrow">↓</div> : null}
+            {index < stages.length - 1 ? (
+              <div className="run-funnel-arrow-row">
+                <div className="run-funnel-arrow">↓</div>
+                <div />
+                <div />
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -1199,6 +1338,8 @@ function App() {
 
   function enterEditor(projectId, tabName = "build") {
     if (!projectId) return;
+    setPubmedCount(null);
+    setPubmedCountBusy(false);
     setSelectedProjectId(projectId);
     setEditorTab(tabName);
     if (tabName === "build") {
@@ -2025,9 +2166,15 @@ function App() {
 
   async function startMetaRun() {
     if (!selectedProjectId) return;
+    if (!selectedMetaSourceRun) {
+      setStatusMsg({ type: "error", text: "Select a NIMADS source before starting meta-analysis." });
+      return;
+    }
     try {
       const payload = {
         ...metaForm,
+        output_folder: selectedMetaSourceOutputFolder || metaForm.output_folder,
+        source_run_id: selectedMetaSourceRun.id,
         include_ids: metaForm.include_ids || null,
       };
       const run = await api(`/api/projects/${selectedProjectId}/meta-runs`, {
@@ -3520,11 +3667,33 @@ function App() {
                     </div>
                   ) : (
                     <>
+                      <div className="meta-source-row">
+                        <div className="run-select-control meta-source-control">
+                          <label>NIMADS Source</label>
+                          <select
+                            value={selectedMetaSourceRun?.id || ""}
+                            onChange={(e) => {
+                              const nextRun = eligibleMetaSourceRuns.find((run) => run.id === e.target.value);
+                              setSelectedMetaSourceRunId(e.target.value);
+                              setMetaSourceManuallySelected(true);
+                              if (nextRun?.output_folder) {
+                                setMetaForm((prev) => ({ ...prev, output_folder: nextRun.output_folder }));
+                              }
+                            }}
+                          >
+                            {eligibleMetaSourceRuns.map((run) => (
+                              <option key={run.id} value={run.id}>
+                                {runSourceLabel(run)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                       <div className="run-primary-controls">
                         <button
                           className={`primary run-action-button ${metaRunInProgress ? "run-action-cancel" : "run-action-start"}`}
                           onClick={metaRunInProgress ? cancelRun : startMetaRun}
-                          disabled={metaRunInProgress ? !currentExecutionRun : !metaForm.output_folder}
+                          disabled={metaRunInProgress ? !currentExecutionRun : !selectedMetaSourceOutputFolder}
                           aria-live="polite"
                         >
                           {metaRunInProgress ? (
@@ -3628,7 +3797,7 @@ function App() {
                           <div className="run-output-summary" style={{ marginTop: 10 }}>
                             <strong>NIMADS source</strong>
                             <span className="mono">
-                              {eligibleMetaRun.progress?.nimads_studyset_path || `${eligibleMetaRun.output_folder}/outputs/nimads_studyset.json`}
+                              {selectedMetaSourceRun.progress?.nimads_studyset_path || `${selectedMetaSourceOutputFolder}/outputs/nimads_studyset.json`}
                             </span>
                           </div>
                         </div>
@@ -3761,7 +3930,8 @@ function App() {
                     <h4>Results</h4>
                     {renderCounterFunnel(
                       currentExecutionRun.progress?.counters || {},
-                      currentExecutionRun.progress?.live_progress || null
+                      currentExecutionRun.progress?.live_progress || null,
+                      currentExecutionRun.progress?.timeline || []
                     )}
 
                     {(currentExecutionRun.progress?.missing_fulltexts?.available) ? (

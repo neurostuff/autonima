@@ -107,6 +107,7 @@ def create_app(
 
     class MetaRunRequest(BaseModel):
         output_folder: str
+        source_run_id: Optional[str] = None
         estimator: str = "mkdadensity"
         estimator_args: str = "{}"
         corrector: str = "fdr"
@@ -465,6 +466,7 @@ def create_app(
             metadata = run_manager.start_meta_run(
                 project=project,
                 output_folder=payload.output_folder,
+                source_run_id=payload.source_run_id,
                 estimator=payload.estimator,
                 estimator_args=payload.estimator_args,
                 corrector=payload.corrector,

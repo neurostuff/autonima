@@ -1,10 +1,14 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from click.testing import CliRunner
 
 from autonima.cli import ui
+from autonima.config import ConfigManager
+from autonima.execution import prepare_execution
 from autonima.webui.preferences import PreferencesManager
 from autonima.webui.progress import build_stage_status
+from autonima.webui.runs import RunManager
 from autonima.webui.secrets import SecretsManager
 from autonima.webui.state import WorkspaceState, utc_now_iso
 
@@ -189,6 +193,61 @@ def test_progress_aggregator_marks_nimads_export_logged(tmp_path):
     )
 
     assert progress["nimads_export_logged"] is True
+
+
+def test_progress_aggregator_counts_annotation_names(tmp_path):
+    outputs_dir = tmp_path / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+
+    (outputs_dir / "annotation_results.json").write_text(
+        (
+            "["
+            '{"annotation_name": "structural", "study_id": "1"},'
+            '{"annotation_name": "structural", "study_id": "2"},'
+            '{"annotation_name": "functional", "study_id": "3"}'
+            "]"
+        ),
+        encoding="utf-8",
+    )
+
+    progress = build_stage_status(
+        run_status="completed",
+        output_folder=str(tmp_path),
+        log_lines=[],
+    )
+
+    assert progress["counters"]["annotation"]["decisions"] == 3
+    assert progress["counters"]["annotation"]["annotations"] == 2
+
+
+def test_progress_aggregator_counts_coordinate_parsing_results(tmp_path):
+    outputs_dir = tmp_path / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+
+    (outputs_dir / "coordinate_parsing_results.json").write_text(
+        (
+            "{"
+            '"studies": ['
+            '{"pmid": "1", "analyses": ['
+            '{"name": "a1", "points": [{"coordinates": [1, 2, 3]}, {"coordinates": [4, 5, 6]}]},'
+            '{"name": "a2", "points": [{"coordinates": [7, 8, 9]}]}'
+            "]},"
+            '{"pmid": "2", "analyses": []}'
+            "]"
+            "}"
+        ),
+        encoding="utf-8",
+    )
+
+    progress = build_stage_status(
+        run_status="completed",
+        output_folder=str(tmp_path),
+        log_lines=[],
+    )
+
+    assert progress["counters"]["parsing"]["studies"] == 2
+    assert progress["counters"]["parsing"]["analyses"] == 2
+    assert progress["counters"]["parsing"]["coordinates"] == 3
 
 
 def test_progress_aggregator_detects_missing_fulltexts_artifacts(tmp_path):
@@ -429,3 +488,114 @@ def test_clone_project_schema_and_cached_results(tmp_path):
     assert cloned_runs[0]["output_folder"] == str(output_path)
     assert cloned["clone_report"]["cloned_runs_count"] == 1
     assert cloned["clone_report"]["skipped_active_runs_count"] == 1
+
+
+def test_run_manager_uses_last_output_as_cache_source(tmp_path):
+    config_text = """
+search:
+  database: pubmed
+  query: ptsd vbm
+screening:
+  abstract:
+    objective: broad screening
+    inclusion_criteria:
+      - neuroimaging
+  fulltext:
+    objective: full text screening
+    inclusion_criteria:
+      - coordinates
+retrieval:
+  sources:
+    - pubget
+parsing:
+  parse_coordinates: true
+  coordinate_model: gpt-4o-mini
+annotation:
+  enabled: true
+  model: gpt-4o-mini
+  annotations:
+    - name: custom
+      inclusion_criteria:
+        - ptsd
+output:
+  formats:
+    - csv
+  nimads: true
+"""
+    runtime_config = tmp_path / "config.yaml"
+    runtime_config.write_text(config_text, encoding="utf-8")
+
+    previous_output = tmp_path / "base" / "executions" / "previous"
+    config = ConfigManager().load_from_file(runtime_config)
+    config.output.directory = str(previous_output)
+    prepare_execution(config, previous_output)
+
+    manager = RunManager(WorkspaceState(tmp_path), secrets_provider=lambda: {})
+    resolved, branched_from, preview = manager._maybe_create_execution_output(
+        runtime_config,
+        tmp_path / "base",
+        "auto_new_on_change",
+        cache_source_output=previous_output,
+    )
+
+    assert resolved == previous_output
+    assert branched_from is None
+    assert preview["changed_stages"] == []
+
+    changed_config = runtime_config.with_name("changed.yaml")
+    changed_config.write_text(
+        config_text.replace("full text screening", "changed full text screening"),
+        encoding="utf-8",
+    )
+    resolved_changed, branched_from_changed, preview_changed = (
+        manager._maybe_create_execution_output(
+            changed_config,
+            tmp_path / "base",
+            "auto_new_on_change",
+            cache_source_output=previous_output,
+        )
+    )
+
+    assert resolved_changed.parent == tmp_path / "base" / "executions"
+    assert branched_from_changed == str(previous_output)
+    assert preview_changed["changed_stages"] == ["fulltext"]
+
+
+def test_meta_run_tracks_source_without_overwriting_screening_output(tmp_path, monkeypatch):
+    state = WorkspaceState(tmp_path)
+    project = state.create_project("meta-source")
+    screening_output = tmp_path / "screening-output"
+    meta_source = tmp_path / "meta-source-output"
+    state.update_project(project["id"], {"last_output_folder": str(screening_output)})
+    project = state.get_project(project["id"])
+
+    manager = RunManager(state, secrets_provider=lambda: {})
+
+    def fake_start_process(run_id, metadata, cmd, env):
+        metadata["status"] = "running"
+        metadata["command"] = cmd
+        state.save_run_metadata(run_id, metadata)
+        return SimpleNamespace(metadata=metadata)
+
+    monkeypatch.setattr(manager, "_start_process", fake_start_process)
+
+    metadata = manager.start_meta_run(
+        project=project,
+        output_folder=str(meta_source),
+        source_run_id="screening-run-1",
+        estimator="mkdadensity",
+        estimator_args="{}",
+        corrector="fdr",
+        corrector_args="{}",
+        include_ids=None,
+        run_reports=False,
+        fail_fast=False,
+        debug=False,
+    )
+
+    updated_project = state.get_project(project["id"])
+    assert metadata["kind"] == "meta"
+    assert metadata["source_run_id"] == "screening-run-1"
+    assert metadata["source_output_folder"] == str(meta_source.resolve())
+    assert updated_project["last_output_folder"] == str(screening_output)
+    assert updated_project["last_meta_output_folder"] == str(meta_source.resolve())

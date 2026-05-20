@@ -994,6 +994,15 @@ button.primary.run-action-button.is-running:hover {
   padding: 8px 10px;
 }
 
+.meta-source-row {
+  margin-top: 12px;
+}
+
+.meta-source-control {
+  width: min(720px, 100%);
+  grid-template-columns: minmax(120px, auto) minmax(220px, 1fr);
+}
+
 .info-tooltip {
   position: relative;
   width: 18px;
@@ -1263,6 +1272,8 @@ button.primary.run-action-button.is-running:hover {
 }
 
 .run-funnel {
+  --run-flow-main-width: 380px;
+  --run-flow-side-width: 230px;
   display: grid;
   gap: 4px;
   margin-bottom: 14px;
@@ -1271,10 +1282,21 @@ button.primary.run-action-button.is-running:hover {
 .run-funnel-stage-wrap {
   display: grid;
   justify-items: center;
+  width: 100%;
+}
+
+.run-funnel-main-row {
+  display: grid;
+  grid-template-columns: var(--run-flow-main-width) 46px var(--run-flow-side-width);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .run-funnel-stage {
-  min-width: min(100%, 340px);
+  width: var(--run-flow-main-width);
+  min-width: 0;
   border: 1px solid #b9d2eb;
   border-radius: 16px;
   background: linear-gradient(135deg, #f8fbff, #edf7ff);
@@ -1289,6 +1311,16 @@ button.primary.run-action-button.is-running:hover {
 .run-funnel-stage.output {
   border-color: #b7dfc0;
   background: linear-gradient(135deg, #f2fbf5, #e3f5e8);
+}
+
+.run-funnel-stage.annotation {
+  border-color: #b9d2eb;
+  background: linear-gradient(135deg, #f8fbff, #edf7ff);
+}
+
+.run-funnel-stage.parsing {
+  border-color: #c2d8ee;
+  background: linear-gradient(135deg, #f7fbff, #e9f4ff);
 }
 
 .run-funnel-title {
@@ -1376,11 +1408,53 @@ button.primary.run-action-button.is-running:hover {
   background: #fff8eb;
 }
 
+.run-funnel-arrow-row {
+  display: grid;
+  grid-template-columns: var(--run-flow-main-width) 46px var(--run-flow-side-width);
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .run-funnel-arrow {
   color: #8aa4bf;
+  text-align: center;
+  font-size: 30px;
   font-weight: 900;
   line-height: 1;
-  padding: 2px 0;
+  padding: 5px 0;
+}
+
+.run-funnel-side-arrow {
+  color: #8aa4bf;
+  font-size: 26px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1;
+}
+
+.run-funnel-side-arrow.empty,
+.run-funnel-side-card.empty {
+  visibility: hidden;
+}
+
+.run-funnel-side-card {
+  width: var(--run-flow-side-width);
+  min-height: 74px;
+  border: 1px solid #b9d2eb;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fbff, #edf7ff);
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 6px;
+  box-shadow: 0 3px 12px rgba(14, 48, 84, 0.05);
+}
+
+.run-funnel-side-item {
+  min-width: 92px;
 }
 
 .run-result-value {
@@ -1723,6 +1797,8 @@ button.primary.run-action-button.is-running:hover {
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
   font-size: 12px;
   line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .log-box-prominent {
@@ -1924,6 +2000,32 @@ button.primary.run-action-button.is-running:hover {
 
   .criteria-grid {
     grid-template-columns: 1fr;
+  }
+
+  .run-funnel-main-row {
+    grid-template-columns: 1fr;
+  }
+
+  .run-funnel-arrow-row {
+    grid-template-columns: 1fr;
+  }
+
+  .run-funnel-arrow-row > div:not(.run-funnel-arrow) {
+    display: none;
+  }
+
+  .run-funnel-stage,
+  .run-funnel-side-card {
+    width: min(100%, var(--run-flow-main-width));
+  }
+
+  .run-funnel-side-arrow {
+    transform: rotate(90deg);
+  }
+
+  .run-funnel-side-arrow.empty,
+  .run-funnel-side-card.empty {
+    display: none;
   }
 
   .timeline {

@@ -127,19 +127,21 @@ class RunManager:
         runtime_config_path: Path,
         resolved_output: Path,
         execution_mode: str,
+        cache_source_output: Optional[Path] = None,
     ) -> tuple[Path, Optional[str], Dict[str, Any]]:
         """Default UI behavior: branch to a new output when signatures changed."""
         if execution_mode != "auto_new_on_change":
             return resolved_output, None, {}
+        source_output = cache_source_output or resolved_output
         try:
             config = ConfigManager().load_from_file(runtime_config_path)
-            config.output.directory = str(resolved_output)
-            preview = preview_execution_changes(config, resolved_output)
+            config.output.directory = str(source_output)
+            preview = preview_execution_changes(config, source_output)
         except Exception:
             return resolved_output, None, {}
 
         if not preview.get("changed_stages"):
-            return resolved_output, None, preview
+            return source_output, None, preview
 
         execution_name = (
             time.strftime("%Y%m%d-%H%M%S")
@@ -147,7 +149,7 @@ class RunManager:
             + str(preview.get("stage_hashes", {}).get("output", ""))[:8]
         )
         branched_output = resolved_output / "executions" / execution_name
-        return branched_output, str(resolved_output), preview
+        return branched_output, str(source_output), preview
 
     def _build_meta_command(
         self,
@@ -318,11 +320,20 @@ class RunManager:
         cache_preview: Dict[str, Any] = {}
         branched_from: Optional[str] = None
         if not output_folder:
+            previous_output_raw = str(project.get("last_output_folder") or "").strip()
+            previous_output = (
+                Path(previous_output_raw).expanduser().resolve()
+                if previous_output_raw
+                else None
+            )
+            if previous_output and not previous_output.exists():
+                previous_output = None
             resolved_output, branched_from, cache_preview = (
                 self._maybe_create_execution_output(
                     runtime_config_path,
                     resolved_output,
                     execution_mode,
+                    cache_source_output=previous_output,
                 )
             )
             if branched_from and not copy_valid_cache_from:
@@ -372,6 +383,7 @@ class RunManager:
         self,
         project: Dict[str, Any],
         output_folder: str,
+        source_run_id: Optional[str],
         estimator: str,
         estimator_args: str,
         corrector: str,
@@ -390,6 +402,8 @@ class RunManager:
             mode="meta",
             output_folder=output_path,
         )
+        metadata["source_run_id"] = source_run_id
+        metadata["source_output_folder"] = output_path
 
         cmd = self._build_meta_command(
             output_folder=output_path,
@@ -413,7 +427,7 @@ class RunManager:
             project["id"],
             {
                 "run_ids": run_ids,
-                "last_output_folder": output_path,
+                "last_meta_output_folder": output_path,
             },
         )
 

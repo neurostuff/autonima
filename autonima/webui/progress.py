@@ -272,11 +272,39 @@ def build_stage_status(
         parsing_data = _safe_read_json(outputs_dir / "coordinate_parsing_results.json")
         if parsing_data is not None:
             stages["parsing"]["status"] = "completed"
+            if isinstance(parsing_data, dict):
+                studies = parsing_data.get("studies", [])
+                analyses_count = 0
+                coordinates_count = 0
+                for study in studies if isinstance(studies, list) else []:
+                    analyses = study.get("analyses", []) if isinstance(study, dict) else []
+                    if not isinstance(analyses, list):
+                        continue
+                    analyses_count += len(analyses)
+                    for analysis in analyses:
+                        points = analysis.get("points", []) if isinstance(analysis, dict) else []
+                        if isinstance(points, list):
+                            coordinates_count += len(points)
+                counters["parsing"] = {
+                    "studies": len(studies) if isinstance(studies, list) else 0,
+                    "analyses": analyses_count,
+                    "coordinates": coordinates_count,
+                }
+            else:
+                counters["parsing"] = {"status": "Done"}
 
         annotation_data = _safe_read_json(outputs_dir / "annotation_results.json")
         if isinstance(annotation_data, list):
             stages["annotation"]["status"] = "completed"
-            counters["annotation"] = {"decisions": len(annotation_data)}
+            annotation_names = {
+                str(item.get("annotation_name", "")).strip()
+                for item in annotation_data
+                if isinstance(item, dict) and str(item.get("annotation_name", "")).strip()
+            }
+            counters["annotation"] = {
+                "decisions": len(annotation_data),
+                "annotations": len(annotation_names),
+            }
 
         final_data = _safe_read_json(outputs_dir / "final_results.json")
         if isinstance(final_data, dict):
@@ -290,6 +318,7 @@ def build_stage_status(
             if stages["parsing"]["status"] != "completed":
                 if not parsing_enabled:
                     stages["parsing"]["status"] = "completed"
+                    counters["parsing"] = {"status": "Off"}
                 elif run_status == "completed":
                     # The run reached final outputs; parsing did not produce a results file
                     # (e.g., no parseable tables). Treat this stage as complete rather than
