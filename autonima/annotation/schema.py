@@ -54,6 +54,7 @@ class AnnotationDecision(BaseModel):
     # NEW: Track which criteria were applied
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
+    cache_signature: Optional[Dict[str, Any]] = None
 
 
 class TableMetadata(BaseModel):

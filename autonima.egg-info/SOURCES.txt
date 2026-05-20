@@ -45,6 +45,15 @@ autonima/templates/sample_config.yml
 autonima/utils/__init__.py
 autonima/utils/base.py
 autonima/utils/criteria.py
+autonima/webui/__init__.py
+autonima/webui/app.py
+autonima/webui/progress.py
+autonima/webui/runs.py
+autonima/webui/secrets.py
+autonima/webui/state.py
+autonima/webui/static/app.jsx
+autonima/webui/static/index.html
+autonima/webui/static/styles.css
 tests/test_annotation_incremental_caching.py
 tests/test_annotation_multi_analysis_validation.py
 tests/test_annotation_retry.py
@@ -56,7 +65,9 @@ tests/test_docs.py
 tests/test_fulltext_incomplete_outputs.py
 tests/test_fulltext_loading.py
 tests/test_fulltext_screening.py
+tests/test_llm_client.py
 tests/test_multi_annotation.py
+tests/test_nimads_annotations.py
 tests/test_objective_in_prompt.py
 tests/test_parallel_screening.py
 tests/test_pipeline_retrieval.py
@@ -65,3 +76,5 @@ tests/test_pubmed.py
 tests/test_retrieval.py
 tests/test_screening.py
 tests/test_simplified_screening.py
+tests/test_webui.py
+tests/test_webui_api.py
