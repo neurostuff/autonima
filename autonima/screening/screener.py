@@ -285,7 +285,6 @@ class LLMScreener(ScreeningEngine):
         else:
             payload.update(
                 {
-                    "full_text_path": study.full_text_path,
                     "pmcid": study.pmcid,
                     "fulltext_available": study.fulltext_available,
                 }

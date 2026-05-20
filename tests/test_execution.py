@@ -9,6 +9,8 @@ from autonima.execution import (
     stage_hashes,
     stable_hash,
 )
+from autonima.models.types import ScreeningConfig, Study
+from autonima.screening.screener import LLMScreener
 
 
 def _config_dict(fulltext_objective="full text objective"):
@@ -89,3 +91,36 @@ def test_prepare_execution_invalidates_changed_fulltext_cache(tmp_path):
     assert fulltext_cache.exists() is False
     assert abstract_cache.exists() is True
     assert any(item["stage"] == "fulltext" for item in manifest["invalidated"])
+
+
+def test_fulltext_study_hash_ignores_path_when_content_matches(tmp_path):
+    first_path = tmp_path / "first.html"
+    second_path = tmp_path / "nested" / "second.html"
+    second_path.parent.mkdir()
+    full_text = "<html><body>same article body</body></html>"
+    first_path.write_text(full_text, encoding="utf-8")
+    second_path.write_text(full_text, encoding="utf-8")
+
+    screener = LLMScreener(ScreeningConfig(), output_dir=str(tmp_path))
+    first = Study(
+        pmid="12345",
+        title="Same study",
+        abstract="",
+        authors=[],
+        journal="",
+        publication_date="",
+        full_text_path=str(first_path),
+        fulltext_available=True,
+    )
+    second = Study(
+        pmid="12345",
+        title="Same study",
+        abstract="",
+        authors=[],
+        journal="",
+        publication_date="",
+        full_text_path=str(second_path),
+        fulltext_available=True,
+    )
+
+    assert screener._study_input_hash(first, "fulltext") == screener._study_input_hash(second, "fulltext")
