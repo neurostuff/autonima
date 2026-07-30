@@ -11,6 +11,7 @@ import concurrent.futures
 from tqdm import tqdm
 
 from .openai_client import CoordinateParsingClient
+from .prompts import create_coordinate_parsing_prompt
 from .schema import ParseAnalysesOutput
 
 logger = logging.getLogger(__name__)
@@ -38,108 +39,11 @@ def parse_single_table(
     Returns:
         Dictionary containing the parsed results
     """    
-    # Create detailed prompt
-    detailed_prompt = f"""
-    You are a neuroimaging data curation assistant.
-
-    You will receive a CSV table extracted from a published fMRI/neuroimaging article.
-    The table reports statistical activation results, usually organized by *analysis* or *contrast*
-    (e.g., "Athletes: motor imagery", "Non-athletes: motor imagery"). Each analysis may contain multiple rows of
-    activation foci, with region names, MNI/TAL coordinates, and statistics.
-
-    Table Caption: {table_caption}
-    Table Foot: {table_foot}
-
-    Your task is to output JSON strictly matching the schema of the `parse_analyses` function:
-
-    {{
-    "analyses": [
-        {{
-        "name": <string or null>,
-        "description": <string or null>,
-        "points": [
-            {{
-            "coordinates": [x, y, z],
-            "space": <"MNI" | "TAL" | null>
-            "values": [
-                {{
-                "value": <float or string or null>,
-                "kind": <string or null>
-                }},
-                ...
-            ]  # Omit this field if no statistical values are available
-            }},
-            ...
-        ]
-        }}
-    ]
-    }}
-
-    ⚠️ CRITICAL RULES for coordinates:
-    - Coordinates **must come ONLY from the X, Y, Z columns** (or an equivalent labeled "MNI coordinates").
-    - Do NOT use any values from other numeric columns (e.g., Cluster, Volume, Brodmann area, ALE, T, Z).
-    - If a row does not contain all three values under X, Y, Z → exclude that row.
-    - Coordinates must be exactly three numeric values, extracted in order: [X, Y, Z].
-
-    Other rules:
-    1. **Analyses/contrasts**  
-    - Start a new analysis whenever a distinct label is present (e.g., "Athletes: motor imagery").  
-    - If no explicit contrasts, treat the whole table as a single analysis.  
-    - Use only names that explicitly appear in the provided table, caption, or footnotes. Never invent.  
-
-    2. **Space**  
-    - If the table mentions MNI or Talairach, set `"space"` accordingly.  
-    - If unclear, use `"space": null`.  
-
-    3. **Values**
-    - If the table has statistical values (e.g., T, Z), include them in `"values"`
-    - For the `"kind"` field, you MUST use ONLY these exact values:
-      * "z-statistic" for Z-scores
-      * "t-statistic" for T-values
-      * "f-statistic" for F-values
-      * "p-value" for p-values (including FDR-corrected)
-      * "beta" for beta coefficients
-      * "correlation" for correlation coefficients
-      * "other" for any other statistical measures
-    - If no statistical columns, omit the `"values"` field entirely
-    - Do NOT include values from non-statistical columns (e.g., Cluster, Volume, Brodmann area, ALE).
-    - Each value must correspond to the same row as its X, Y, Z coordinates
-
-    4. **Filtering**  
-    - Ignore all other columns (cluster size, Brodmann area, ALE, etc.).  
-    - Only extract X, Y, Z → nothing else.  
-
-    5. **Null handling**  
-    - Missing analysis names → `"name": null`.  
-    - No valid coordinates in an analysis → keep `"points": []`.  
-
-    6. **Consistency**  
-    - Ensure coordinates are always `[float, float, float]`.  
-    - Do not include fields outside the schema.  
-    - Do not fabricate analysis names from prompt examples.  
-
-    ---
-
-    Example clarification:
-
-    If a row looks like this:  
-    ```
-
-    Cluster,Volume,Brain regions,Hemisphere,Brodmann area,X,Y,Z,ALE
-    2,864,Precentral Gyrus,L,6,-24,-12,54,1.78
-
-    ```
-
-    ✅ Correct coordinates = `[-24, -12, 54]`  
-    ❌ Do NOT use `6,-24,-12` (the "6" is Brodmann area, not a coordinate).  
-    ❌ Do NOT use ALE (1.78).  
-
-    ---
-
-    Now apply these rules to the following table:
-
-    {table_text}
-    """
+    detailed_prompt = create_coordinate_parsing_prompt(
+        table_text,
+        table_caption=table_caption,
+        table_foot=table_foot,
+    )
 
     # Send to API
     response = client.parse_analyses(detailed_prompt, model=model)
