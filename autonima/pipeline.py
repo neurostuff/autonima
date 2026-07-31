@@ -4,6 +4,7 @@ import logging
 import os
 import csv
 import json
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Literal, cast
@@ -20,10 +21,11 @@ from .search import PubMedSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .retrieval.utils import (
-        _apply_activation_tables_to_studies,
-        _apply_analyses_to_studies,
-        _map_pmids_to_text
-    )
+    ACEProcessingError,
+    _apply_activation_tables_to_studies,
+    _apply_analyses_to_studies,
+    _map_pmids_to_text,
+)
 from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
 from .execution import (
@@ -369,6 +371,8 @@ class AutonimaPipeline:
             # Complete pipeline
             return self._complete_run("full")
 
+        except ACEProcessingError:
+            raise
         except Exception as e:
             log_error_with_debug(logger, f"Pipeline failed: {e}")
             self.results.errors.append(str(e))
@@ -567,10 +571,37 @@ class AutonimaPipeline:
                 )
 
                 # Map PMIDs to text files in source
+                source_identity = json.dumps({
+                    "root_path": str(full_text_config.get("root_path", "")),
+                    "source_name": str(source_name),
+                    "pmid_source": str(
+                        full_text_config.get("pmid_source", "")
+                    ),
+                    "allowed_extensions": sorted(
+                        str(extension)
+                        for extension in full_text_config.get(
+                            "allowed_extensions",
+                            [],
+                        )
+                    ),
+                }, sort_keys=True)
+                source_key = hashlib.sha256(
+                    source_identity.encode("utf-8")
+                ).hexdigest()[:12]
+                generated_processed_data_path = (
+                    Path(self.config.output.directory)
+                    / "retrieval"
+                    / "ace"
+                    / source_key
+                )
                 text_paths, analyses, tables = _map_pmids_to_text(
                     **full_text_config,
-                    pmids_to_include=pmids_set
-                    )
+                    pmids_to_include=pmids_set,
+                    generated_processed_data_path=generated_processed_data_path,
+                    ace_num_workers=getattr(
+                        self.config.retrieval, "n_jobs", 1
+                    ),
+                )
 
                 source_matches = []
                 

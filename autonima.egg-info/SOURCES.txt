@@ -4,6 +4,7 @@ autonima/__init__.py
 autonima/__main__.py
 autonima/cli.py
 autonima/config.py
+autonima/execution.py
 autonima/meta.py
 autonima/pipeline.py
 autonima.egg-info/PKG-INFO
@@ -47,6 +48,7 @@ autonima/utils/base.py
 autonima/utils/criteria.py
 autonima/webui/__init__.py
 autonima/webui/app.py
+autonima/webui/preferences.py
 autonima/webui/progress.py
 autonima/webui/runs.py
 autonima/webui/secrets.py
@@ -60,8 +62,10 @@ tests/test_annotation_retry.py
 tests/test_basic.py
 tests/test_cli.py
 tests/test_confidence_reporting.py
+tests/test_config_global_defaults.py
 tests/test_criteria_mapping.py
 tests/test_docs.py
+tests/test_execution.py
 tests/test_fulltext_incomplete_outputs.py
 tests/test_fulltext_loading.py
 tests/test_fulltext_screening.py
