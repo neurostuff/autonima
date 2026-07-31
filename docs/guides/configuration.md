@@ -49,8 +49,29 @@ annotation:
 - `screening.fulltext` must define an `objective` and `inclusion_criteria`, or set `skip_stage: true`.
 - `output.directory` must be non-empty.
 - In `retrieval.full_text_sources`, `coordinates_path_templates` and `processed_data_path` are mutually exclusive for a given source.
+- If `defaults.model` is set, it is used as a fallback for stage-level model fields that are omitted.
 
 ## Top-Level Sections
+
+## `defaults` (optional)
+
+Purpose: set global fallback values for model fields.
+
+Common fields:
+
+- `model`
+  Type: string
+  Example: `"gpt-5-mini-2025-08-07"`
+
+Behavior:
+
+- `defaults.model` is used when these fields are missing or blank:
+  - `screening.abstract.model`
+  - `screening.fulltext.model`
+  - `annotation.model`
+  - `parsing.coordinate_model`
+  - `retrieval.coordinate_model`
+- Explicit stage-level values are preserved and take precedence.
 
 ## `search`
 

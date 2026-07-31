@@ -5,6 +5,8 @@ import asyncio
 import pytest
 
 from autonima.config import ConfigManager
+from autonima.coordinates.schema import Analysis
+from autonima.models.types import Study, StudyStatus
 from autonima.pipeline import AutonimaPipeline
 
 
@@ -26,6 +28,25 @@ def _build_pipeline(tmp_path) -> AutonimaPipeline:
     config = ConfigManager().create_sample_config()
     config.output.directory = str(tmp_path)
     return AutonimaPipeline(config)
+
+
+def _study_with_analysis(pmid: str, status: StudyStatus) -> Study:
+    return Study(
+        pmid=pmid,
+        title=f"Study {pmid}",
+        abstract="Abstract",
+        authors=[],
+        journal="Journal",
+        publication_date="2024-01-01",
+        status=status,
+        analyses=[
+            Analysis(
+                name="Analysis",
+                description="Test analysis",
+                points=[],
+            )
+        ],
+    )
 
 
 def test_pipeline_stop_after_search_runs_only_search(tmp_path, monkeypatch):
@@ -155,3 +176,86 @@ def test_pipeline_rejects_invalid_stop_after_stage(tmp_path):
 
     with pytest.raises(ValueError, match="Invalid stop_after_stage"):
         asyncio.run(pipeline.run(stop_after_stage="retrieval"))  # type: ignore[arg-type]
+
+
+def test_annotation_baselines_require_load_excluded_false(
+    tmp_path, monkeypatch
+):
+    pipeline = _build_pipeline(tmp_path)
+    pipeline.config.annotation.enabled = True
+    pipeline.config.annotation.create_all_included_annotations = True
+    pipeline.config.retrieval.load_excluded = False
+    pipeline.results.studies = [
+        _study_with_analysis("included", StudyStatus.INCLUDED_FULLTEXT),
+        _study_with_analysis("abstract-excluded", StudyStatus.EXCLUDED_ABSTRACT),
+        _study_with_analysis("fulltext-excluded", StudyStatus.EXCLUDED_FULLTEXT),
+    ]
+    captured = {}
+
+    def fake_process_studies(
+        self,
+        included_studies,
+        all_studies=None,
+        all_abstract_studies=None,
+        output_dir=None,
+    ):
+        captured["included_studies"] = included_studies
+        captured["all_studies"] = all_studies
+        captured["all_abstract_studies"] = all_abstract_studies
+        return []
+
+    monkeypatch.setattr(
+        "autonima.annotation.processor.AnnotationProcessor.process_studies",
+        fake_process_studies,
+    )
+
+    asyncio.run(pipeline._execute_annotation_phase())
+
+    assert [study.pmid for study in captured["included_studies"]] == ["included"]
+    assert captured["all_studies"] is None
+    assert captured["all_abstract_studies"] is None
+
+
+def test_annotation_baselines_created_when_load_excluded_true(
+    tmp_path, monkeypatch
+):
+    pipeline = _build_pipeline(tmp_path)
+    pipeline.config.annotation.enabled = True
+    pipeline.config.annotation.create_all_included_annotations = True
+    pipeline.config.retrieval.load_excluded = True
+    pipeline.results.studies = [
+        _study_with_analysis("included", StudyStatus.INCLUDED_FULLTEXT),
+        _study_with_analysis("abstract-excluded", StudyStatus.EXCLUDED_ABSTRACT),
+        _study_with_analysis("fulltext-excluded", StudyStatus.EXCLUDED_FULLTEXT),
+    ]
+    captured = {}
+
+    def fake_process_studies(
+        self,
+        included_studies,
+        all_studies=None,
+        all_abstract_studies=None,
+        output_dir=None,
+    ):
+        captured["included_studies"] = included_studies
+        captured["all_studies"] = all_studies
+        captured["all_abstract_studies"] = all_abstract_studies
+        return []
+
+    monkeypatch.setattr(
+        "autonima.annotation.processor.AnnotationProcessor.process_studies",
+        fake_process_studies,
+    )
+
+    asyncio.run(pipeline._execute_annotation_phase())
+
+    assert [study.pmid for study in captured["included_studies"]] == ["included"]
+    assert {study.pmid for study in captured["all_studies"]} == {
+        "included",
+        "abstract-excluded",
+        "fulltext-excluded",
+    }
+    assert {study.pmid for study in captured["all_abstract_studies"]} == {
+        "included",
+        "fulltext-excluded",
+    }

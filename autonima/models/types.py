@@ -387,6 +387,9 @@ class PipelineConfig:
                     self.annotation.create_all_included_annotations
                 ),
                 "metadata_fields": self.annotation.metadata_fields,
+                "prompt_type": self.annotation.prompt_type,
+                "inclusion_criteria": self.annotation.inclusion_criteria,
+                "exclusion_criteria": self.annotation.exclusion_criteria,
                 "annotations": [
                     {
                         "name": criteria.name,
@@ -420,6 +423,7 @@ class ScreeningResult:
     timestamp: datetime = field(default_factory=datetime.now)
     inclusion_criteria_applied: List[str] = field(default_factory=list)
     exclusion_criteria_applied: List[str] = field(default_factory=list)
+    cache_signature: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert screening result to dictionary."""
@@ -433,6 +437,7 @@ class ScreeningResult:
             "timestamp": self.timestamp.isoformat(),
             "inclusion_criteria_applied": self.inclusion_criteria_applied,
             "exclusion_criteria_applied": self.exclusion_criteria_applied,
+            "cache_signature": self.cache_signature,
         }
 
 

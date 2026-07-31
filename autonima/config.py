@@ -1,5 +1,6 @@
 """Configuration management and validation for Autonima."""
 
+from copy import deepcopy
 from importlib import resources
 import logging
 from pathlib import Path
@@ -81,6 +82,8 @@ class ConfigManager:
             ConfigurationError: If configuration is invalid
         """
         try:
+            config_dict = self._apply_global_model_defaults(config_dict)
+
             # Build nested configurations
             search_config = SearchConfig(**config_dict.get('search', {}))
 
@@ -145,6 +148,73 @@ class ConfigManager:
 
         except Exception as e:
             raise ConfigurationError(f"Error parsing configuration: {e}")
+
+    def _apply_global_model_defaults(
+        self,
+        config_dict: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Apply defaults.model fallback to all model-related config fields.
+
+        Behavior:
+        - If defaults.model is set, it is used as a fallback when stage-level
+          model fields are missing or blank.
+        - Explicit stage-level model values are preserved.
+        """
+        config_copy = deepcopy(config_dict)
+        defaults = config_copy.get("defaults")
+
+        if defaults is None:
+            return config_copy
+        if not isinstance(defaults, dict):
+            raise ConfigurationError("defaults section must be a mapping")
+
+        global_model = defaults.get("model")
+        if global_model is None:
+            return config_copy
+        if not isinstance(global_model, str) or not global_model.strip():
+            raise ConfigurationError(
+                "defaults.model must be a non-empty string"
+            )
+        global_model = global_model.strip()
+
+        def _set_default_string(
+            section: Dict[str, Any],
+            key: str,
+            fallback_value: str,
+        ) -> None:
+            value = section.get(key)
+            if isinstance(value, str) and value.strip():
+                return
+            section[key] = fallback_value
+
+        screening = config_copy.setdefault("screening", {})
+        if not isinstance(screening, dict):
+            raise ConfigurationError("screening section must be a mapping")
+        for stage in ("abstract", "fulltext"):
+            stage_config = screening.setdefault(stage, {})
+            if not isinstance(stage_config, dict):
+                raise ConfigurationError(
+                    f"screening.{stage} must be a mapping"
+                )
+            _set_default_string(stage_config, "model", global_model)
+
+        annotation = config_copy.setdefault("annotation", {})
+        if not isinstance(annotation, dict):
+            raise ConfigurationError("annotation section must be a mapping")
+        _set_default_string(annotation, "model", global_model)
+
+        parsing = config_copy.setdefault("parsing", {})
+        if not isinstance(parsing, dict):
+            raise ConfigurationError("parsing section must be a mapping")
+        _set_default_string(parsing, "coordinate_model", global_model)
+
+        retrieval = config_copy.setdefault("retrieval", {})
+        if not isinstance(retrieval, dict):
+            raise ConfigurationError("retrieval section must be a mapping")
+        _set_default_string(retrieval, "coordinate_model", global_model)
+
+        return config_copy
 
     def _validate_config(self, config: PipelineConfig) -> None:
         """
