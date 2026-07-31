@@ -36,8 +36,10 @@ retrieval:
   #   - root_path: "/path/to/your/html/files"
   #     pmid_source: "file_name"
   #     allowed_extensions: [".html"]
-  #     # Table source for this specific source (pubget-like format).
-  #     processed_data_path: "/path/to/processed/pubget_like_data"
+  #     # No processed_data_path is required. Autonima runs ACE automatically
+  #     # and stores generated table artifacts under the run output.
+  #     # An existing ACE export can optionally be reused:
+  #     # processed_data_path: "/path/to/processed/ace_data"
   #
   #   # Example: folder-based structure with plain-text files.
   #   - root_path: "/path/to/your/first/full/texts"

@@ -3,10 +3,20 @@
 import pandas as pd
 import json
 import logging
+import csv
+import hashlib
+import os
+import shutil
+import tempfile
+import re
 from pathlib import Path
 from typing import Optional, Union, List, Set, Dict, Any
 from ..models.types import Study, ActivationTable
 from bs4 import BeautifulSoup, Comment
+
+
+class ACEProcessingError(RuntimeError):
+    """Raised when a configured local HTML source cannot be processed by ACE."""
 
 # Try to import readabilipy for enhanced HTML cleaning
 try:
@@ -81,6 +91,222 @@ def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
     raise ValueError(f"No full text found for study with pmcid {study.pmcid}")
 
 
+def _load_ace_api():
+    try:
+        import ace
+        from ace.ingest import extract_and_export
+        from ace.tableparser import (
+            GATING_VERSION,
+            classify_coordinate_table,
+        )
+    except ImportError as exc:
+        raise ACEProcessingError(
+            "ACE is required to process local HTML coordinate tables. "
+            "Install a compatible ACE package or provide a complete "
+            "processed_data_path."
+        ) from exc
+    return ace, extract_and_export, GATING_VERSION, classify_coordinate_table
+
+
+def _table_rows_from_path(path: Path) -> List[List[str]]:
+    if path.suffix.lower() not in {".csv", ".tsv"}:
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",\t;")
+    except csv.Error:
+        dialect = csv.excel_tab if path.suffix.lower() == ".tsv" else csv.excel
+    return list(csv.reader(text.splitlines(), dialect=dialect))
+
+
+def _is_coordinate_candidate_path(path: Path) -> bool:
+    if not path.exists() or not path.is_file():
+        return False
+    _, _, _, classify_coordinate_table = _load_ace_api()
+    suffix = path.suffix.lower()
+    if suffix in {".csv", ".tsv"}:
+        return classify_coordinate_table(
+            rows=_table_rows_from_path(path)
+        ).candidate
+    if suffix in {".html", ".htm", ".xml"}:
+        return classify_coordinate_table(
+            html=path.read_text(encoding="utf-8", errors="replace")
+        ).candidate
+    return False
+
+
+def _normalized_table_id(table_id: Any) -> str:
+    value = str(table_id or "").strip().lower()
+    return re.sub(r"^\d+[_-]+(?=(?:t|tbl)\d)", "", value)
+
+
+def _normalized_table_content(
+    *,
+    path: Optional[Path] = None,
+    raw_table: Optional[str] = None,
+) -> str:
+    rows: List[List[str]] = []
+    if path is not None and path.exists():
+        if path.suffix.lower() in {".csv", ".tsv"}:
+            rows = _table_rows_from_path(path)
+        elif path.suffix.lower() in {".html", ".htm", ".xml"}:
+            raw_table = path.read_text(encoding="utf-8", errors="replace")
+    if raw_table:
+        soup = BeautifulSoup(raw_table, "lxml")
+        rows = [
+            [cell.get_text(" ", strip=True) for cell in row.find_all(
+                ["th", "td", "entry"],
+                recursive=True,
+            )]
+            for row in soup.find_all(["tr", "row"])
+        ]
+    normalized_rows = []
+    for row in rows:
+        normalized = [
+            re.sub(r"\s+", " ", str(cell).replace("−", "-")).strip().lower()
+            for cell in row
+        ]
+        if any(normalized):
+            normalized_rows.append("\x1f".join(normalized))
+    return "\x1e".join(normalized_rows)
+
+
+def _ace_export_complete(processed_path: Optional[Path]) -> bool:
+    if processed_path is None:
+        return False
+    coordinates_file = processed_path / "coordinates.csv"
+    tables_file = processed_path / "tables.csv"
+    if not coordinates_file.is_file() or not tables_file.is_file():
+        return False
+    try:
+        tables_df = pd.read_csv(tables_file)
+    except Exception:
+        return False
+    if "table_raw_file" not in tables_df.columns:
+        return False
+    for raw_path in tables_df["table_raw_file"].dropna():
+        if raw_path and not (processed_path / str(raw_path)).is_file():
+            return False
+    return True
+
+
+def _ace_source_fingerprint(
+    html_files: List[Path],
+    pmids_to_include: Optional[Set[int]],
+) -> Dict[str, Any]:
+    ace, _, gate_version, _ = _load_ace_api()
+    digest = hashlib.sha256()
+    for path in html_files:
+        digest.update(str(path.resolve()).encode("utf-8"))
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    return {
+        "ace_version": getattr(ace, "__version__", "unknown"),
+        "gate_version": gate_version,
+        "pmids": sorted(int(pmid) for pmid in (pmids_to_include or set())),
+        "input_sha256": digest.hexdigest(),
+        "input_count": len(html_files),
+    }
+
+
+def _ensure_ace_export(
+    root_path: Path,
+    configured_processed_path: Optional[Path],
+    generated_processed_path: Path,
+    pmids_to_include: Optional[Set[int]],
+    num_workers: int = 1,
+) -> Path:
+    """Return a complete ACE export, generating a run-managed one if needed."""
+    if _ace_export_complete(configured_processed_path):
+        return configured_processed_path
+
+    generated_processed_path = generated_processed_path.resolve()
+    excluded_roots = {
+        path.resolve()
+        for path in (configured_processed_path, generated_processed_path)
+        if path is not None
+    }
+    html_files = []
+    for path in root_path.rglob("*.html"):
+        try:
+            pmid = int(path.stem)
+        except ValueError:
+            continue
+        if pmids_to_include is not None and pmid not in pmids_to_include:
+            continue
+        resolved = path.resolve()
+        if any(
+            resolved == excluded or excluded in resolved.parents
+            for excluded in excluded_roots
+        ):
+            continue
+        html_files.append(path)
+    html_files.sort(key=lambda path: str(path.resolve()))
+
+    if not html_files:
+        raise ACEProcessingError(
+            f"No PMID-named HTML files were found under {root_path} "
+            "for the current retrieval scope."
+        )
+
+    fingerprint = _ace_source_fingerprint(html_files, pmids_to_include)
+    manifest_path = generated_processed_path / "ace_manifest.json"
+    if _ace_export_complete(generated_processed_path) and manifest_path.is_file():
+        try:
+            if json.loads(manifest_path.read_text(encoding="utf-8")) == fingerprint:
+                return generated_processed_path
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    generated_processed_path.parent.mkdir(parents=True, exist_ok=True)
+    stage_path = Path(tempfile.mkdtemp(
+        prefix=f".{generated_processed_path.name}.",
+        dir=str(generated_processed_path.parent),
+    ))
+    backup_path = generated_processed_path.with_name(
+        f".{generated_processed_path.name}.previous"
+    )
+    try:
+        _, extract_and_export, _, _ = _load_ace_api()
+        extract_and_export(
+            html_files,
+            stage_path,
+            pmid_filenames=True,
+            skip_metadata=True,
+            num_workers=max(1, int(num_workers)),
+            use_readability=False,
+        )
+        if not _ace_export_complete(stage_path):
+            raise ACEProcessingError(
+                f"ACE produced an incomplete export in {stage_path}"
+            )
+        (stage_path / "ace_manifest.json").write_text(
+            json.dumps(fingerprint, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+        if backup_path.exists():
+            shutil.rmtree(backup_path)
+        if generated_processed_path.exists():
+            os.replace(generated_processed_path, backup_path)
+        os.replace(stage_path, generated_processed_path)
+        if backup_path.exists():
+            shutil.rmtree(backup_path)
+    except Exception:
+        if (
+            backup_path.exists()
+            and not generated_processed_path.exists()
+        ):
+            os.replace(backup_path, generated_processed_path)
+        raise
+    finally:
+        if stage_path.exists():
+            shutil.rmtree(stage_path)
+
+    return generated_processed_path
+
+
 def _map_pmids_to_text(
     root_path: Union[str, Path],
     pmid_source: str,
@@ -90,7 +316,11 @@ def _map_pmids_to_text(
     json_filename: str = 'identifiers.json',
     json_pmid_key: str = 'pmid',
     allowed_extensions: Optional[List[str]] = None,
-    processed_data_path: Optional[str] = None
+    processed_data_path: Optional[str] = None,
+    generated_processed_data_path: Optional[Union[str, Path]] = None,
+    ace_num_workers: int = 1,
+    source_name: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> Dict[int, Path]:
     """
     Generically maps PubMed IDs (PMIDs) to their full-text file paths.
@@ -194,17 +424,60 @@ def _map_pmids_to_text(
             if pmids_to_include is None or pmid in pmids_to_include:
                 index[pmid] = text_file_path
 
-    if processed_data_path:
-        # Load activation tables and analyses from source
+    is_html_source = (
+        pmid_source == "file_name"
+        and any(
+            str(extension).lower() in {".html", ".htm"}
+            for extension in (allowed_extensions or [])
+        )
+    )
+    if is_html_source and not index:
+        return index, {}, {}
+    if is_html_source:
+        configured_path = (
+            Path(processed_data_path)
+            if processed_data_path
+            else None
+        )
+        if _ace_export_complete(configured_path):
+            processed_data_path = configured_path
+        elif generated_processed_data_path is None:
+            raise ValueError(
+                "generated_processed_data_path is required when processing "
+                "a local HTML source without a complete ACE export"
+            )
+        else:
+            try:
+                processed_data_path = _ensure_ace_export(
+                    root_path=root,
+                    configured_processed_path=configured_path,
+                    generated_processed_path=Path(generated_processed_data_path),
+                    pmids_to_include=pmids_to_include,
+                    num_workers=ace_num_workers,
+                )
+            except ACEProcessingError:
+                raise
+            except Exception as exc:
+                raise ACEProcessingError(
+                    f"ACE failed while processing HTML source {root}: {exc}"
+                ) from exc
+    elif processed_data_path:
         processed_data_path = Path(processed_data_path)
 
     analyses, tables = load_activation_table_map(
         processed_data_path=processed_data_path,
         processed_coordinate_paths=processed_coordinate_paths,
         ids_to_include=pmids_to_include,
-        filter_by_coordinates=True,
+        filter_by_coordinates=not is_html_source,
         identifier_key='pmid',
     )
+
+    if coordinates_path_templates:
+        _append_sibling_candidate_tables(
+            tables=tables,
+            text_paths=index,
+            ids_to_include=pmids_to_include,
+        )
 
     return index, analyses, tables
 
@@ -343,6 +616,97 @@ def _load_activation_table_metadata(
     return id_to_tables
 
 
+def _append_sibling_candidate_tables(
+    tables: Dict[Any, List[Dict[str, Any]]],
+    text_paths: Dict[int, Path],
+    ids_to_include: Optional[Set[int]] = None,
+) -> None:
+    """Add coordinate-like sibling table files omitted by coordinates.json."""
+    supported = {".csv", ".tsv", ".html", ".htm", ".xml"}
+    for pmid, text_path in text_paths.items():
+        if ids_to_include is not None and pmid not in ids_to_include:
+            continue
+        article_dir = text_path.parent
+        table_dir = article_dir / "tables"
+        if not table_dir.is_dir():
+            continue
+
+        existing = tables.setdefault(pmid, [])
+        existing_ids = {
+            _normalized_table_id(item.get("table_id"))
+            for item in existing
+        }
+        existing_paths = {
+            str(Path(path).resolve())
+            for item in existing
+            for path in (
+                item.get("table_raw_path"),
+                item.get("table_data_path"),
+            )
+            if path
+        }
+        existing_content = {
+            signature
+            for item in existing
+            for signature in [_normalized_table_content(
+                path=Path(
+                    item.get("table_raw_path")
+                    or item.get("table_data_path")
+                )
+                if (
+                    item.get("table_raw_path")
+                    or item.get("table_data_path")
+                )
+                else None,
+                raw_table=item.get("raw_table"),
+            )]
+            if signature
+        }
+        for candidate_path in sorted(table_dir.rglob("*")):
+            if (
+                not candidate_path.is_file()
+                or candidate_path.suffix.lower() not in supported
+            ):
+                continue
+            table_id = candidate_path.stem
+            normalized_id = _normalized_table_id(table_id)
+            resolved = str(candidate_path.resolve())
+            normalized_content = _normalized_table_content(
+                path=candidate_path,
+            )
+            if (
+                normalized_id in existing_ids
+                or resolved in existing_paths
+                or (
+                    normalized_content
+                    and normalized_content in existing_content
+                )
+            ):
+                continue
+            if not _is_coordinate_candidate_path(candidate_path):
+                continue
+            existing.append({
+                "table_id": table_id,
+                "table_label": table_id,
+                "table_raw_path": (
+                    resolved
+                    if candidate_path.suffix.lower() in {".html", ".htm", ".xml"}
+                    else None
+                ),
+                "table_data_path": (
+                    resolved
+                    if candidate_path.suffix.lower() in {".csv", ".tsv"}
+                    else None
+                ),
+                "table_caption": None,
+                "table_foot": None,
+            })
+            existing_ids.add(normalized_id)
+            existing_paths.add(resolved)
+            if normalized_content:
+                existing_content.add(normalized_content)
+
+
 def _load_analyses_from_coordinates_df(
     coords_df: pd.DataFrame,
     ids_to_include: Optional[Set[str]] = None,
@@ -414,6 +778,7 @@ def load_activation_table_map(
     ids_to_include: Optional[Set[str]] = None,
     filter_by_coordinates: bool = True,
     identifier_key: str = "pmcid",
+    fallback_candidate_gate: bool = False,
 ) -> tuple[Optional[Dict[str, List[Dict[str, Any]]]], Dict[str, List[Dict[str, Any]]]]:
     """
     Core function: Load and (optionally) filter activation tables.
@@ -456,12 +821,39 @@ def load_activation_table_map(
         try:
             df = pd.read_csv(tables_file)
 
-            # Optional coordinate filtering
+            # Optional coordinate filtering, with a recall-oriented ACE fallback
+            # for source tables rejected by the source's first-pass gate.
             if filter_by_coordinates and coords_df is not None:
-                df = df[
-                    df.set_index([identifier_key, "table_id"]).index
-                    .isin(coords_df.set_index([identifier_key, "table_id"]).index)
-                ]
+                coordinate_index = coords_df.set_index(
+                    [identifier_key, "table_id"]
+                ).index
+                selected_mask = df.set_index(
+                    [identifier_key, "table_id"]
+                ).index.isin(coordinate_index)
+                if fallback_candidate_gate:
+                    fallback_mask = []
+                    for selected, (_, row) in zip(
+                        selected_mask,
+                        df.iterrows(),
+                    ):
+                        if selected:
+                            fallback_mask.append(True)
+                            continue
+                        raw_file = row.get("table_raw_file")
+                        data_file = row.get("table_data_file")
+                        relative_path = (
+                            raw_file if pd.notna(raw_file) and raw_file
+                            else data_file
+                        )
+                        fallback_mask.append(bool(
+                            relative_path
+                            and _is_coordinate_candidate_path(
+                                processed_data_path / str(relative_path)
+                            )
+                        ))
+                    df = df[fallback_mask]
+                else:
+                    df = df[selected_mask]
 
             tables = _load_activation_table_metadata(
                 df=df,

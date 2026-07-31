@@ -24,7 +24,7 @@ Each item in `full_text_sources` maps PMIDs to local files and, optionally, to a
 - `json_pmid_key`
   Key in the JSON file that contains the PMID
 - `processed_data_path`
-  Path to pubget-like processed coordinate/table CSVs
+  Optional path to existing pubget-like or ACE coordinate/table CSVs
 - `coordinates_path_templates`
   Relative coordinate-file templates when coordinates are stored near each source item
 
@@ -71,7 +71,20 @@ full_text_sources:
 
 ## Coordinates and Tables
 
-You have two ways to attach coordinate/table context:
+PMID-named HTML sources do not require preprocessed coordinate files:
+
+```yaml
+full_text_sources:
+  - root_path: "/data/html"
+    pmid_source: "file_name"
+    allowed_extensions: [".html"]
+```
+
+Autonima runs ACE automatically and stores the generated export under the
+run's `retrieval/ace` directory. If `processed_data_path` points to a complete
+existing ACE export, Autonima reuses it instead.
+
+For non-HTML sources, you have two ways to attach coordinate/table context:
 
 1. `processed_data_path`
    Use a directory containing pubget-like processed CSV outputs such as `coordinates.csv` and `tables.csv`.

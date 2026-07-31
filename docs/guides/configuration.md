@@ -132,7 +132,9 @@ Common fields:
 - `allowed_extensions`: valid file extensions for `file_name` mode
 - `json_filename`: metadata filename for `json` mode
 - `json_pmid_key`: key holding the PMID in the JSON metadata
-- `processed_data_path`: path to pubget-like processed coordinate/table CSVs
+- `processed_data_path`: optional path to existing pubget-like or ACE
+  coordinate/table CSVs. It is not required for PMID-named HTML sources;
+  Autonima runs ACE and caches its export under the run output.
 - `coordinates_path_templates`: direct coordinate-file templates when not using processed CSVs
 
 Important interaction:

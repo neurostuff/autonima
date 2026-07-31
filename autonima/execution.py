@@ -14,6 +14,8 @@ from uuid import uuid4
 
 import yaml
 
+from .coordinates.prompts import COORDINATE_PARSING_PROMPT_VERSION
+
 logger = logging.getLogger(__name__)
 
 CACHE_POLICIES = {"auto", "ignore", "trust-legacy"}
@@ -162,7 +164,8 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
         "parsing": _pick(
             parsing or retrieval,
             ["parse_coordinates", "coordinate_model"],
-        ),
+        )
+        | {"prompt_version": COORDINATE_PARSING_PROMPT_VERSION},
         "annotation": _pick(
             annotation,
             [
