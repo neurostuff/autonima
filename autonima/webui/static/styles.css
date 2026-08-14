@@ -866,6 +866,90 @@ button.danger:hover {
   margin-top: 12px;
 }
 
+.cache-plan {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #b9d2eb;
+  border-radius: 12px;
+  background: #f7fbff;
+}
+
+.cache-plan.warning {
+  border-color: #e7b36a;
+  background: #fff8ed;
+}
+
+.cache-plan-header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.cache-plan-header span,
+.cache-plan-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cache-plan-destination {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.cache-plan-destination span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.cache-plan-destination code {
+  overflow-wrap: anywhere;
+}
+
+.cache-plan-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.cache-plan-stage {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d9e5f0;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.cache-plan-stage > span,
+.cache-plan-stage small {
+  color: var(--muted);
+}
+
+.cache-plan-stage > span {
+  font-size: 12px;
+}
+
+.cache-plan-stage strong {
+  font-size: 13px;
+}
+
+.cache-plan-stage small {
+  line-height: 1.35;
+}
+
+.cache-plan-stage.incremental strong {
+  color: var(--ok);
+}
+
+.cache-plan-stage.unverified strong {
+  color: var(--secondary-dark);
+}
+
 .run-card-header {
   display: flex;
   align-items: flex-start;

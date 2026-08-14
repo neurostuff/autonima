@@ -292,7 +292,7 @@ def _run_pipeline_command(
     type=click.Choice(sorted(CACHE_POLICIES)),
     default="auto",
     show_default=True,
-    help="How Autonima should treat existing cache artifacts.",
+    help="'auto' reuses verified per-input results; 'ignore' recomputes generated results.",
 )
 @click.option(
     "--clear-cache",
@@ -377,7 +377,7 @@ def run(
     type=click.Choice(sorted(CACHE_POLICIES)),
     default="auto",
     show_default=True,
-    help="How Autonima should treat existing cache artifacts.",
+    help="'auto' reuses verified per-input results; 'ignore' recomputes generated results.",
 )
 @click.option(
     "--clear-cache",
@@ -440,7 +440,7 @@ def run_search(
     type=click.Choice(sorted(CACHE_POLICIES)),
     default="auto",
     show_default=True,
-    help="How Autonima should treat existing cache artifacts.",
+    help="'auto' reuses verified per-input results; 'ignore' recomputes generated results.",
 )
 @click.option(
     "--clear-cache",

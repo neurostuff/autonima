@@ -15,7 +15,12 @@ from uuid import uuid4
 import yaml
 
 from autonima.config import ConfigManager
-from autonima.execution import complete_execution_progress, preview_execution_changes
+from autonima.execution import (
+    UnsupportedCacheError,
+    complete_execution_progress,
+    preview_execution_changes,
+    stable_hash,
+)
 
 from .progress import build_stage_status
 from .state import WorkspaceState, utc_now_iso
@@ -157,28 +162,96 @@ class RunManager:
         resolved_output: Path,
         execution_mode: str,
         cache_source_output: Optional[Path] = None,
+        cache_policy: str = "auto",
+        clear_cache: Optional[List[str]] = None,
+        use_existing_source: bool = True,
     ) -> tuple[Path, Optional[str], Dict[str, Any]]:
-        """Default UI behavior: branch to a new output when signatures changed."""
-        if execution_mode != "auto_new_on_change":
-            return resolved_output, None, {}
+        """Resolve the destination and preview the exact shared cache plan."""
         source_output = cache_source_output or resolved_output
-        try:
-            config = ConfigManager().load_from_file(runtime_config_path)
-            config.output.directory = str(source_output)
-            preview = preview_execution_changes(config, source_output)
-        except Exception:
-            return resolved_output, None, {}
+        config = ConfigManager().load_from_file(runtime_config_path)
+        config.output.directory = str(source_output)
+        preview = preview_execution_changes(
+            config,
+            source_output,
+            cache_policy=cache_policy,
+            clear_cache=clear_cache or [],
+        )
+        unchanged_target = source_output if use_existing_source else resolved_output
 
-        if not preview.get("changed_stages"):
-            return source_output, None, preview
+        def copy_source() -> Optional[str]:
+            if cache_policy == "ignore" or source_output == unchanged_target:
+                return None
+            return str(source_output)
+
+        if execution_mode != "auto_new_on_change":
+            return unchanged_target, copy_source(), preview
+
+        explicit_refresh = cache_policy == "ignore" or bool(clear_cache)
+        should_branch = bool(
+            source_output == unchanged_target
+            and preview.get("has_cache_artifacts")
+            and not preview.get("unsupported_cache")
+            and (preview.get("changed_stages") or explicit_refresh)
+        )
+        if not should_branch:
+            return unchanged_target, copy_source(), preview
 
         execution_name = (
             time.strftime("%Y%m%d-%H%M%S")
             + "-"
-            + str(preview.get("stage_hashes", {}).get("output", ""))[:8]
+            + stable_hash(preview.get("stage_hashes", {}))[:8]
         )
         branched_output = resolved_output / "executions" / execution_name
         return branched_output, str(source_output), preview
+
+    def preview_pipeline_run(
+        self,
+        project: Dict[str, Any],
+        *,
+        output_folder: Optional[str],
+        cache_policy: str = "auto",
+        clear_cache: Optional[List[str]] = None,
+        copy_valid_cache_from: Optional[str] = None,
+        execution_mode: str = "auto_new_on_change",
+    ) -> Dict[str, Any]:
+        """Preview source, destination, and per-stage cache actions for the UI."""
+        config_path = Path(project["config_path"]).expanduser().resolve()
+        resolved_output = self._resolve_output_folder(config_path, output_folder)
+        previous_output_raw = str(project.get("last_output_folder") or "").strip()
+        previous_output = (
+            Path(previous_output_raw).expanduser().resolve()
+            if previous_output_raw
+            else None
+        )
+        if previous_output and not previous_output.exists():
+            previous_output = None
+        explicit_source = (
+            Path(copy_valid_cache_from).expanduser().resolve()
+            if copy_valid_cache_from
+            else None
+        )
+        source_output = explicit_source or (
+            resolved_output if output_folder else (previous_output or resolved_output)
+        )
+        use_existing_source = not output_folder and not explicit_source
+        destination, copy_from, preview = self._maybe_create_execution_output(
+            config_path,
+            resolved_output,
+            execution_mode,
+            cache_source_output=source_output,
+            cache_policy=cache_policy,
+            clear_cache=clear_cache or [],
+            use_existing_source=use_existing_source,
+        )
+        return {
+            **preview,
+            "destination_output": str(destination),
+            "copy_valid_cache_from": (
+                copy_from if cache_policy != "ignore" else None
+            ),
+            "branched_from_output_folder": copy_from,
+            "execution_mode": execution_mode,
+        }
 
     def _build_meta_command(
         self,
@@ -346,27 +419,46 @@ class RunManager:
         )
 
         resolved_output = self._resolve_output_folder(config_path, output_folder)
-        cache_preview: Dict[str, Any] = {}
-        branched_from: Optional[str] = None
-        if not output_folder:
-            previous_output_raw = str(project.get("last_output_folder") or "").strip()
-            previous_output = (
-                Path(previous_output_raw).expanduser().resolve()
-                if previous_output_raw
-                else None
+        previous_output_raw = str(project.get("last_output_folder") or "").strip()
+        previous_output = (
+            Path(previous_output_raw).expanduser().resolve()
+            if previous_output_raw
+            else None
+        )
+        if previous_output and not previous_output.exists():
+            previous_output = None
+        explicit_source = (
+            Path(copy_valid_cache_from).expanduser().resolve()
+            if copy_valid_cache_from
+            else None
+        )
+        source_output = explicit_source or (
+            resolved_output if output_folder else (previous_output or resolved_output)
+        )
+        use_existing_source = not output_folder and not explicit_source
+        resolved_output, branched_from, cache_preview = (
+            self._maybe_create_execution_output(
+                runtime_config_path,
+                resolved_output,
+                execution_mode,
+                cache_source_output=source_output,
+                cache_policy=cache_policy,
+                clear_cache=clear_cache or [],
+                use_existing_source=use_existing_source,
             )
-            if previous_output and not previous_output.exists():
-                previous_output = None
-            resolved_output, branched_from, cache_preview = (
-                self._maybe_create_execution_output(
-                    runtime_config_path,
-                    resolved_output,
-                    execution_mode,
-                    cache_source_output=previous_output,
-                )
+        )
+        if cache_policy == "auto" and cache_preview.get("unsupported_cache"):
+            unverified_stages = ", ".join(
+                cache_preview.get("unverified_stages", [])
             )
-            if branched_from and not copy_valid_cache_from:
-                copy_valid_cache_from = branched_from
+            detail = f" ({unverified_stages})" if unverified_stages else ""
+            raise UnsupportedCacheError(
+                "This output folder contains results that this version cannot "
+                f"verify{detail}. Choose 'Recompute generated results' to use "
+                "the folder without reusing them."
+            )
+        if branched_from and cache_policy != "ignore":
+            copy_valid_cache_from = branched_from
         metadata = self._base_metadata(
             run_id=run_id,
             project_id=project["id"],
@@ -390,6 +482,9 @@ class RunManager:
         )
         metadata["cache_preview"] = cache_preview
         metadata["branched_from_output_folder"] = branched_from
+        metadata["cache_copied_forward"] = bool(
+            branched_from and cache_policy != "ignore"
+        )
         metadata["execution_mode"] = execution_mode
 
         env = os.environ.copy()
@@ -398,13 +493,10 @@ class RunManager:
 
         run_ids = list(project.get("run_ids", []))
         run_ids.append(run_id)
-        self.state.update_project(
-            project["id"],
-            {
-                "run_ids": run_ids,
-                "last_output_folder": str(resolved_output),
-            },
-        )
+        project_updates: Dict[str, Any] = {"run_ids": run_ids}
+        if not dry_run:
+            project_updates["last_output_folder"] = str(resolved_output)
+        self.state.update_project(project["id"], project_updates)
 
         return managed.metadata
 

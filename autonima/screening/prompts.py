@@ -3,6 +3,10 @@
 from typing import List
 from ..models.types import Study, StudyStatus
 from ..utils.criteria import CriteriaMapping
+from ..cache_versions import (
+    ABSTRACT_SCREENING_PROMPT_VERSION,
+    FULLTEXT_SCREENING_PROMPT_VERSION,
+)
 
 
 class PromptLibrary:

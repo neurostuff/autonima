@@ -11,11 +11,19 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from .base import ScreeningEngine
-from .prompts import PromptLibrary
+from .prompts import (
+    ABSTRACT_SCREENING_PROMPT_VERSION,
+    FULLTEXT_SCREENING_PROMPT_VERSION,
+    PromptLibrary,
+)
 from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
-from ..execution import stable_hash
+from ..execution import (
+    CACHE_SCHEMA_VERSION,
+    stable_hash,
+    study_full_text_content_hash,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +204,7 @@ class LLMScreener(ScreeningEngine):
         self.force_reextract_incomplete_fulltext = (
             force_reextract_incomplete_fulltext
         )
+        self.cache_stats: Dict[str, Dict[str, int]] = {}
         # Load existing results
         self._existing_abstract_results = self._load_existing_results(
             "abstract"
@@ -286,15 +295,19 @@ class LLMScreener(ScreeningEngine):
             payload.update(
                 {
                     "pmcid": study.pmcid,
-                    "fulltext_available": study.fulltext_available,
+                    "fulltext_available": bool(
+                        study.fulltext_available
+                        or study.full_text_path
+                        or study.pmcid
+                    ),
                 }
             )
-            try:
-                if not study.full_text_output_dir:
-                    study.full_text_output_dir = str(self.result_dir)
-                payload["full_text_hash"] = stable_hash(study.full_text)
-            except Exception:
-                payload["full_text_hash"] = None
+            if not study.full_text_output_dir:
+                study.full_text_output_dir = str(self.result_dir)
+            payload["full_text_hash"] = study_full_text_content_hash(
+                study,
+                self.result_dir,
+            )
         return stable_hash(payload)
 
     def _screening_cache_signature(
@@ -308,10 +321,17 @@ class LLMScreener(ScreeningEngine):
             "model",
             "gpt-4o-mini" if screening_type == "abstract" else "gpt-4",
         )
+        prompt_version = (
+            ABSTRACT_SCREENING_PROMPT_VERSION
+            if screening_type == "abstract"
+            else FULLTEXT_SCREENING_PROMPT_VERSION
+        )
         return {
-            "schema_version": 1,
+            "schema_version": CACHE_SCHEMA_VERSION,
             "stage": screening_type,
-            "stage_hash": stable_hash(config),
+            "stage_hash": stable_hash(
+                {**config, "prompt_version": prompt_version}
+            ),
             "study_input_hash": self._study_input_hash(study, screening_type),
             "model": model,
         }
@@ -321,10 +341,8 @@ class LLMScreener(ScreeningEngine):
         existing_result: Dict[str, Any],
         expected_signature: Dict[str, Any],
     ) -> bool:
-        """Return True for valid signed caches; allow legacy unsigned caches."""
+        """Return True only for complete modern cache signatures."""
         cached_signature = existing_result.get("cache_signature")
-        if not cached_signature:
-            return True
         return cached_signature == expected_signature
 
     def _get_status_for_decision(
@@ -676,6 +694,11 @@ class LLMScreener(ScreeningEngine):
             len(studies_to_screen),
             len(existing_results),
         )
+        self.cache_stats[screening_type] = {
+            "eligible": len(screenable_studies),
+            "reused": len(existing_results),
+            "processed": len(studies_to_screen),
+        }
 
         # Process studies that need screening
         new_results = []

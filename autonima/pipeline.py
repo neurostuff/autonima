@@ -15,6 +15,7 @@ from .config import ConfigManager
 from .models.types import (
     PipelineConfig,
     PipelineResult,
+    Study,
     StudyStatus
 )
 from .search import PubMedSearch
@@ -29,10 +30,13 @@ from .retrieval.utils import (
 from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
 from .execution import (
+    CACHE_SCHEMA_VERSION,
     complete_execution_manifest,
     complete_execution_progress,
+    coordinate_study_input_hash,
     initialize_execution_progress,
     prepare_execution,
+    stable_hash,
     update_execution_progress_stage,
 )
 
@@ -71,6 +75,7 @@ class AutonimaPipeline:
         cache_policy: str = "auto",
         clear_cache: List[str] | None = None,
         copy_valid_cache_from: str | None = None,
+        stop_after_stage: RunStopStage = "full",
     ):
         """
         Initialize the pipeline with configuration.
@@ -86,6 +91,7 @@ class AutonimaPipeline:
         self.cache_policy = cache_policy
         self.clear_cache = clear_cache or []
         self.copy_valid_cache_from = copy_valid_cache_from
+        self.stop_after_stage = stop_after_stage
         self.results = PipelineResult(
             config=config,
             started_at=datetime.now()
@@ -105,6 +111,7 @@ class AutonimaPipeline:
             cache_policy=self.cache_policy,
             clear_cache=self.clear_cache,
             copy_valid_cache_from=self.copy_valid_cache_from,
+            stop_after_stage=self.stop_after_stage,
         )
         self.stage_hashes = self.execution_manifest.get("stage_hashes", {})
         initialize_execution_progress(output_dir, self.execution_manifest)
@@ -149,7 +156,7 @@ class AutonimaPipeline:
             raise
 
         counters = self._stage_counters(stage)
-        source = "not_applicable" if counters.get("status") in {"Off", "Skipped"} else "fresh"
+        source = self._stage_source(stage, counters)
         status = "skipped" if counters.get("status") in {"Off", "Skipped"} else "completed"
         self._update_progress_stage(
             stage,
@@ -158,10 +165,22 @@ class AutonimaPipeline:
             counters=counters,
         )
 
+    def _stage_source(self, stage: str, counters: Dict[str, Any]) -> str:
+        if counters.get("status") in {"Off", "Skipped"}:
+            return "not_applicable"
+        reused = int(counters.get("reused", 0) or 0)
+        processed = int(counters.get("processed", 0) or 0)
+        if reused and processed:
+            return "mixed"
+        if reused and not processed:
+            return "cache"
+        return "fresh"
+
     def _stage_counters(self, stage: str) -> Dict[str, Any]:
         if stage == "search":
             return {
                 "studies_found": len(self.results.studies),
+                **getattr(self._search_engine, "cache_stats", {}),
             }
         if stage == "abstract":
             abstract_results = self.results.abstract_screening_results
@@ -178,6 +197,7 @@ class AutonimaPipeline:
                     "screened": len(abstract_results),
                     "included": included,
                     "excluded": excluded,
+                    **self._screener.cache_stats.get("abstract", {}),
                 }
             return {
                 "screened": len([s for s in self.results.studies if s.status != StudyStatus.PENDING]),
@@ -212,6 +232,7 @@ class AutonimaPipeline:
                 "included": included,
                 "excluded": excluded,
                 "incomplete": incomplete,
+                **self._screener.cache_stats.get("fulltext", {}),
             }
         if stage == "parsing":
             stats = self.results.execution_stats.get("coordinate_parsing", {})
@@ -231,6 +252,8 @@ class AutonimaPipeline:
                 "studies": len(studies_with_analyses),
                 "analyses": analyses,
                 "coordinates": coordinates,
+                "reused": stats.get("studies_reused", 0) if isinstance(stats, dict) else 0,
+                "processed": stats.get("tables_processed", 0) if isinstance(stats, dict) else 0,
             }
         if stage == "annotation":
             stats = self.results.execution_stats.get("annotation", {})
@@ -418,7 +441,7 @@ class AutonimaPipeline:
             "studies": [study.to_dict() for study in studies],
             "timestamp": datetime.now().isoformat(),
             "cache_signature": {
-                "schema_version": 1,
+                "schema_version": CACHE_SCHEMA_VERSION,
                 "stage": "search",
                 "stage_hash": self.stage_hashes.get("search"),
             },
@@ -480,7 +503,7 @@ class AutonimaPipeline:
             ],
             "timestamp": datetime.now().isoformat(),
             "cache_signature": {
-                "schema_version": 1,
+                "schema_version": CACHE_SCHEMA_VERSION,
                 "stage": "abstract",
                 "stage_hash": self.stage_hashes.get("abstract"),
             },
@@ -731,7 +754,7 @@ class AutonimaPipeline:
             ],
             "timestamp": datetime.now().isoformat(),
             "cache_signature": {
-                "schema_version": 1,
+                "schema_version": CACHE_SCHEMA_VERSION,
                 "stage": "retrieval",
                 "stage_hash": self.stage_hashes.get("retrieval"),
             },
@@ -819,7 +842,7 @@ class AutonimaPipeline:
             ],
             "timestamp": datetime.now().isoformat(),
             "cache_signature": {
-                "schema_version": 1,
+                "schema_version": CACHE_SCHEMA_VERSION,
                 "stage": "fulltext",
                 "stage_hash": self.stage_hashes.get("fulltext"),
             },
@@ -848,6 +871,14 @@ class AutonimaPipeline:
             }
             return
     
+        # Capture the exact per-study inputs before cached parsed analyses are
+        # applied or fresh parsing mutates the studies.
+        self._coordinate_input_hashes = {
+            study.pmid: self._coordinate_study_input_hash(study)
+            for study in self.results.studies
+        }
+        self._coordinate_cache_loaded = 0
+
         # Load cached coordinate parsing results
         await self._load_cached_coordinate_results()
  
@@ -865,6 +896,7 @@ class AutonimaPipeline:
                 "enabled": True,
                 "studies_with_tables": 0,
                 "tables_processed": 0,
+                "studies_reused": self._coordinate_cache_loaded,
             }
             return
  
@@ -894,6 +926,7 @@ class AutonimaPipeline:
                 "enabled": True,
                 "studies_with_tables": len(studies_with_tables),
                 "tables_processed": 0,
+                "studies_reused": self._coordinate_cache_loaded,
             }
             return
         
@@ -963,6 +996,7 @@ class AutonimaPipeline:
             "enabled": True,
             "studies_with_tables": len(studies_with_tables),
             "tables_processed": processed_count,
+            "studies_reused": self._coordinate_cache_loaded,
         }
  
     async def _execute_annotation_phase(self):
@@ -1088,9 +1122,26 @@ class AutonimaPipeline:
         self.results.execution_stats["annotation"] = {
             "enabled": True,
             "decisions": len(annotation_results),
+            **processor.cache_stats,
         }
             
  
+    def _coordinate_study_input_hash(self, study: Study) -> str:
+        """Hash all study inputs that can affect coordinate parsing output."""
+        return coordinate_study_input_hash(study)
+
+    def _coordinate_cache_signature(self, study: Study) -> Dict[str, Any]:
+        return {
+            "schema_version": CACHE_SCHEMA_VERSION,
+            "stage": "parsing",
+            "stage_hash": self.stage_hashes.get("parsing"),
+            "study_input_hash": getattr(
+                self,
+                "_coordinate_input_hashes",
+                {},
+            ).get(study.pmid) or self._coordinate_study_input_hash(study),
+        }
+
     async def _load_cached_coordinate_results(self):
         """Load cached coordinate parsing results."""
         try:
@@ -1106,11 +1157,11 @@ class AutonimaPipeline:
                 cached_data = json.load(f)
 
             cache_signature = cached_data.get("cache_signature") or {}
-            cached_stage_hash = cache_signature.get("stage_hash")
-            if (
-                cached_stage_hash
-                and cached_stage_hash != self.stage_hashes.get("parsing")
-            ):
+            if cache_signature != {
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "stage": "parsing",
+                "stage_hash": self.stage_hashes.get("parsing"),
+            }:
                 logger.info(
                     "Skipping stale coordinate parsing cache for current parsing signature"
                 )
@@ -1122,8 +1173,10 @@ class AutonimaPipeline:
             
             for study in self.results.studies:
                 if study.pmid in cached_studies and not any(a.parsed for a in study.analyses):
-                    study.analyses = []
                     cached_study = cached_studies[study.pmid]
+                    if cached_study.get("cache_signature") != self._coordinate_cache_signature(study):
+                        continue
+                    study.analyses = []
                     # Load analyses from cached data
                     if 'analyses' in cached_study:
                         from .coordinates.schema import Analysis, CoordinatePoint, PointsValue
@@ -1149,6 +1202,8 @@ class AutonimaPipeline:
                                 table_id=analysis_data.get('table_id')
                             ))
                         loaded_count += 1
+
+            self._coordinate_cache_loaded = loaded_count
             
             logger.debug(
                 f"Loaded cached coordinate parsing results for {loaded_count} studies"
@@ -1174,11 +1229,13 @@ class AutonimaPipeline:
                 "studies": [
                     {
                         "pmid": study.pmid,
+                        "cache_signature": self._coordinate_cache_signature(study),
                         "analyses": [
                             {
                                 "name": analysis.name,
                                 "description": analysis.description,
                                 "table_id": analysis.table_id,
+                                "parsed": analysis.parsed,
                                 "points": [
                                     {
                                         "coordinates": point.coordinates,
@@ -1201,7 +1258,7 @@ class AutonimaPipeline:
                 ],
                 "timestamp": datetime.now().isoformat(),
                 "cache_signature": {
-                    "schema_version": 1,
+                    "schema_version": CACHE_SCHEMA_VERSION,
                     "stage": "parsing",
                     "stage_hash": self.stage_hashes.get("parsing"),
                 },
@@ -1571,5 +1628,6 @@ async def run_pipeline_from_config(
         cache_policy=cache_policy,
         clear_cache=clear_cache,
         copy_valid_cache_from=copy_valid_cache_from,
+        stop_after_stage=stop_after_stage,
     )
     return await pipeline.run(stop_after_stage=stop_after_stage)

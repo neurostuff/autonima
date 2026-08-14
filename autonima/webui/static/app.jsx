@@ -12,6 +12,15 @@ const BUILD_STEPS = [
   ["parsing_annotation", "Parsing + Annotation"],
   ["review", "Review"],
 ];
+const CACHE_STAGE_LABELS = {
+  search: "Study search",
+  abstract: "Abstract screening",
+  retrieval: "Full-text retrieval",
+  fulltext: "Full-text screening",
+  parsing: "Coordinate parsing",
+  annotation: "Analysis annotation",
+  output: "Final outputs",
+};
 
 function formatApiError(payload) {
   if (payload == null) {
@@ -128,6 +137,13 @@ function formatBytes(value) {
     unitIndex += 1;
   }
   return `${current.toFixed(current >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function cacheActionLabel(item) {
+  const action = item?.action || "recompute";
+  if (action === "incremental") return "Reuse verified entries";
+  if (action === "unverified") return "Cannot reuse";
+  return "Recompute";
 }
 
 function buildMetaArtifactUrl(runId, relativePath) {
@@ -487,6 +503,9 @@ function App() {
     copy_valid_cache_from: "",
     execution_mode: "auto_new_on_change",
   });
+  const [runPreview, setRunPreview] = useState(null);
+  const [runPreviewBusy, setRunPreviewBusy] = useState(false);
+  const [runPreviewError, setRunPreviewError] = useState("");
 
   const [metaForm, setMetaForm] = useState({
     output_folder: "",
@@ -553,7 +572,20 @@ function App() {
   );
   const selectedMetaSourceOutputFolder = selectedMetaSourceRun?.output_folder || "";
   const metaAnalysisEnabled = Boolean(selectedMetaSourceRun);
-  const selectedOutputFolder = selectedRun?.output_folder || selectedMetaSourceOutputFolder || runForm.output_folder || "";
+  const selectedOutputFolder = runPreview?.destination_output || runForm.output_folder || "";
+  const previewStageIds = runForm.mode === "run-search"
+    ? ["search"]
+    : runForm.mode === "run-abstract"
+      ? ["search", "abstract"]
+      : Object.keys(CACHE_STAGE_LABELS);
+  const runPreviewStages = previewStageIds
+    .map((stage) => [stage, runPreview?.stages?.[stage]])
+    .filter(([, item]) => Boolean(item));
+  const runStartBlocked = Boolean(
+    runPreviewBusy
+    || runPreviewError
+    || (runForm.cache_policy === "auto" && runPreview?.unsupported_cache)
+  );
   const activeScreeningRun = useMemo(
     () => {
       const candidates = [];
@@ -809,6 +841,54 @@ function App() {
       refreshRuns().catch((err) => setStatusMsg({ type: "error", text: err.message }));
     }
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setRunPreview(null);
+      setRunPreviewError("");
+      setRunPreviewBusy(false);
+      return undefined;
+    }
+
+    let mounted = true;
+    const timer = setTimeout(async () => {
+      setRunPreviewBusy(true);
+      setRunPreviewError("");
+      try {
+        const payload = {
+          ...runForm,
+          output_folder: runForm.output_folder || null,
+          copy_valid_cache_from: runForm.copy_valid_cache_from || null,
+          clear_cache: runForm.clear_cache || [],
+        };
+        const preview = await api(`/api/projects/${selectedProjectId}/run-preview`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        if (mounted) setRunPreview(preview);
+      } catch (err) {
+        if (mounted) {
+          setRunPreview(null);
+          setRunPreviewError(err.message);
+        }
+      } finally {
+        if (mounted) setRunPreviewBusy(false);
+      }
+    }, 350);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [
+    selectedProjectId,
+    runForm.mode,
+    runForm.output_folder,
+    runForm.execution_mode,
+    runForm.cache_policy,
+    runForm.copy_valid_cache_from,
+    JSON.stringify(runForm.clear_cache || []),
+  ]);
 
   useEffect(() => {
     if (editorTab !== "runs" || !currentExecutionRun?.id) return;
@@ -1200,7 +1280,7 @@ function App() {
       return (
         <div className="run-results-empty">
           {hasReset
-            ? "Results were reset for this rerun and will appear as each stage is evaluated."
+            ? "Results that require recomputation will appear as each stage is evaluated."
             : "Results will appear here as Autonima writes stage outputs."}
         </div>
       );
@@ -2218,9 +2298,11 @@ function App() {
       await refreshRuns();
       setStatusMsg({
         type: "ok",
-        text: run.branched_from_output_folder
+        text: run.cache_copied_forward
           ? "Run started in a new execution folder with valid cache copied forward."
-          : "Run started.",
+          : run.branched_from_output_folder
+            ? "Run started in a new execution folder."
+            : "Run started.",
       });
     } catch (err) {
       setStatusMsg({ type: "error", text: err.message });
@@ -3566,7 +3648,7 @@ function App() {
                     <button
                       className={`primary run-action-button ${screeningRunInProgress ? "run-action-cancel" : "run-action-start"}`}
                       onClick={screeningRunInProgress ? cancelRun : startRun}
-                      disabled={screeningRunInProgress ? !currentExecutionRun : false}
+                      disabled={screeningRunInProgress ? !currentExecutionRun : runStartBlocked}
                       aria-live="polite"
                     >
                       {screeningRunInProgress ? (
@@ -3601,6 +3683,51 @@ function App() {
                     </div>
                   </div>
 
+                  <div className={`cache-plan ${runPreview?.unsupported_cache ? "warning" : ""}`}>
+                    <div className="cache-plan-header">
+                      <div>
+                        <strong>Planned work</strong>
+                        <span>
+                          {runPreviewBusy
+                            ? "Checking existing results…"
+                            : runPreviewError
+                              ? runPreviewError
+                              : runPreview?.unsupported_cache
+                                ? "These existing results cannot be verified. Choose recompute to replace them."
+                                : "Verified results are reused study by study; only missing or changed inputs are processed."}
+                        </span>
+                      </div>
+                    </div>
+                    {runPreview && !runPreviewBusy ? (
+                      <>
+                        <div className="cache-plan-destination">
+                          <span>Run destination</span>
+                          <code>{runPreview.destination_output}</code>
+                        </div>
+                        {runPreview.copy_valid_cache_from ? (
+                          <div className="cache-plan-destination">
+                            <span>Reuse from</span>
+                            <code>{runPreview.copy_valid_cache_from}</code>
+                          </div>
+                        ) : null}
+                        <div className="cache-plan-stages">
+                          {runPreviewStages.map(([stage, item]) => (
+                            <div className={`cache-plan-stage ${item.action}`} key={stage}>
+                              <span>{CACHE_STAGE_LABELS[stage] || stage}</span>
+                              <strong>{cacheActionLabel(item)}</strong>
+                              <small>{item.reason}</small>
+                            </div>
+                          ))}
+                        </div>
+                        {runForm.mode !== "run" ? (
+                          <div className="cache-plan-note">
+                            Later pipeline stages are not run and remain untouched.
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+
                   <details className="advanced-panel">
                     <summary>Advanced</summary>
                     <div className="advanced-content">
@@ -3633,24 +3760,23 @@ function App() {
                       ) : null}
                       <div className="grid-3" style={{ marginTop: 10 }}>
                         <div>
-                          <label>Execution Behavior</label>
+                          <label>When settings change</label>
                           <select
                             value={runForm.execution_mode}
                             onChange={(e) => setRunForm((prev) => ({ ...prev, execution_mode: e.target.value }))}
                           >
-                            <option value="auto_new_on_change">New folder when spec changed</option>
-                            <option value="in_place">Run in selected output folder</option>
+                            <option value="auto_new_on_change">Keep prior run; create a new folder</option>
+                            <option value="in_place">Update the selected folder in place</option>
                           </select>
                         </div>
                         <div>
-                          <label>Cache Policy</label>
+                          <label>Existing results</label>
                           <select
                             value={runForm.cache_policy}
                             onChange={(e) => setRunForm((prev) => ({ ...prev, cache_policy: e.target.value }))}
                           >
-                            <option value="auto">auto</option>
-                            <option value="ignore">ignore</option>
-                            <option value="trust-legacy">trust-legacy</option>
+                            <option value="auto">Reuse verified results (recommended)</option>
+                            <option value="ignore">Recompute generated results</option>
                           </select>
                         </div>
                         <div>
@@ -3985,7 +4111,11 @@ function App() {
                       {(currentExecutionRun.progress?.timeline || []).map((stage) => (
                         <div key={stage.stage} className={`stage ${stage.status}`}>
                           <div style={{ fontWeight: 700 }}>{stage.stage}</div>
-                          <div>{stage.status}</div>
+                          <div>
+                            {stage.status}
+                            {stage.source === "cache" ? " · reused" : ""}
+                            {stage.source === "mixed" ? " · reused + new" : ""}
+                          </div>
                         </div>
                       ))}
                     </div>
