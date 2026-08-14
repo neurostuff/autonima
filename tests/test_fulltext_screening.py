@@ -206,3 +206,98 @@ def test_force_reextract_incomplete_fulltext_bypasses_cache():
             mock_client.screen_fulltext.assert_called_once()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_expanding_fulltext_eligibility_screens_only_new_studies():
+    """Signed full-text decisions survive an expanded eligible study set."""
+    temp_dir = Path(tempfile.mkdtemp())
+    try:
+        _write_fulltext_csv(
+            temp_dir,
+            "123456",
+            "Introduction Methods Results Discussion",
+        )
+        config = _build_fulltext_config()
+
+        with patch("autonima.screening.screener.GenericLLMClient") as client_class:
+            client = MagicMock()
+            client_class.return_value = client
+            response = MagicMock()
+            response.decision = "INCLUDED"
+            response.confidence = 0.95
+            response.reason = "Meets all inclusion criteria"
+            response.fulltext_incomplete = False
+            response.inclusion_criteria_applied = []
+            response.exclusion_criteria_applied = []
+            client.screen_fulltext.return_value = response
+
+            first_screener = LLMScreener(config, output_dir=str(temp_dir))
+            first_results = asyncio.run(
+                first_screener.screen_fulltexts(
+                    [_build_fulltext_study("EXISTING")]
+                )
+            )
+            assert len(first_results) == 1
+            assert first_screener.cache_stats["fulltext"] == {
+                "eligible": 1,
+                "reused": 0,
+                "processed": 1,
+            }
+
+            client.screen_fulltext.reset_mock()
+            expanded_screener = LLMScreener(config, output_dir=str(temp_dir))
+            expanded_results = asyncio.run(
+                expanded_screener.screen_fulltexts(
+                    [
+                        _build_fulltext_study("EXISTING"),
+                        _build_fulltext_study("NEW"),
+                    ]
+                )
+            )
+
+            assert {result.study_id for result in expanded_results} == {
+                "EXISTING",
+                "NEW",
+            }
+            assert expanded_screener.cache_stats["fulltext"] == {
+                "eligible": 2,
+                "reused": 1,
+                "processed": 1,
+            }
+            client.screen_fulltext.assert_called_once()
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_migration_unverified_fulltext_signature_is_not_reused():
+    """An unavailable legacy input marker makes an otherwise valid miss."""
+    temp_dir = Path(tempfile.mkdtemp())
+    try:
+        _write_fulltext_csv(
+            temp_dir,
+            "123456",
+            "Introduction Methods Results Discussion",
+        )
+        study = _build_fulltext_study("MIGRATED")
+        config = _build_fulltext_config()
+        screener = LLMScreener(config, output_dir=str(temp_dir))
+        signature = screener._screening_cache_signature(
+            study,
+            "fulltext",
+            config.fulltext,
+        )
+        migrated_signature = {
+            **signature,
+            "migration_input_unverified": True,
+        }
+
+        assert screener._cached_signature_matches(
+            {"cache_signature": signature},
+            signature,
+        )
+        assert not screener._cached_signature_matches(
+            {"cache_signature": migrated_signature},
+            signature,
+        )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

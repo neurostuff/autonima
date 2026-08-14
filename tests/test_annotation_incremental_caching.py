@@ -125,6 +125,7 @@ def test_study_based_caching_custom_annotations():
         # Create annotation config with custom annotations
         config = AnnotationConfig(
             create_all_included_annotations=False,
+            prompt_type="single_analysis",
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -199,6 +200,7 @@ def test_study_based_caching_mixed_annotations():
         # Create annotation config with both types
         config = AnnotationConfig(
             create_all_included_annotations=True,
+            prompt_type="single_analysis",
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -269,6 +271,7 @@ def test_partial_cache_replacement():
         # Create annotation config
         config = AnnotationConfig(
             create_all_included_annotations=True,
+            prompt_type="single_analysis",
             annotations=[
                 AnnotationCriteriaConfig(
                     name="test_annotation",
@@ -328,6 +331,7 @@ def test_partial_cache_replacement():
             # Now modify the config to test cache replacement
             config2 = AnnotationConfig(
                 create_all_included_annotations=True,
+                prompt_type="single_analysis",
                 annotations=[
                     AnnotationCriteriaConfig(
                         name="test_annotation_v2",  # Different annotation name

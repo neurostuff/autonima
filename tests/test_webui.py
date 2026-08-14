@@ -582,6 +582,10 @@ output:
     config = ConfigManager().load_from_file(runtime_config)
     config.output.directory = str(previous_output)
     prepare_execution(config, previous_output)
+    (previous_output / "outputs" / "final_results.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
 
     manager = RunManager(WorkspaceState(tmp_path), secrets_provider=lambda: {})
     resolved, branched_from, preview = manager._maybe_create_execution_output(
@@ -612,6 +616,18 @@ output:
     assert resolved_changed.parent == tmp_path / "base" / "executions"
     assert branched_from_changed == str(previous_output)
     assert preview_changed["changed_stages"] == ["fulltext"]
+
+    in_place, in_place_source, in_place_preview = (
+        manager._maybe_create_execution_output(
+            changed_config,
+            previous_output,
+            "in_place",
+            cache_source_output=previous_output,
+        )
+    )
+    assert in_place == previous_output
+    assert in_place_source is None
+    assert in_place_preview["changed_stages"] == ["fulltext"]
 
 
 def test_meta_run_tracks_source_without_overwriting_screening_output(tmp_path, monkeypatch):

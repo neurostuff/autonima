@@ -56,6 +56,18 @@ Useful options:
 - `--debug` for post-mortem debugging on errors
 - `-j` / `--num-workers` to control parallel screening workers
 - `--force-reextract-incomplete-fulltext` to re-run full-text screening for cached `fulltext_incomplete` studies using current files
+- `--cache-policy auto` (the default) to reuse only verified results
+- `--cache-policy ignore` to recompute generated results in the selected output folder
+- `--clear-cache STAGE` to recompute one stage; repeat the option for more stages
+- `--copy-valid-cache-from FOLDER` to seed a new output folder with verified cache entries
+
+## How Reruns Reuse Work
+
+The default cache policy validates work per stage and, where applicable, per study. A rerun therefore processes only new or changed inputs while retaining valid decisions for unchanged studies.
+
+Changing one stage's settings does not automatically discard unrelated downstream decisions. For example, changing `retrieval.load_excluded` refreshes the retrieval scope, but existing full-text screening decisions are still checked study by study and reused when their full-text input and screening settings match. Final derived outputs are always regenerated from the results selected by the current run.
+
+If an output folder contains results that the current cache schema cannot verify, `auto` stops instead of trusting them. Use `--cache-policy ignore` only when you intend to replace those generated results.
 
 ## Run Search Only
 
@@ -80,7 +92,7 @@ autonima run-abstract config.yaml
 
 This runs search plus abstract screening, then stops before full-text retrieval.
 
-`run-abstract` always reruns upstream stages for the current invocation; it does not reuse cached search results as an input shortcut.
+`run-abstract` uses the same verified, per-input cache policy as `run`. It stops after abstract screening and leaves downstream artifacts untouched.
 
 Useful options:
 

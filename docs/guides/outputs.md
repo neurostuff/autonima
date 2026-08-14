@@ -23,9 +23,12 @@ projects/cue_reactivity/default/
 │   ├── abstract_screening_results.json
 │   ├── fulltext_retrieval_results.json
 │   ├── fulltext_screening_results.json
+│   ├── execution_manifest.json
+│   ├── execution_progress.json
+│   ├── config.executed.yaml
 │   ├── final_results.json
-│   ├── incomplete_fulltext.txt
-│   ├── incomplete_fulltext.csv
+│   ├── missing_fulltexts.txt
+│   ├── missing_fulltexts.csv
 │   ├── criteria_mapping.json
 │   ├── coordinate_parsing_results.json
 │   ├── nimads_studyset.json
@@ -64,11 +67,17 @@ Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-orien
 
 - final included/excluded status and execution outputs
 
-## `outputs/incomplete_fulltext.txt`
+## Execution and cache records
+
+- `execution_manifest.json` records the exact semantic hashes and cache plan for the run.
+- `execution_progress.json` records per-stage status and whether work was fresh, reused, or mixed.
+- `config.executed.yaml` is the normalized runtime config snapshot used for that output folder.
+
+## `outputs/missing_fulltexts.txt`
 
 - PMIDs where full-text screening returned `fulltext_incomplete`
 
-## `outputs/incomplete_fulltext.csv`
+## `outputs/missing_fulltexts.csv`
 
 - PMIDs where full-text screening returned `fulltext_incomplete`
 - includes `full_text_path` to help locate/fix the problematic source text
@@ -103,5 +112,6 @@ Created by `autonima meta`. Contains one directory per annotation column and the
 ## Practical Notes
 
 - The CLI runtime output path may differ from the `output.directory` stored in YAML.
-- If you rerun with the same output folder, Autonima may reuse cached intermediary artifacts such as search results and annotation results.
+- If you rerun with the same output folder, Autonima reuses only signed entries whose stage settings and per-study inputs still match.
+- Final exports are regenerated even when every upstream decision is reused.
 - When documenting or sharing a run, include both the config file and the resolved runtime output folder.
