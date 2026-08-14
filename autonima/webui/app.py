@@ -456,6 +456,24 @@ def create_app(
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/projects/{project_id}/run-preview")
+    async def preview_pipeline_run(project_id: str, payload: PipelineRunRequest):
+        project = state.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        try:
+            return run_manager.preview_pipeline_run(
+                project=project,
+                output_folder=payload.output_folder,
+                cache_policy=payload.cache_policy,
+                clear_cache=payload.clear_cache,
+                copy_valid_cache_from=payload.copy_valid_cache_from,
+                execution_mode=payload.execution_mode,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/projects/{project_id}/meta-runs")
     async def start_meta_run(project_id: str, payload: MetaRunRequest):
         project = state.get_project(project_id)

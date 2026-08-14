@@ -41,6 +41,7 @@ class PubMedSearch(SearchEngine):
         self.max_retries = 3
         self.retry_delay = 1.0
         self.result_dir = output_dir
+        self.cache_stats = {"reused": 0, "processed": 0}
 
     async def search(self, query: str) -> List[Study]:
         """
@@ -109,6 +110,10 @@ class PubMedSearch(SearchEngine):
                 for pmid in pmids
                 if pmid in cached_by_pmid or pmid in new_by_pmid
             ]
+            self.cache_stats = {
+                "reused": sum(1 for pmid in pmids if pmid in cached_by_pmid),
+                "processed": sum(1 for pmid in pmids if pmid in new_by_pmid),
+            }
 
             return studies
 

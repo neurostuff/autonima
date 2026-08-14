@@ -9,10 +9,16 @@ from tqdm import tqdm
 
 from .schema import AnnotationConfig, AnnotationDecision, AnalysisMetadata, AnnotationCriteriaConfig
 from .client import AnnotationClient
+from .prompts import ANNOTATION_PROMPT_VERSION
 from ..models.types import Study
 from ..coordinates.schema import Analysis
 from ..coordinates.nimads_models import sanitize_analysis_name
 from ..utils import log_error_with_debug
+from ..execution import (
+    CACHE_SCHEMA_VERSION,
+    stable_hash,
+    study_full_text_content_hash,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +39,57 @@ class AnnotationProcessor:
         self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
+        self.stage_hash = stable_hash(
+            {
+                **self.config.model_dump(),
+                "prompt_version": ANNOTATION_PROMPT_VERSION,
+            }
+        )
+        self.cache_stats = {"reused": 0, "processed": 0}
+        self._signature_cache: dict[tuple[str, str], dict] = {}
+
+    def _study_input_hash(self, study: Study) -> str:
+        """Hash the exact metadata and analyses supplied to annotation prompts."""
+        metadata_fields = [
+            field
+            for field in self.config.metadata_fields
+            if field != "study_fulltext"
+        ]
+        group = self._build_study_analysis_group(
+            study,
+            metadata_fields,
+        )
+        payload = {"study_analysis_group": group}
+        if "study_fulltext" in self.config.metadata_fields:
+            payload["study_fulltext_hash"] = study_full_text_content_hash(study)
+        return stable_hash(payload)
+
+    def _cache_signature(self, study: Study, annotation_name: str) -> dict:
+        key = (study.pmid, annotation_name)
+        cached = self._signature_cache.get(key)
+        if cached is not None:
+            return dict(cached)
+        signature = {
+            "schema_version": CACHE_SCHEMA_VERSION,
+            "stage": "annotation",
+            "stage_hash": self.stage_hash,
+            "study_input_hash": self._study_input_hash(study),
+            "annotation_name": annotation_name,
+        }
+        self._signature_cache[key] = signature
+        return dict(signature)
+
+    def _sign_decisions(
+        self,
+        study: Study,
+        decisions: List[AnnotationDecision],
+    ) -> List[AnnotationDecision]:
+        for decision in decisions:
+            decision.cache_signature = self._cache_signature(
+                study,
+                decision.annotation_name,
+            )
+        return decisions
     
     def process_studies(
         self,
@@ -56,6 +113,10 @@ class AnnotationProcessor:
         Returns:
             List of annotation decisions
         """
+        # Study objects may have been rehydrated or reparsed since a previous
+        # call on this processor, so per-call signatures must start fresh.
+        self._signature_cache.clear()
+
         # Load existing cached results
         existing_cached_results = self._load_cached_results(output_dir) or []
         
@@ -65,7 +126,7 @@ class AnnotationProcessor:
             and not all_abstract_studies
         ):
             logger.info("No studies with analyses found for annotation")
-            return existing_cached_results
+            return []
 
         if included_studies:
             logger.info(
@@ -149,12 +210,37 @@ class AnnotationProcessor:
         # Return only results eligible for this execution. Cached decisions
         # for studies that no longer pass current screening can remain on disk
         # for reuse, but must not flow into current outputs.
-        return self._filter_cached_results_for_current_run(
+        eligible_results = self._filter_cached_results_for_current_run(
             self._load_cached_results(output_dir) or [],
             included_studies=included_studies or [],
             all_studies=all_studies or [],
             all_abstract_studies=all_abstract_studies or [],
         )
+        processed_keys = {
+            (decision.study_id, decision.analysis_id, decision.annotation_name)
+            for decision in all_decisions
+        }
+        self.cache_stats = {
+            "processed": sum(
+                1
+                for decision in eligible_results
+                if (
+                    decision.study_id,
+                    decision.analysis_id,
+                    decision.annotation_name,
+                ) in processed_keys
+            ),
+            "reused": sum(
+                1
+                for decision in eligible_results
+                if (
+                    decision.study_id,
+                    decision.analysis_id,
+                    decision.annotation_name,
+                ) not in processed_keys
+            ),
+        }
+        return eligible_results
     
     def _create_all_analyses_annotations(
         self,
@@ -186,6 +272,10 @@ class AnnotationProcessor:
                     include=True,
                     reasoning=f"All analyses included in '{annotation_name}'",
                     model_used="none"
+                )
+                decision.cache_signature = self._cache_signature(
+                    study,
+                    annotation_name,
                 )
                 decisions.append(decision)
         
@@ -244,6 +334,10 @@ class AnnotationProcessor:
                         reasoning=f"All analyses included in '{annotation_name}'",
                         model_used="none"
                     )
+                    decision.cache_signature = self._cache_signature(
+                        study,
+                        annotation_name,
+                    )
                     decisions.append(decision)
         else:
             logger.info(f"All studies already have complete results for '{annotation_name}' annotation")
@@ -301,6 +395,7 @@ class AnnotationProcessor:
                     study_decisions = self._process_single_study_annotations(
                         study, self.config.metadata_fields, annotations_to_process, model
                     )
+                    self._sign_decisions(study, study_decisions)
                     decisions.extend(study_decisions)
                 except Exception as e:
                     logger.error(f"Error processing annotations for study {study.pmid}: {e}")
@@ -318,6 +413,8 @@ class AnnotationProcessor:
                 for future in tqdm(as_completed(future_to_study), total=len(studies_to_process), desc="Processing studies"):
                     try:
                         study_decisions = future.result()
+                        study, _ = future_to_study[future]
+                        self._sign_decisions(study, study_decisions)
                         decisions.extend(study_decisions)
                     except Exception as e:
                         study, annotations_to_process = future_to_study[future]
@@ -405,7 +502,16 @@ class AnnotationProcessor:
         # Check which studies have complete results
         studies_with_complete_results = set()
         for study_id, analyses_count in study_analysis_count.items():
-            if study_id in study_results and len(study_results[study_id]) == analyses_count:
+            study = next(item for item in studies if item.pmid == study_id)
+            expected_signature = self._cache_signature(study, annotation_name)
+            cached = study_results.get(study_id, [])
+            if (
+                len(cached) == analyses_count
+                and all(
+                    result.cache_signature == expected_signature
+                    for result in cached
+                )
+            ):
                 studies_with_complete_results.add(study_id)
         
         return studies_with_complete_results
@@ -418,21 +524,25 @@ class AnnotationProcessor:
         all_abstract_studies: List[Study],
     ) -> List[AnnotationDecision]:
         """Filter cached annotation decisions to the current eligibility graph."""
-        included_ids = {study.pmid for study in included_studies}
-        all_ids = {study.pmid for study in all_studies}
-        abstract_ids = {study.pmid for study in all_abstract_studies}
+        included_by_id = {study.pmid: study for study in included_studies}
+        all_by_id = {study.pmid: study for study in all_studies}
+        abstract_by_id = {study.pmid: study for study in all_abstract_studies}
         custom_names = {annotation.name for annotation in self.config.annotations}
 
         filtered: List[AnnotationDecision] = []
         for result in results:
             name = result.annotation_name
-            if name == "all_studies" and result.study_id in all_ids:
-                filtered.append(result)
-            elif name == "all_abstract" and result.study_id in abstract_ids:
-                filtered.append(result)
-            elif name == "all_analyses" and result.study_id in included_ids:
-                filtered.append(result)
-            elif name in custom_names and result.study_id in included_ids:
+            study = None
+            if name == "all_studies":
+                study = all_by_id.get(result.study_id)
+            elif name == "all_abstract":
+                study = abstract_by_id.get(result.study_id)
+            elif name == "all_analyses" or name in custom_names:
+                study = included_by_id.get(result.study_id)
+            if (
+                study is not None
+                and result.cache_signature == self._cache_signature(study, name)
+            ):
                 filtered.append(result)
 
         return filtered
@@ -456,12 +566,10 @@ class AnnotationProcessor:
             Set of annotation names with complete results
         """
         # Count existing results per annotation for this study
-        annotation_counts = {}
+        annotation_results = {}
         for result in existing_results:
             if result.study_id == study_id:
-                if result.annotation_name not in annotation_counts:
-                    annotation_counts[result.annotation_name] = 0
-                annotation_counts[result.annotation_name] += 1
+                annotation_results.setdefault(result.annotation_name, []).append(result)
         
         # Get expected number of analyses from the study itself
         expected_count = len(study.analyses)
@@ -473,7 +581,15 @@ class AnnotationProcessor:
         # Check which annotations have complete results
         annotations_with_complete_results = set()
         for annotation in all_annotations:
-            if annotation_counts.get(annotation.name, 0) == expected_count:
+            cached = annotation_results.get(annotation.name, [])
+            expected_signature = self._cache_signature(study, annotation.name)
+            if (
+                len(cached) == expected_count
+                and all(
+                    result.cache_signature == expected_signature
+                    for result in cached
+                )
+            ):
                 annotations_with_complete_results.add(annotation.name)
         
         return annotations_with_complete_results
@@ -627,6 +743,12 @@ class AnnotationProcessor:
         tables = []
         if study.activation_tables:
             for table in study.activation_tables:
+                if not table.table_id:
+                    logger.debug(
+                        "Skipping activation table without an ID for study %s",
+                        study.pmid,
+                    )
+                    continue
                 tables.append(TableMetadata(
                     table_id=table.table_id,
                     caption=table.table_caption,

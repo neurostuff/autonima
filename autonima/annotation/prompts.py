@@ -3,6 +3,7 @@
 from typing import List
 from collections import defaultdict
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, TableMetadata, StudyAnalysisGroup
+from ..cache_versions import ANNOTATION_PROMPT_VERSION
 
 
 def create_study_multi_annotation_prompt(
