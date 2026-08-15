@@ -6,6 +6,35 @@ from pydantic import BaseModel
 import openai
 
 
+MODEL_PREFIX_ENV = "AUTONIMA_MODEL_PREFIX"
+
+
+def resolve_model_name(model: Optional[str]) -> Optional[str]:
+    """Qualify a bare model name with the gateway prefix from the environment.
+
+    Some gateways (e.g. Portkey) route on a provider-qualified model name such as
+    ``@my-provider-slug/gpt-5-mini-2025-08-07``. Keeping that prefix in config files
+    hard-codes one deployment into every config and, because the model string is part
+    of each stage's cache signature, changing it invalidates otherwise-valid cached
+    screening results. So the prefix is applied here, at request time only, and never
+    written back into the config object.
+
+    A model name that is already provider-qualified (contains ``/``) is returned
+    unchanged, so configs that pin a full name keep working and are never double-prefixed.
+
+    Only the leading provider segment of the environment value is used, so both
+    ``@my-provider-slug`` and a full ``@my-provider-slug/some-model`` are accepted. The
+    latter is a common way to write it down, and taking the first segment keeps each
+    config's own model choice intact instead of overriding it.
+    """
+    if not model:
+        return model
+    prefix = os.getenv(MODEL_PREFIX_ENV, "").strip().strip("/").split("/")[0]
+    if not prefix or "/" in model:
+        return model
+    return f"{prefix}/{model}"
+
+
 class GenericLLMClient:
     """Generic LLM API client for various tasks."""
     

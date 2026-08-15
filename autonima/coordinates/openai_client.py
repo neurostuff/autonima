@@ -3,7 +3,7 @@
 import math
 from typing import Type
 from pydantic import BaseModel
-from ..llm.client import GenericLLMClient
+from ..llm.client import GenericLLMClient, resolve_model_name
 from .schema import ParseAnalysesOutput
 
 
@@ -90,7 +90,7 @@ class CoordinateParsingClient(GenericLLMClient):
 
         # Call the LLM API
         response = self.client.chat.completions.create(
-            model=model,
+            model=resolve_model_name(model),
             messages=[
                 {
                     "role": "system",

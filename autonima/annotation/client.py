@@ -5,7 +5,7 @@ import logging
 from types import SimpleNamespace
 from typing import List, Dict, Any, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
-from ..llm.client import GenericLLMClient
+from ..llm.client import GenericLLMClient, resolve_model_name
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
 from ..utils import log_error_with_debug
 
@@ -303,7 +303,7 @@ class AnnotationClient:
             
             # Call the LLM API with function calling
             response = self._client.client.chat.completions.create(
-                model=model,
+                model=resolve_model_name(model),
                 messages=[
                     {
                         "role": "system",
@@ -626,7 +626,7 @@ class AnnotationClient:
         """
         try:
             response = self._client.client.chat.completions.create(
-                model=model,
+                model=resolve_model_name(model),
                 messages=messages,
                 response_format=response_format
             )
