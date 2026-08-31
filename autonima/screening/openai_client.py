@@ -1,8 +1,8 @@
 """LLM API client for systematic review screening."""
 
-from typing import Type, Dict, Any
+from typing import Type, Dict, Any, Optional
 from pydantic import BaseModel
-from ..llm.client import GenericLLMClient, resolve_model_name
+from ..llm.client import GenericLLMClient, resolve_model_name, resolve_model_kwargs
 from .schema import AbstractScreeningOutput, FullTextScreeningOutput
 
 
@@ -70,7 +70,8 @@ class ScreeningLLMClient(GenericLLMClient):
     def screen_abstract(
         self,
         prompt: str,
-        model: str = "gpt-4"
+        model: str = "gpt-4",
+        model_params: Optional[Dict[str, Any]] = None
     ) -> AbstractScreeningOutput:
         """Screen an abstract using LLM API with function calling.
         
@@ -105,7 +106,8 @@ class ScreeningLLMClient(GenericLLMClient):
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name}
+            function_call={"name": func_name},
+                **resolve_model_kwargs(model, model_params)
         )
         
         # Extract the function call result
@@ -121,7 +123,8 @@ class ScreeningLLMClient(GenericLLMClient):
     def screen_fulltext(
         self,
         prompt: str,
-        model: str = "gpt-4"
+        model: str = "gpt-4",
+        model_params: Optional[Dict[str, Any]] = None
     ) -> FullTextScreeningOutput:
         """Screen a full-text using LLM API with function calling.
         
@@ -156,7 +159,8 @@ class ScreeningLLMClient(GenericLLMClient):
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name}
+            function_call={"name": func_name},
+                **resolve_model_kwargs(model, model_params)
         )
         
         # Extract the function call result

@@ -1,9 +1,9 @@
 """LLM client for coordinate parsing tasks."""
 
 import math
-from typing import Type
+from typing import Type, Dict, Any, Optional
 from pydantic import BaseModel
-from ..llm.client import GenericLLMClient, resolve_model_name
+from ..llm.client import GenericLLMClient, resolve_model_name, resolve_model_kwargs
 from .schema import ParseAnalysesOutput
 
 
@@ -70,7 +70,8 @@ class CoordinateParsingClient(GenericLLMClient):
     def parse_analyses(
         self,
         prompt: str,
-        model: str = "gpt-4o-mini"
+        model: str = "gpt-4o-mini",
+        model_params: Optional[Dict[str, Any]] = None
     ) -> ParseAnalysesOutput:
         """Parse neuroimaging results table into distinct analyses with metadata.
         
@@ -106,7 +107,8 @@ class CoordinateParsingClient(GenericLLMClient):
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name}
+            function_call={"name": func_name},
+                **resolve_model_kwargs(model, model_params)
         )
         
         # Extract the function call result

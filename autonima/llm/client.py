@@ -1,5 +1,6 @@
 """Generic LLM API client for systematic review tasks."""
 
+import json
 import os
 from typing import Optional, Type, Dict, Any
 from pydantic import BaseModel
@@ -7,6 +8,55 @@ import openai
 
 
 MODEL_PREFIX_ENV = "AUTONIMA_MODEL_PREFIX"
+MODEL_PARAMS_ENV = "AUTONIMA_MODEL_PARAMS"
+
+
+def resolve_model_kwargs(
+    model: Optional[str] = None,
+    config_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Extra keyword arguments to pass to the chat-completions call for this model.
+
+    Every stage builds its request with an explicit kwarg list, so before this existed there
+    was no way to send a model-specific parameter and some models were simply unusable. The
+    concrete case: reasoning models reject function tools unless ``reasoning_effort`` is set,
+    e.g. ``gpt-5.6-luna`` returns ``400 Function tools with reasoning_effort are not supported
+    ... set reasoning_effort to 'none'``. Since all three stages use function calling, such a
+    model could not be used at all.
+
+    Two sources, merged in order of increasing precedence:
+
+    1. ``AUTONIMA_MODEL_PARAMS`` -- a JSON object in the environment. Either flat, applying to
+       every model (``{"reasoning_effort": "none"}``), or keyed by model name so one deployment
+       can hold settings for several models (``{"gpt-5.6-luna": {"reasoning_effort": "none"}}``).
+       Keys are matched against the model name BEFORE the gateway prefix is applied, and a
+       substring match is accepted so a dated name such as ``gpt-5-mini-2025-08-07`` is covered
+       by the key ``gpt-5-mini``.
+    2. ``config_params`` -- a per-stage ``model_params`` block from the config file.
+
+    Kept out of the stage cache signature deliberately: like the gateway prefix, these are
+    deployment details rather than part of the semantic definition of a run, so changing one
+    must not invalidate otherwise-valid cached results.
+    """
+    out: Dict[str, Any] = {}
+    raw = os.getenv(MODEL_PARAMS_ENV, "").strip()
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict):
+            nested = {k: v for k, v in parsed.items() if isinstance(v, dict)}
+            if nested:
+                bare = (model or "").split("/")[-1]
+                for key, params in nested.items():
+                    if key and (key in bare or bare in key):
+                        out.update(params)
+            else:
+                out.update(parsed)
+    if config_params:
+        out.update(config_params)
+    return out
 
 
 def resolve_model_name(model: Optional[str]) -> Optional[str]:
