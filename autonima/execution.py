@@ -24,6 +24,7 @@ from .cache_versions import (
     FULLTEXT_SCREENING_PROMPT_VERSION,
 )
 from .coordinates.prompts import COORDINATE_PARSING_PROMPT_VERSION
+from .llm import usage as llm_usage
 
 logger = logging.getLogger(__name__)
 
@@ -1019,6 +1020,15 @@ def update_execution_progress_stage(
     elif status in {"completed", "skipped"} and not item.get("counters"):
         item["counters"] = _read_stage_counters(output_dir, stage)
 
+    # Token/cost accounting for whatever this execution actually computed. Incremental stages
+    # only call the API for uncached items, so this is the cost of *this run* rather than of
+    # building the artifact from scratch -- `counters` above says how much was reused. Absent
+    # when a stage made no calls (fully cached, disabled, or non-LLM).
+    if status in {"completed", "skipped", "failed"}:
+        stage_usage = llm_usage.snapshot(stage)
+        if stage_usage:
+            item["usage"] = stage_usage
+
     progress["status"] = "failed" if status == "failed" else "running"
     progress["current_stage"] = stage if status == "running" else None
     progress["updated_at"] = now
@@ -1054,6 +1064,28 @@ def complete_execution_progress(
                 item["status"] = "skipped"
                 item["source"] = "not_applicable"
                 item["completed_at"] = now
+
+    # Run-level roll-up. Summed from the per-stage records already on the progress file rather
+    # than from the accumulator, so a resumed run that reused earlier stages still reports the
+    # cost of everything this file describes.
+    stage_usage = [
+        item.get("usage")
+        for item in progress.get("stages", [])
+        if isinstance(item, dict) and isinstance(item.get("usage"), dict)
+    ]
+    if stage_usage:
+        costs = [u.get("cost_usd") for u in stage_usage]
+        progress["usage_total"] = {
+            "calls": sum(u.get("calls", 0) for u in stage_usage),
+            "input_tokens": sum(u.get("input_tokens", 0) for u in stage_usage),
+            "uncached_input_tokens": sum(u.get("uncached_input_tokens", 0) for u in stage_usage),
+            "cached_input_tokens": sum(u.get("cached_input_tokens", 0) for u in stage_usage),
+            "output_tokens": sum(u.get("output_tokens", 0) for u in stage_usage),
+            # None if any stage used an unpriced model: a partial total would read as a full one.
+            "cost_usd": (
+                round(sum(costs), 6) if all(c is not None for c in costs) else None
+            ),
+        }
     write_execution_progress(output_dir, progress)
 
 

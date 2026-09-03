@@ -12,6 +12,7 @@ import concurrent.futures
 from tqdm import tqdm
 
 from .config import ConfigManager
+from .llm import usage as llm_usage
 from .models.types import (
     PipelineConfig,
     PipelineResult,
@@ -142,6 +143,9 @@ class AutonimaPipeline:
         )
 
     async def _run_progress_stage(self, stage: str, func) -> None:
+        # Clear any usage carried over from an earlier attempt at this stage, so the recorded
+        # tokens describe exactly this execution of it.
+        llm_usage.reset(stage)
         self._update_progress_stage(stage, status="running", source="fresh")
         try:
             await func()

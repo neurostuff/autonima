@@ -4,6 +4,7 @@ import math
 from typing import Type, Dict, Any, Optional
 from pydantic import BaseModel
 from ..llm.client import GenericLLMClient, resolve_model_name, resolve_model_kwargs
+from ..llm.usage import record as record_usage
 from .schema import ParseAnalysesOutput
 
 
@@ -110,6 +111,7 @@ class CoordinateParsingClient(GenericLLMClient):
             function_call={"name": func_name},
                 **resolve_model_kwargs(model, model_params)
         )
+        record_usage("parsing", resolve_model_name(model), getattr(response, "usage", None))
         
         # Extract the function call result
         function_call = response.choices[0].message.function_call
