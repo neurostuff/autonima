@@ -80,6 +80,8 @@ screening:
     # confidence_reporting: false  # Optional, default false.
     # threshold: 0.9  # Optional probability cutoff.
     # additional_instructions: "Pay special attention to sample sizes."
+    # model_params:  # Optional. Passed through to the model API call.
+    #   reasoning_effort: "none"  # Required by gpt-5.6-* with function tools.
 
   fulltext:
     model: "gpt-5-mini-2025-08-07"
@@ -99,6 +101,8 @@ screening:
     # confidence_reporting: false
     # threshold: 0.95
     # additional_instructions: "Focus on methodological rigor."
+    # model_params:
+    #   reasoning_effort: "none"
 
 parsing:
   parse_coordinates: true

@@ -486,6 +486,7 @@ class LLMScreener(ScreeningEngine):
                 "model",
                 "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"
             )
+            model_params = config.get("model_params") or {}
             
             # Call LLM API
             screen_method = (
@@ -493,7 +494,11 @@ class LLMScreener(ScreeningEngine):
                 if screening_type == "abstract"
                 else self._llm_client.screen_fulltext
             )
-            response = screen_method(prompt, model)
+            response = (
+                screen_method(prompt, model, model_params=model_params)
+                if model_params
+                else screen_method(prompt, model)
+            )
                 
             # Process response to get decision string
             decision_str, reason = self._process_screening_response(

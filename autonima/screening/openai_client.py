@@ -1,6 +1,6 @@
 """LLM API client for systematic review screening."""
 
-from typing import Type, Dict, Any
+from typing import Type, Dict, Any, Optional
 from pydantic import BaseModel
 from ..llm.client import GenericLLMClient, resolve_model_name
 from .schema import AbstractScreeningOutput, FullTextScreeningOutput
@@ -70,13 +70,16 @@ class ScreeningLLMClient(GenericLLMClient):
     def screen_abstract(
         self,
         prompt: str,
-        model: str = "gpt-4"
+        model: str = "gpt-4",
+        model_params: Optional[Dict[str, Any]] = None
     ) -> AbstractScreeningOutput:
         """Screen an abstract using LLM API with function calling.
         
         Args:
             prompt: The prompt to send to the LLM
             model: The model to use
+            model_params: Extra model-specific parameters to pass through to
+                the API call, e.g. {"reasoning_effort": "none"}
             
         Returns:
             AbstractScreeningOutput: The screening result
@@ -105,7 +108,8 @@ class ScreeningLLMClient(GenericLLMClient):
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name}
+            function_call={"name": func_name},
+            **(model_params or {})
         )
         
         # Extract the function call result
@@ -121,13 +125,16 @@ class ScreeningLLMClient(GenericLLMClient):
     def screen_fulltext(
         self,
         prompt: str,
-        model: str = "gpt-4"
+        model: str = "gpt-4",
+        model_params: Optional[Dict[str, Any]] = None
     ) -> FullTextScreeningOutput:
         """Screen a full-text using LLM API with function calling.
         
         Args:
             prompt: The prompt to send to the LLM
             model: The model to use
+            model_params: Extra model-specific parameters to pass through to
+                the API call, e.g. {"reasoning_effort": "none"}
             
         Returns:
             FullTextScreeningOutput: The screening result
@@ -156,7 +163,8 @@ class ScreeningLLMClient(GenericLLMClient):
                 }
             ],
             functions=[function_schema],
-            function_call={"name": func_name}
+            function_call={"name": func_name},
+            **(model_params or {})
         )
         
         # Extract the function call result
