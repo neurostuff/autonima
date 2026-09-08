@@ -55,7 +55,10 @@ setup(
         "matplotlib>=3.5",
         "pubget>=0.0.8",
         "beautifulsoup4>=4.9.0",
-        "lxml>=4.6.0"
+        "lxml>=4.6.0",
+        # Imported at module scope by pipeline.py, screening/screener.py,
+        # annotation/processor.py and coordinates/parser.py -- not optional.
+        "tqdm>=4.60"
     ],
     extras_require={
         "dev": [

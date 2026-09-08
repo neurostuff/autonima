@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -58,4 +59,46 @@ def test_mkdocs_build_strict():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+    )
+
+
+# The docs build imports autonima.cli (via mkdocs-click) to generate the CLI reference page, and
+# it installs only the `docs` extra. So the CLI's module-scope import graph must stay inside the
+# core dependencies. test_mkdocs_build_strict above cannot catch a violation: it runs in a
+# developer environment where the optional packages happen to be installed, which is exactly how
+# an undeclared `tqdm` and an llm-extra-only `openai` reached master and broke the docs workflow.
+# One entry per extras_require group that ships an importable module.
+OPTIONAL_AT_IMPORT_TIME = ["openai", "readabilipy", "nimare", "fastapi", "uvicorn"]
+
+_IMPORT_UNDER_BLOCK = """
+import sys
+
+BLOCKED = set({blocked!r})
+
+
+class _Blocker:
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] in BLOCKED:
+            raise ModuleNotFoundError("No module named %r" % name.split(".")[0])
+        return None
+
+
+sys.meta_path.insert(0, _Blocker())
+import autonima.cli  # noqa: F401
+"""
+
+
+@pytest.mark.parametrize("blocked", OPTIONAL_AT_IMPORT_TIME)
+def test_cli_imports_without_optional_dependency(blocked):
+    repo_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_UNDER_BLOCK.format(blocked=[blocked])],
+        cwd=repo_root,
+        env={**os.environ, "PYTHONPATH": str(repo_root)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"`import autonima.cli` requires {blocked!r}, which the docs build does not install:\n"
+        f"{result.stderr}"
     )
