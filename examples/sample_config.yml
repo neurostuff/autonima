@@ -80,6 +80,8 @@ screening:
     # confidence_reporting: false  # Optional, default false.
     # threshold: 0.9  # Optional probability cutoff.
     # additional_instructions: "Pay special attention to sample sizes."
+    # model_params:  # Optional. Passed through to the model API call. Not part of the stage
+    #   reasoning_effort: "none"  # cache signature, so setting it does not force a re-screen.
 
   fulltext:
     model: "gpt-5-mini-2025-08-07"
@@ -99,10 +101,14 @@ screening:
     # confidence_reporting: false
     # threshold: 0.95
     # additional_instructions: "Focus on methodological rigor."
+    # model_params:
+    #   reasoning_effort: "none"  # Required by gpt-5.6-* when function tools are used.
 
 parsing:
   parse_coordinates: true
   coordinate_model: "gpt-4o-mini"
+  # coordinate_model_params:  # Optional, same idea as screening's model_params.
+  #   reasoning_effort: "none"
 
 output:
   # Keep this non-empty. The CLI can override it with an explicit output folder
@@ -115,6 +121,8 @@ output:
 annotation:
   enabled: true
   model: "gpt-4o-mini"
+  # model_params:  # Optional, same idea as screening's model_params.
+  #   reasoning_effort: "none"
   # Options: "single_analysis" or "multi_analysis".
   prompt_type: "multi_analysis"
   create_all_included_annotations: true
