@@ -19,6 +19,12 @@ class AnnotationCriteriaConfig(BaseModel):
 class AnnotationConfig(BaseModel):
     """Configuration for the annotation phase."""
     model: str = "gpt-4o-mini"
+    # Model-specific request parameters, e.g. {"reasoning_effort": "none"} for models that
+    # reject function tools without it. Declared here so the value reaches
+    # config.executed.yaml and a finished run records what it was executed with. Excluded from
+    # the annotation cache signature, which allowlists its keys, so setting it does not
+    # invalidate cached decisions.
+    model_params: Optional[Dict[str, Any]] = None
     # Create system annotations:
     # - "all_studies" (all studies with parsed analyses)
     # - "all_abstract" (studies included after abstract screening)

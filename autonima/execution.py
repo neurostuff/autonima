@@ -273,6 +273,19 @@ def _pick(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
     return {key: mapping.get(key) for key in keys if key in mapping}
 
 
+# Keys that describe HOW a request is made rather than WHAT it asks for. The screening stages
+# splat their whole config block into the signature (unlike parsing and annotation, which use an
+# allowlist), so anything added to that block would otherwise invalidate cached results. A model
+# parameter such as reasoning_effort does not change what a run means -- for some models it is
+# what makes the request legal at all -- so two runs differing only in it must share cache.
+DEPLOYMENT_KEYS = frozenset({"model_params"})
+
+
+def _drop(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
+    excluded = set(keys)
+    return {k: v for k, v in mapping.items() if k not in excluded}
+
+
 def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     """Build per-stage semantic payloads for cache validation."""
     config = pipeline_config_to_dict(config_or_dict)
@@ -297,7 +310,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "abstract": {
-            **(screening.get("abstract") or {}),
+            **_drop(screening.get("abstract") or {}, DEPLOYMENT_KEYS),
             "prompt_version": ABSTRACT_SCREENING_PROMPT_VERSION,
         },
         "retrieval": _pick(
@@ -313,7 +326,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "fulltext": {
-            **(screening.get("fulltext") or {}),
+            **_drop(screening.get("fulltext") or {}, DEPLOYMENT_KEYS),
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
         },
         "parsing": _pick(

@@ -157,3 +157,64 @@ def test_empty_or_degenerate_prefix_leaves_the_name_alone(monkeypatch, value):
 def test_absent_model_passes_through(monkeypatch, model):
     monkeypatch.setenv(MODEL_PREFIX_ENV, "@my-provider")
     assert resolve_model_name(model) == model
+
+
+# ------------------------------------------------------- config plumbing and cache isolation
+
+def test_screening_signature_ignores_model_params():
+    """Setting model_params must not invalidate cached screening results.
+
+    The screening stages splat their whole config block into the signature, unlike parsing and
+    annotation which allowlist keys, so without an explicit exclusion adding a deployment
+    parameter would force a full re-screen. reasoning_effort does not change what a run means --
+    for some models it is what makes the request legal at all.
+    """
+    from autonima.execution import stage_signature_payloads
+
+    base = {"screening": {"abstract": {"model": "m", "objective": "o"},
+                          "fulltext": {"model": "m", "objective": "o"}}}
+    with_params = {"screening": {
+        "abstract": {"model": "m", "objective": "o", "model_params": {"reasoning_effort": "none"}},
+        "fulltext": {"model": "m", "objective": "o", "model_params": {"reasoning_effort": "none"}},
+    }}
+    a = stage_signature_payloads(base)
+    b = stage_signature_payloads(with_params)
+    assert a["abstract"] == b["abstract"]
+    assert a["fulltext"] == b["fulltext"]
+
+
+def test_screening_signature_still_reacts_to_semantic_keys():
+    """The exclusion must be narrow -- a criteria change still has to bust the cache."""
+    from autonima.execution import stage_signature_payloads
+
+    a = stage_signature_payloads({"screening": {"abstract": {"model": "m", "objective": "one"}}})
+    b = stage_signature_payloads({"screening": {"abstract": {"model": "m", "objective": "two"}}})
+    assert a["abstract"] != b["abstract"]
+
+
+def test_parsing_and_annotation_signatures_never_saw_model_params():
+    """Those two allowlist their keys, so they are cache-safe without an exclusion."""
+    from autonima.execution import stage_signature_payloads
+
+    payloads = stage_signature_payloads({
+        "parsing": {"parse_coordinates": True, "coordinate_model": "m",
+                    "coordinate_model_params": {"reasoning_effort": "none"}},
+        "annotation": {"model": "m", "model_params": {"reasoning_effort": "none"}},
+    })
+    assert "coordinate_model_params" not in payloads["parsing"]
+    assert "model_params" not in payloads["annotation"]
+
+
+def test_every_stage_config_can_carry_model_params():
+    """#62 is about function calling, and all three LLM stages use function tools -- so a fix
+    that reaches only screening leaves parsing and annotation returning the same 400."""
+    from autonima.annotation.schema import AnnotationConfig
+    from autonima.models.types import ParsingConfig
+
+    assert AnnotationConfig(model="m", model_params={"reasoning_effort": "none"}).model_params == {
+        "reasoning_effort": "none"
+    }
+    assert ParsingConfig(coordinate_model_params={"reasoning_effort": "none"}
+                         ).coordinate_model_params == {"reasoning_effort": "none"}
+    assert AnnotationConfig(model="m").model_params is None
+    assert ParsingConfig().coordinate_model_params is None

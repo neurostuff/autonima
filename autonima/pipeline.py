@@ -912,7 +912,8 @@ class AutonimaPipeline:
  
         # Initialize the coordinate processor
         model = getattr(self.config.parsing, 'coordinate_model', 'gpt-4o-mini')
-        processor = CoordinateProcessor(model=model)
+        model_params = getattr(self.config.parsing, 'coordinate_model_params', None)
+        processor = CoordinateProcessor(model=model, model_params=model_params)
  
         # Prepare all table processing jobs
         table_jobs = []
