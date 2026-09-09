@@ -173,10 +173,44 @@ def _print_pipeline_summary(
         print(f"Coordinate parsing: {coordinate_summary}")
         print(f"Annotation: {annotation_summary}")
 
+    _print_usage_summary()
+
     if results.errors:
         print(f"\nErrors encountered: {len(results.errors)}")
         for error in results.errors:
             print(f"  - {error}")
+
+
+def _print_usage_summary() -> None:
+    """Report what this execution spent, per stage.
+
+    Reflects only calls this run actually made: incremental stages reuse cached items, so a
+    re-run that recomputes a handful of studies reports a handful of calls. Silent when nothing
+    was called, so cache-only runs stay quiet.
+    """
+    from .llm import usage as llm_usage
+
+    report = llm_usage.totals()
+    stages = report.get("stages") or {}
+    if not stages:
+        return
+
+    print("\nToken usage (this execution):")
+    for stage, data in stages.items():
+        cost = data.get("cost_usd")
+        money = f"${cost:,.4f}" if cost is not None else "cost unknown"
+        cached = data.get("cached_input_tokens") or 0
+        cached_note = f" ({cached:,} cached)" if cached else ""
+        print(
+            f"  {stage:<12} {data['calls']:>6,} calls  "
+            f"in {data['input_tokens']:>10,}{cached_note}  "
+            f"out {data['output_tokens']:>9,}  {money}"
+        )
+    total = report.get("total") or {}
+    if total:
+        cost = total.get("cost_usd")
+        money = f"${cost:,.4f}" if cost is not None else "cost unknown (unpriced model)"
+        print(f"  {'TOTAL':<12} {total['calls']:>6,} calls  {money}")
 
 
 def _run_pipeline_command(

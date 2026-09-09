@@ -3,9 +3,10 @@
 import json
 import logging
 from types import SimpleNamespace
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
-from ..llm.client import GenericLLMClient, resolve_model_name
+from ..llm.client import GenericLLMClient, resolve_model_name, resolve_model_kwargs
+from ..llm.usage import record as record_usage
 from .schema import AnalysisMetadata, AnnotationCriteriaConfig, AnnotationDecision, StudyAnalysisGroup, build_dynamic_multi_annotation_models
 from ..utils import log_error_with_debug
 
@@ -172,6 +173,7 @@ class AnnotationClient:
         criteria_list: List[AnnotationCriteriaConfig],
         metadata_fields: List[str],
         model: str = "gpt-4o-mini",
+        model_params: Optional[Dict[str, Any]] = None,
         prompt_type: str = "multi_analysis",
     ) -> List[AnnotationDecision]:
         """
@@ -228,6 +230,7 @@ class AnnotationClient:
         metadata_fields: List[str],
         model: str,
         prompt_type: str,
+        model_params: Optional[Dict[str, Any]] = None,
     ) -> List[AnnotationDecision]:
         """
         Single attempt at making annotation decisions.
@@ -318,9 +321,11 @@ class AnnotationClient:
                     }
                 ],
                 functions=[function_schema],
-                function_call={"name": func_name}
+                function_call={"name": func_name},
+                **resolve_model_kwargs(model, model_params)
             )
-            
+            record_usage("annotation", resolve_model_name(model), getattr(response, "usage", None))
+
             message = response.choices[0].message
             function_call = getattr(message, "function_call", None)
             function_args = (
@@ -628,8 +633,10 @@ class AnnotationClient:
             response = self._client.client.chat.completions.create(
                 model=resolve_model_name(model),
                 messages=messages,
-                response_format=response_format
+                response_format=response_format,
+                **resolve_model_kwargs(model, model_params)
             )
+            record_usage("annotation", resolve_model_name(model), getattr(response, "usage", None))
             return response.choices[0].message.content
         except Exception as e:
             log_error_with_debug(logger, f"Error in chat completion: {e}")

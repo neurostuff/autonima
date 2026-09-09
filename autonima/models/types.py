@@ -307,6 +307,11 @@ class ParsingConfig:
     """Configuration for the parsing phase."""
     parse_coordinates: bool = False
     coordinate_model: str = "gpt-4o-mini"
+    # Model-specific request parameters, e.g. {"reasoning_effort": "none"} for models that reject
+    # function tools without it. Named coordinate_model_params to sit beside coordinate_model.
+    # Not in the parsing cache signature, which allowlists parse_coordinates and coordinate_model
+    # only, so setting it does not invalidate parsed coordinates.
+    coordinate_model_params: Optional[Dict[str, Any]] = None
 
 
 @dataclass

@@ -1,7 +1,7 @@
 """Coordinate parsing processor for the pipeline."""
 
 import logging
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from .openai_client import CoordinateParsingClient
 from .prompts import create_coordinate_parsing_prompt
@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class CoordinateProcessor:
     """Processor for parsing coordinates from activation tables."""
     
-    def __init__(self, model: str = "gpt-4o-mini", 
+    def __init__(self, model: str = "gpt-4o-mini",
+                 model_params: Optional[Dict[str, Any]] = None, 
                  path_preference: List[str] = ['table_raw_path', 'table_data_path']):
         """
         Initialize the coordinate processor.
@@ -21,6 +22,10 @@ class CoordinateProcessor:
             model: The model to use for parsing
         """
         self.model = model
+        # Model-specific request parameters, e.g. reasoning_effort for models that reject
+        # function tools without it. Excluded from the parsing cache signature, which
+        # allowlists its keys, so setting it does not invalidate parsed coordinates.
+        self.model_params = model_params
         self.path_preference = path_preference
         self.client = CoordinateParsingClient()
 
@@ -55,7 +60,8 @@ class CoordinateProcessor:
             )
             
             # Parse the table
-            result = self.client.parse_analyses(prompt, model=self.model)
+            result = self.client.parse_analyses(prompt, model=self.model,
+                                                model_params=self.model_params)
             
             # Set the table_id for each analysis
             for analysis in result.analyses:

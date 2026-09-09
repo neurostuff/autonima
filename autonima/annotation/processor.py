@@ -3,7 +3,7 @@
 import logging
 import json
 from pathlib import Path
-from typing import List, Set, Optional
+from typing import Any, Dict, List, Optional, Set
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
@@ -449,6 +449,7 @@ class AnnotationProcessor:
             study_decisions = self.client.make_decision(
                 study_group, annotations_to_process, metadata_fields,
                 model=model,
+                model_params=self.config.model_params,
                 prompt_type=self.config.prompt_type
             )
         else:
@@ -464,6 +465,7 @@ class AnnotationProcessor:
                 analysis_decisions = self.client.make_decision(
                     metadata, annotations_to_process, metadata_fields,
                     model=model,
+                    model_params=self.config.model_params,
                     prompt_type=self.config.prompt_type
                 )
                 

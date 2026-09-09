@@ -24,6 +24,7 @@ from .cache_versions import (
     FULLTEXT_SCREENING_PROMPT_VERSION,
 )
 from .coordinates.prompts import COORDINATE_PARSING_PROMPT_VERSION
+from .llm import usage as llm_usage
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,19 @@ def _pick(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
     return {key: mapping.get(key) for key in keys if key in mapping}
 
 
+# Keys that describe HOW a request is made rather than WHAT it asks for. The screening stages
+# splat their whole config block into the signature (unlike parsing and annotation, which use an
+# allowlist), so anything added to that block would otherwise invalidate cached results. A model
+# parameter such as reasoning_effort does not change what a run means -- for some models it is
+# what makes the request legal at all -- so two runs differing only in it must share cache.
+DEPLOYMENT_KEYS = frozenset({"model_params"})
+
+
+def _drop(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
+    excluded = set(keys)
+    return {k: v for k, v in mapping.items() if k not in excluded}
+
+
 def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     """Build per-stage semantic payloads for cache validation."""
     config = pipeline_config_to_dict(config_or_dict)
@@ -296,7 +310,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "abstract": {
-            **(screening.get("abstract") or {}),
+            **_drop(screening.get("abstract") or {}, DEPLOYMENT_KEYS),
             "prompt_version": ABSTRACT_SCREENING_PROMPT_VERSION,
         },
         "retrieval": _pick(
@@ -312,7 +326,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "fulltext": {
-            **(screening.get("fulltext") or {}),
+            **_drop(screening.get("fulltext") or {}, DEPLOYMENT_KEYS),
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
         },
         "parsing": _pick(
@@ -1019,6 +1033,15 @@ def update_execution_progress_stage(
     elif status in {"completed", "skipped"} and not item.get("counters"):
         item["counters"] = _read_stage_counters(output_dir, stage)
 
+    # Token/cost accounting for whatever this execution actually computed. Incremental stages
+    # only call the API for uncached items, so this is the cost of *this run* rather than of
+    # building the artifact from scratch -- `counters` above says how much was reused. Absent
+    # when a stage made no calls (fully cached, disabled, or non-LLM).
+    if status in {"completed", "skipped", "failed"}:
+        stage_usage = llm_usage.snapshot(stage)
+        if stage_usage:
+            item["usage"] = stage_usage
+
     progress["status"] = "failed" if status == "failed" else "running"
     progress["current_stage"] = stage if status == "running" else None
     progress["updated_at"] = now
@@ -1054,6 +1077,28 @@ def complete_execution_progress(
                 item["status"] = "skipped"
                 item["source"] = "not_applicable"
                 item["completed_at"] = now
+
+    # Run-level roll-up. Summed from the per-stage records already on the progress file rather
+    # than from the accumulator, so a resumed run that reused earlier stages still reports the
+    # cost of everything this file describes.
+    stage_usage = [
+        item.get("usage")
+        for item in progress.get("stages", [])
+        if isinstance(item, dict) and isinstance(item.get("usage"), dict)
+    ]
+    if stage_usage:
+        costs = [u.get("cost_usd") for u in stage_usage]
+        progress["usage_total"] = {
+            "calls": sum(u.get("calls", 0) for u in stage_usage),
+            "input_tokens": sum(u.get("input_tokens", 0) for u in stage_usage),
+            "uncached_input_tokens": sum(u.get("uncached_input_tokens", 0) for u in stage_usage),
+            "cached_input_tokens": sum(u.get("cached_input_tokens", 0) for u in stage_usage),
+            "output_tokens": sum(u.get("output_tokens", 0) for u in stage_usage),
+            # None if any stage used an unpriced model: a partial total would read as a full one.
+            "cost_usd": (
+                round(sum(costs), 6) if all(c is not None for c in costs) else None
+            ),
+        }
     write_execution_progress(output_dir, progress)
 
 

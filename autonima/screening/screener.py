@@ -486,14 +486,26 @@ class LLMScreener(ScreeningEngine):
                 "model",
                 "gpt-4o-mini" if screening_type == "abstract" else "gpt-4"
             )
-            
+            # Model-specific request parameters, e.g. reasoning_effort for models that reject
+            # function tools without it. Read from the stage block so the value lands in
+            # config.executed.yaml and a finished run records what it was executed with;
+            # AUTONIMA_MODEL_PARAMS supplies a deployment-wide default and this overrides it.
+            model_params = config.get("model_params") or None
+
             # Call LLM API
             screen_method = (
                 self._llm_client.screen_abstract
                 if screening_type == "abstract"
                 else self._llm_client.screen_fulltext
             )
-            response = screen_method(prompt, model)
+            # Only pass the kwarg when there is something to pass. Callers and test doubles that
+            # implement the older two-argument signature keep working -- exactly the guard PR #70
+            # used, and tests/test_parallel_screening.py mocks that shape.
+            response = (
+                screen_method(prompt, model, model_params=model_params)
+                if model_params
+                else screen_method(prompt, model)
+            )
                 
             # Process response to get decision string
             decision_str, reason = self._process_screening_response(
