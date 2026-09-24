@@ -1,7 +1,7 @@
 # Jev (TypeSafe System One) as a screening backend
 
-**Status: experiment.** Written against the published API contract and exercised only against a
-fake transport. Nothing here has been run against the live service.
+**Status: experiment, contract validated live.** Two calls have been made against the real
+service (see *Live validation* below); everything else is exercised against a fake transport.
 
 ## Why
 
@@ -34,7 +34,18 @@ screening:
     objective: ...
     inclusion_criteria: [...]
     exclusion_criteria: [...]
+
+annotation:                   # analysis-level selection
+  backend: jev
+  model: jev-latest
+  inclusion_threshold: 0.5
+  exclusion_threshold: 0.5
+  annotations: [...]
 ```
+
+For selection, the article is the **state** and each question carries one analysis, so a study
+with `n` analyses and `m` targets costs one call of `n x m x criteria` questions rather than
+`n x m` separate requests. Calls are chunked at `max_questions_per_call` (default 200).
 
 `export TYPESAFE_API_KEY=...` before running. Criterion IDs (`I1`, `E1`, …) are assigned by
 `ConfigManager` as usual and are reused verbatim as Jev question keys, so
@@ -66,13 +77,43 @@ criteria mask one coin-flip.
 
 These need a key and a real run to settle:
 
-1. **Does independent evaluation cost accuracy?** The chat model can trade criteria off against
-   each other and read the objective as a whole. Jev cannot. This is the experiment.
-2. **State size.** Full texts are long and the API documents no limit. Untested.
-3. **Threshold calibration.** 0.5 is a placeholder, not a tuned value. The right way to set it
+1. **Does independent evaluation cost accuracy at corpus scale?** One study agreeing 4/4 is
+   encouraging, not evidence. The chat model can trade criteria off against each other and read
+   the objective as a whole; Jev cannot. Running a full project against the benchmark is the
+   experiment.
+2. **Threshold calibration.** 0.5 is a placeholder, not a tuned value. The right way to set it
    is to sweep against the benchmark — which this backend makes possible for the first time.
-4. **Criterion phrasing.** Criteria written as instructions to a chat model may need rewording
-   as statements. `build_criteria_questions` wraps them, but wrapping is not rewriting.
+3. **Criterion phrasing.** Criteria written as instructions to a chat model may need rewording
+   as statements. `build_criteria_questions` wraps them, but wrapping is not rewriting. The
+   reverse-direction contrast landing at p=0.54 may be a criteria-wording problem rather than a
+   model limitation.
+4. **Question-count ceiling.** Undocumented. Calls are chunked at `max_questions_per_call`
+   (default 200); the largest live call so far was 12.
+
+## Live validation
+
+Two calls, 2026-09-24, against `jev-latest`.
+
+**1. Screening contract** (`examples/jev_smoke.py`) — 4 criteria, abstract-sized state.
+790 input / 72 output tokens, **513 ms**. Probabilities cleanly separated: inclusion 0.98 and
+0.99, exclusion 0.02 and 0.01.
+
+**2. Analysis-level selection** — real article (PMID 26529426), **60,781-character full text**,
+4 parsed analyses x 3 reappraisal criteria = 12 questions in **one call, 720 ms**.
+
+| analysis | Jev | current pipeline |
+|---|---|---|
+| Reappraisal > Maintain | include | include |
+| Maintain > Reappraisal | include (conf 0.08) | include |
+| Pictures vs baseline: patients > controls | exclude (I1 p=0.04) | exclude |
+| Maintain vs Reappraise: patients > controls | exclude (I1 p=0.28) | exclude |
+
+**4/4 agreement**, and the confidences are informative: the passive-viewing contrast is
+rejected decisively (p=0.04), while the reverse-direction contrast sits at p=0.54 — a coin
+flip the model correctly reports as one. That is the calibration the chat path cannot give.
+
+Two open questions are now closed: a full text **fits in `state`**, and the payload we build is
+accepted as specified.
 
 ## Testing
 

@@ -36,7 +36,20 @@ class AnnotationProcessor:
             max_retries: Maximum number of retries for malformed LLM responses
         """
         self.config = config
-        self.client = AnnotationClient(max_retries=max_retries)
+        # Selecting the backend here, rather than at each call site, keeps every downstream
+        # path (caching, signatures, result writing) identical for both: the two clients share
+        # `make_decision`'s signature and return type, so nothing else has to know which is in
+        # play. `backend` defaults to openai, so an existing config behaves exactly as before.
+        if str(getattr(config, "backend", "openai") or "openai").lower() == "jev":
+            from .jev_client import JevAnnotationClient
+
+            self.client = JevAnnotationClient(
+                model=config.model or "jev-latest",
+                inclusion_threshold=float(getattr(config, "inclusion_threshold", 0.5) or 0.5),
+                exclusion_threshold=float(getattr(config, "exclusion_threshold", 0.5) or 0.5),
+            )
+        else:
+            self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
         self.stage_hash = stable_hash(

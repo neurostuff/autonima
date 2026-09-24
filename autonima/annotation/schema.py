@@ -32,6 +32,12 @@ class AnnotationConfig(BaseModel):
     create_all_included_annotations: bool = True
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
+    # Decision backend: "openai" (chat model, generates a rationale) or "jev" (TypeSafe
+    # System One -- a calibrated probability per criterion, gate applied in code, no
+    # rationale). See docs/jev-backend.md.
+    backend: str = "openai"
+    inclusion_threshold: float = 0.5
+    exclusion_threshold: float = 0.5
     # Options: "single_analysis" (per-analysis) or
     # "multi_analysis" (whole study)
     prompt_type: str = "multi_analysis"
