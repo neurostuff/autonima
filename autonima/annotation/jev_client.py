@@ -26,12 +26,17 @@ Analysis ids and annotation names are free text from a config and a parser; buil
 of them would need escaping, and a collision would silently attach one analysis's probability
 to another. An integer and a lookup cannot collide.
 
-BATCHING
+BATCHING AGAINST A REAL CEILING
 
-`n_analyses x n_annotations x n_criteria` grows quickly -- a 10-analysis study with 5 targets
-and 6 criteria each is 300 questions. The API documents no ceiling, so calls are chunked at
-`max_questions_per_call` and the state is resent per chunk. Input is $0.042/MTok, so resending
-an article is worth far less than discovering a limit in production.
+jev-1.13 allows 64k tokens per request (state plus all questions) and 32k for the state plus
+the longest single question; both return a non-retryable HTTP 400 when exceeded. A first full
+run of the emotion-regulation project lost 63 of 128 studies to this, and the failures tracked
+ANALYSES PER STUDY (median 7 against 3) rather than article length, because every question
+repeats its analysis metadata.
+
+So chunking is by token budget, not question count, and the article is trimmed from the middle
+if the state alone will not fit. The state is re-sent per chunk; at $0.042/MTok that is far
+cheaper than losing the study.
 """
 
 from __future__ import annotations
@@ -40,7 +45,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-from ..backends.jev import JevClient, JevError, apply_gate, normalise_mapping
+from ..backends.jev import (JevClient, JevError, apply_gate, estimate_tokens, fit_state,
+                            normalise_mapping, plan_chunks)
 from ..llm.usage import record as record_usage
 from .schema import (
     AnalysisMetadata,
@@ -50,8 +56,6 @@ from .schema import (
 )
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_MAX_QUESTIONS_PER_CALL = 200
 
 
 def mapping_for(criteria: AnnotationCriteriaConfig) -> Dict[str, Dict[str, str]]:
@@ -128,13 +132,11 @@ class JevAnnotationClient:
         model: str = "jev-latest",
         inclusion_threshold: float = 0.5,
         exclusion_threshold: float = 0.5,
-        max_questions_per_call: int = DEFAULT_MAX_QUESTIONS_PER_CALL,
         client: Optional[JevClient] = None,
     ) -> None:
         self.client = client or JevClient(api_key=api_key, model=model)
         self.inclusion_threshold = inclusion_threshold
         self.exclusion_threshold = exclusion_threshold
-        self.max_questions_per_call = max(1, int(max_questions_per_call))
 
     def make_decision(
         self,
@@ -213,12 +215,22 @@ class JevAnnotationClient:
         state: Mapping[str, Any],
         questions: Mapping[str, Mapping[str, Any]],
     ) -> Dict[str, Any]:
-        """One call, or several equal chunks if the question count is large."""
-        keys = list(questions)
+        """Fit the state, then split questions to respect the documented token budgets.
+
+        Chunking on a fixed question COUNT is what lost 63 of 128 studies on the first full
+        run: the binding constraint is tokens, and it is dominated by the article in the
+        state plus the per-question analysis metadata, not by the number of questions.
+        """
+        longest = max((estimate_tokens({k: q}) for k, q in questions.items()), default=0)
+        fitted, truncated = fit_state(state, reserve_tokens=longest)
+        if truncated:
+            logger.info("Truncated state for study %s to fit Jev's 32k state budget",
+                        (state or {}).get("study_id", "?"))
         answers: Dict[str, Any] = {}
-        for start in range(0, len(keys), self.max_questions_per_call):
-            chunk = {k: questions[k] for k in keys[start:start + self.max_questions_per_call]}
-            body = self.client.evaluate(state, chunk)
+        for chunk in plan_chunks(fitted, questions):
+            if not chunk:
+                continue
+            body = self.client.evaluate(fitted, chunk)
             answers.update(body.get("answers", {}))
             self._record(body.get("usage") or {})
         return answers
@@ -260,6 +272,7 @@ class JevAnnotationClient:
                     timestamp=datetime.now(),
                     inclusion_criteria_applied=decision.satisfied_inclusion_ids,
                     exclusion_criteria_applied=decision.fired_exclusion_ids,
+                    criterion_probabilities=decision.probabilities,
                 ))
         return decisions
 

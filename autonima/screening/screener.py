@@ -411,7 +411,8 @@ class LLMScreener(ScreeningEngine):
         model: str,
         screening_type: str,
         inclusion_criteria_applied: List[str] = None,
-        exclusion_criteria_applied: List[str] = None
+        exclusion_criteria_applied: List[str] = None,
+        criterion_probabilities: Dict[str, float] = None,
     ) -> ScreeningResult:
         """Create a ScreeningResult object."""
         return ScreeningResult(
@@ -423,6 +424,7 @@ class LLMScreener(ScreeningEngine):
             screening_type=screening_type,
             inclusion_criteria_applied=inclusion_criteria_applied or [],
             exclusion_criteria_applied=exclusion_criteria_applied or [],
+            criterion_probabilities=criterion_probabilities or {},
             cache_signature=self._screening_cache_signature(
                 study,
                 screening_type,
@@ -836,6 +838,7 @@ class LLMScreener(ScreeningEngine):
             study, decision, response.reason, response.confidence,
             stage.get("model", "jev-latest"), screening_type,
             inclusion_applied, exclusion_applied,
+            criterion_probabilities=response.criterion_probabilities,
         )
 
         result_dict = result.to_dict()

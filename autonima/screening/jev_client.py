@@ -20,7 +20,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional, Tuple
 
-from ..backends.jev import GateDecision, JevClient, JevError, normalise_mapping
+from ..backends.jev import (GateDecision, JevClient, JevError, build_criteria_questions,
+                            estimate_tokens, fit_state, normalise_mapping)
 from ..llm.usage import record as record_usage
 from .schema import AbstractScreeningOutput, FullTextScreeningOutput
 
@@ -80,6 +81,7 @@ class JevScreeningClient:
             reason=_explain(decision),
             inclusion_criteria_applied=decision.satisfied_inclusion_ids,
             exclusion_criteria_applied=decision.fired_exclusion_ids,
+            criterion_probabilities=decision.probabilities,
         )
 
     def screen_fulltext_structured(
@@ -101,6 +103,7 @@ class JevScreeningClient:
             fulltext_incomplete=bool(incomplete),
             inclusion_criteria_applied=decision.satisfied_inclusion_ids,
             exclusion_criteria_applied=decision.fired_exclusion_ids,
+            criterion_probabilities=decision.probabilities,
         )
 
     # -- internals ------------------------------------------------------------------------
@@ -124,6 +127,11 @@ class JevScreeningClient:
                 "Jev screening needs a criteria_mapping with at least one criterion. "
                 "Criteria IDs are assigned by ConfigManager; check the stage config."
             )
+        # Full-text screening sends a whole article; long ones exceed the 32k state budget.
+        # Reserve the longest question so the state-plus-question limit is respected too.
+        probe = build_criteria_questions(criteria_mapping, objective=objective)
+        longest = max((estimate_tokens({k: q}) for k, q in probe.items()), default=0)
+        state, _ = fit_state(state, reserve_tokens=longest)
         decision, answers = self.client.gate(
             state=state,
             criteria_mapping=criteria_mapping,

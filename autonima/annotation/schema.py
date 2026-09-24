@@ -67,6 +67,9 @@ class AnnotationDecision(BaseModel):
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
     cache_signature: Optional[Dict[str, Any]] = None
+    # Criterion ID -> probability of truth, for calibrated backends only. Lets the selection
+    # threshold be re-swept offline without re-running the model.
+    criterion_probabilities: Dict[str, float] = {}
 
 
 class TableMetadata(BaseModel):

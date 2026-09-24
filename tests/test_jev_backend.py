@@ -393,3 +393,50 @@ def test_usage_is_recorded_under_the_pipeline_stage_names():
     snap = llm_usage.snapshot("fulltext")
     assert snap and snap["input_tokens"] == 9000
     assert snap["cost_usd"] is not None, "jev must be priced so cost is a number"
+
+
+def test_probabilities_are_persisted_so_thresholds_can_be_swept_later():
+    """The whole point of a calibrated backend: re-gate a finished run with no API calls.
+
+    Regression: the first full project run stored only the DECIDING criteria, inside the
+    `reason` string, so the threshold sweep the backend exists to enable was impossible
+    without re-running.
+    """
+    from autonima.backends.jev import apply_gate
+
+    probs = dict(I1=0.62, I2=0.58, E1=0.10, E2=0.05)
+    transport, _ = transport_returning(nouls(**probs))
+    out = JevScreeningClient(client=JevClient(transport=transport, api_key="k")) \
+        .screen_abstract_structured({"title": "t"}, MAPPING)
+
+    assert out.criterion_probabilities == pytest.approx(probs)
+    assert out.decision == "INCLUDED"
+
+    # re-gate the STORED numbers at a stricter threshold, no transport involved
+    stored = {k: {"type": "noul", "noul": v} for k, v in out.criterion_probabilities.items()}
+    assert not apply_gate(stored, MAPPING, inclusion_threshold=0.75).include
+
+
+def test_probabilities_survive_into_the_persisted_screening_result(tmp_path, monkeypatch):
+    """ScreeningResult.to_dict() is what lands on disk; the vector must be in it."""
+    import autonima.screening.jev_client as jc
+
+    class FakeJev:
+        def __init__(self, **kwargs):
+            pass
+
+        def screen_abstract_structured(self, state, criteria_mapping, objective=None):
+            from autonima.screening.schema import AbstractScreeningOutput
+
+            return AbstractScreeningOutput(
+                decision="INCLUDED", confidence=0.4, reason="[jev] all criteria satisfied",
+                inclusion_criteria_applied=["I1", "I2"],
+                criterion_probabilities={"I1": 0.7, "I2": 0.66, "E1": 0.2, "E2": 0.1},
+            )
+
+    monkeypatch.setattr(jc, "JevScreeningClient", FakeJev)
+    screener, cfg = _screener(tmp_path, "jev")
+    result = screener._screen_single_study(_study(), "abstract", cfg.abstract)
+    assert result.criterion_probabilities["I2"] == 0.66
+    assert "criterion_probabilities" in result.to_dict()
+    assert result.to_dict()["criterion_probabilities"]["E1"] == 0.2

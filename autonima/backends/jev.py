@@ -50,8 +50,97 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 DEFAULT_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
 
+# Documented for jev-1.13 (docs.typesafe.ai/models):
+#   64k tokens per request  -- state plus ALL questions combined
+#   32k tokens              -- state plus the SINGLE LONGEST question
+# Both are hard: exceeding either returns HTTP 400 max_tokens_exceeded, which is not
+# retryable. A full ER project run lost 63 of 128 studies to this before the budget existed,
+# and the failures tracked analyses-per-study (median 7 vs 3) rather than article length,
+# because every question repeats its analysis metadata.
+MAX_REQUEST_TOKENS = 64_000
+MAX_STATE_PLUS_QUESTION_TOKENS = 32_000
+# Chars per token. Deliberately pessimistic: 4.0 is the usual rule of thumb, and scientific
+# prose with coordinates and markup runs denser than prose. Overestimating tokens costs an
+# extra chunk; underestimating costs the whole study.
+CHARS_PER_TOKEN = 3.2
+# Leave room for the envelope (model name, keys, JSON punctuation) and for the estimate
+# being wrong in the unsafe direction.
+BUDGET_HEADROOM = 0.90
+
 # Retry on the two statuses the API documents as transient. 401 and 422 are our bug, not theirs.
 RETRY_STATUSES = frozenset({429, 529})
+
+
+def estimate_tokens(obj: Any) -> int:
+    """Rough token count for anything JSON-serialisable, biased to overestimate."""
+    import json as _json
+
+    try:
+        text = obj if isinstance(obj, str) else _json.dumps(obj, ensure_ascii=False)
+    except (TypeError, ValueError):
+        text = str(obj)
+    return int(len(text) / CHARS_PER_TOKEN) + 1
+
+
+def fit_state(state: Any, reserve_tokens: int = 0) -> Tuple[Any, bool]:
+    """Shrink `state` until it fits the 32k state-plus-longest-question budget.
+
+    Only the longest string field is trimmed, and it is trimmed from the MIDDLE: the head of
+    an article carries title, abstract and methods, and the tail carries results and tables,
+    which is where the criteria are actually decided. Cutting the tail to fit would
+    systematically drop the evidence and quietly bias every decision on long articles.
+
+    Returns (state, was_truncated).
+    """
+    budget = int((MAX_STATE_PLUS_QUESTION_TOKENS - reserve_tokens) * BUDGET_HEADROOM)
+    if budget <= 0 or estimate_tokens(state) <= budget:
+        return state, False
+    if not isinstance(state, dict):
+        keep = max(1, int(budget * CHARS_PER_TOKEN))
+        text = state if isinstance(state, str) else str(state)
+        half = keep // 2
+        return text[:half] + "\n[... truncated ...]\n" + text[-half:], True
+
+    trimmed = dict(state)
+    # repeatedly halve the largest string field until the whole object fits
+    for _ in range(24):
+        if estimate_tokens(trimmed) <= budget:
+            return trimmed, True
+        longest = max((k for k, v in trimmed.items() if isinstance(v, str)),
+                      key=lambda k: len(trimmed[k]), default=None)
+        if longest is None or len(trimmed[longest]) < 400:
+            break
+        text = trimmed[longest]
+        keep = len(text) // 2
+        half = keep // 2
+        trimmed[longest] = text[:half] + "\n[... truncated ...]\n" + text[-half:]
+    return trimmed, True
+
+
+def plan_chunks(
+    state: Any,
+    questions: Mapping[str, Mapping[str, Any]],
+) -> List[Dict[str, Dict[str, Any]]]:
+    """Split questions so each request fits the 64k state-plus-all-questions budget.
+
+    The state is re-sent with every chunk, so it is charged once per chunk -- at $0.042/MTok
+    that is the right trade against losing the study entirely.
+    """
+    state_tokens = estimate_tokens(state)
+    budget = int(MAX_REQUEST_TOKENS * BUDGET_HEADROOM) - state_tokens
+    chunks: List[Dict[str, Dict[str, Any]]] = []
+    current: Dict[str, Dict[str, Any]] = {}
+    used = 0
+    for key, question in questions.items():
+        cost = estimate_tokens({key: question})
+        if current and used + cost > budget:
+            chunks.append(current)
+            current, used = {}, 0
+        current[key] = question
+        used += cost
+    if current:
+        chunks.append(current)
+    return chunks or [{}]
 
 
 class JevError(RuntimeError):

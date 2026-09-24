@@ -201,20 +201,70 @@ def test_missing_answer_does_not_silently_include():
 
 # --- batching -------------------------------------------------------------------------------
 
-def test_large_question_sets_are_chunked():
+def test_small_studies_still_go_in_one_call():
     t, calls = transport(lambda k, q: 1.0)
-    client_with(t, max_questions_per_call=5).make_decision(group(4), [criteria()], FIELDS)
-    assert len(calls) == 3           # 12 questions, chunks of 5
+    client_with(t).make_decision(group(4), [criteria()], FIELDS)
+    assert len(calls) == 1
     assert sum(len(c["questions"]) for c in calls) == 12
+
+
+def test_many_analyses_are_split_to_respect_the_64k_request_budget():
+    """Regression: a fixed question COUNT lost 63 of 128 studies to max_tokens_exceeded.
+
+    The binding constraint is tokens -- the article in the state plus per-question analysis
+    metadata -- so chunking has to be budget-driven.
+    """
+    from autonima.backends.jev import MAX_REQUEST_TOKENS, estimate_tokens
+
+    big = StudyAnalysisGroup(
+        study_id="S1", study_title="A study", study_fulltext="word " * 8000,
+        analyses=[AnalysisMetadata(analysis_id=f"a{i}", study_id="S1", table_id="T1",
+                                   analysis_name=f"analysis {i}",
+                                   analysis_description="d" * 2000)
+                  for i in range(40)],
+    )
+    t, calls = transport(lambda k, q: 1.0)
+    out = client_with(t).make_decision(big, [criteria("x"), criteria("y")], FIELDS)
+    assert len(calls) > 1, "a 40-analysis study must not go in one request"
+    for payload in calls:
+        total = estimate_tokens(payload["state"]) + sum(
+            estimate_tokens({k: q}) for k, q in payload["questions"].items())
+        assert total <= MAX_REQUEST_TOKENS, f"chunk of {total} tokens exceeds the budget"
+    assert len(out) == 40 * 2
+
+
+def test_an_oversized_article_is_trimmed_from_the_middle():
+    """Head has title/abstract/methods, tail has results and tables. Cutting the tail to fit
+    would systematically drop the evidence the criteria turn on."""
+    from autonima.backends.jev import MAX_STATE_PLUS_QUESTION_TOKENS, estimate_tokens
+
+    huge = StudyAnalysisGroup(
+        study_id="S1", study_title="A study",
+        study_fulltext="HEAD_MARKER " + ("filler " * 200000) + " TAIL_MARKER",
+        analyses=[analysis("a0", "one")],
+    )
+    t, calls = transport(lambda k, q: 1.0)
+    client_with(t).make_decision(huge, [criteria()], FIELDS)
+    sent = calls[0]["state"]["full_text"]
+    assert estimate_tokens(calls[0]["state"]) <= MAX_STATE_PLUS_QUESTION_TOKENS
+    assert "HEAD_MARKER" in sent and "TAIL_MARKER" in sent
+    assert "truncated" in sent
 
 
 def test_chunking_does_not_change_the_decisions():
     prob = lambda k, q: 0.9 if "ROI" not in q["instructions"]["criterion"] else 0.1  # noqa: E731
     t1, _ = transport(prob)
     t2, _ = transport(prob)
-    one = client_with(t1).make_decision(group(4), [criteria()], FIELDS)
-    many = client_with(t2, max_questions_per_call=2).make_decision(group(4), [criteria()], FIELDS)
-    assert [(d.analysis_id, d.include) for d in one] == [(d.analysis_id, d.include) for d in many]
+    small = client_with(t1).make_decision(group(4), [criteria()], FIELDS)
+    import autonima.backends.jev as jev
+    old = jev.MAX_REQUEST_TOKENS
+    jev.MAX_REQUEST_TOKENS = 1200          # force many chunks
+    try:
+        many = client_with(t2).make_decision(group(4), [criteria()], FIELDS)
+    finally:
+        jev.MAX_REQUEST_TOKENS = old
+    assert [(d.analysis_id, d.include) for d in small] == \
+           [(d.analysis_id, d.include) for d in many]
 
 
 # --- edge cases -----------------------------------------------------------------------------
@@ -288,3 +338,81 @@ def test_processor_default_backend_is_the_chat_client():
 
     proc = AnnotationProcessor(AnnotationConfig(annotations=[criteria()]))
     assert isinstance(proc.client, AnnotationClient)
+
+
+def test_annotation_decisions_persist_the_probability_vector():
+    t, _ = transport(lambda k, q: 0.9 if "ROI" not in q["instructions"]["criterion"] else 0.1)
+    d = client_with(t).make_decision(group(1), [criteria()], FIELDS)[0]
+    assert d.criterion_probabilities == {"I1": 0.9, "I2": 0.9, "E1": 0.1}
+
+
+def test_stored_probabilities_can_be_re_gated_offline():
+    from autonima.backends.jev import apply_gate
+    from autonima.annotation.jev_client import mapping_for
+
+    t, _ = transport(lambda k, q: 0.6 if "ROI" not in q["instructions"]["criterion"] else 0.0)
+    d = client_with(t).make_decision(group(1), [criteria()], FIELDS)[0]
+    stored = {k: {"type": "noul", "noul": v} for k, v in d.criterion_probabilities.items()}
+    m = mapping_for(criteria())
+    assert d.include is True
+    assert not apply_gate(stored, m, inclusion_threshold=0.8).include
+
+
+def test_config_loader_preserves_the_annotation_backend(tmp_path):
+    """_load_annotation_config is an explicit allowlist, so new fields need adding to it.
+
+    Regression: `backend: jev` parsed, validated and ran a whole project while the loader
+    silently dropped it, so every annotation request went to OpenAI and 404'd on `jev-latest`.
+    """
+    import yaml
+    from autonima.config import ConfigManager
+
+    cfg = {
+        "search": {"database": "pubmed", "query": "x", "email": "a@b.c"},
+        "screening": {
+            "abstract": {"objective": "o", "inclusion_criteria": ["c"]},
+            "fulltext": {"objective": "o", "inclusion_criteria": ["c"]},
+        },
+        "annotation": {
+            "model": "jev-latest", "backend": "jev",
+            "inclusion_threshold": 0.7, "exclusion_threshold": 0.3,
+            "model_params": {"reasoning_effort": "none"},
+            "annotations": [],
+        },
+    }
+    f = tmp_path / "c.yml"
+    f.write_text(yaml.safe_dump(cfg))
+    loaded = ConfigManager().load_from_file(str(f))
+    assert loaded.annotation.backend == "jev"
+    assert loaded.annotation.inclusion_threshold == 0.7
+    assert loaded.annotation.exclusion_threshold == 0.3
+    # pre-existing drop, fixed alongside: annotation model_params never reached the config
+    assert loaded.annotation.model_params == {"reasoning_effort": "none"}
+
+
+def test_every_annotation_config_field_is_reachable_from_yaml(tmp_path):
+    """Guard the allowlist itself: a field on the model that the loader cannot set is a bug."""
+    import yaml
+    from autonima.annotation.schema import AnnotationConfig
+    from autonima.config import ConfigManager
+
+    ignore = {"annotations"}  # built separately from its own sub-dicts
+    probe = {
+        "model": "probe-model", "backend": "jev", "enabled": False,
+        "prompt_type": "single_analysis", "create_all_included_annotations": False,
+        "metadata_fields": ["analysis_name"], "inclusion_criteria": ["i"],
+        "exclusion_criteria": ["e"], "inclusion_threshold": 0.9,
+        "exclusion_threshold": 0.1, "model_params": {"k": "v"},
+    }
+    missing = set(AnnotationConfig.model_fields) - set(probe) - ignore
+    assert not missing, f"AnnotationConfig gained fields with no loader coverage: {missing}"
+
+    cfg = {"search": {"database": "pubmed", "query": "x", "email": "a@b.c"},
+           "screening": {"abstract": {"objective": "o", "inclusion_criteria": ["c"]},
+                         "fulltext": {"objective": "o", "inclusion_criteria": ["c"]}},
+           "annotation": {**probe, "annotations": []}}
+    f = tmp_path / "c.yml"
+    f.write_text(yaml.safe_dump(cfg))
+    loaded = ConfigManager().load_from_file(str(f))
+    for key, want in probe.items():
+        assert getattr(loaded.annotation, key) == want, f"{key} was dropped by the loader"
