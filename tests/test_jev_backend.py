@@ -366,3 +366,30 @@ def test_adapter_rejects_an_empty_dataclass_mapping():
     with pytest.raises(JevError):
         JevScreeningClient(client=JevClient(transport=transport, api_key="k")) \
             .screen_abstract_structured({"title": "t"}, CriteriaMapping())
+
+
+def test_usage_is_recorded_under_the_pipeline_stage_names():
+    """execution.py snapshots with llm_usage.snapshot("abstract"/"fulltext"/"annotation").
+
+    Regression: the first full run recorded under "jev_screening", which never appears in
+    execution_progress.json, so the whole run reported zero cost.
+    """
+    from autonima.llm import usage as llm_usage
+
+    llm_usage.reset()
+    transport, _ = transport_returning(
+        nouls(I1=0.9, I2=0.9, E1=0.0, E2=0.0), usage={"input_tokens": 1000, "output_tokens": 10})
+    client = JevScreeningClient(client=JevClient(transport=transport, api_key="k"))
+    client.screen_abstract_structured({"title": "t"}, MAPPING)
+    assert llm_usage.snapshot("abstract"), "nothing recorded under 'abstract'"
+    assert not llm_usage.snapshot("jev_screening")
+
+    llm_usage.reset()
+    answers = nouls(I1=0.9, I2=0.9, E1=0.0, E2=0.0)
+    answers["__fulltext_incomplete"] = {"type": "noul", "noul": 0.0}
+    transport2, _ = transport_returning(answers, usage={"input_tokens": 9000, "output_tokens": 20})
+    JevScreeningClient(client=JevClient(transport=transport2, api_key="k")) \
+        .screen_fulltext_structured({"title": "t", "full_text": "x"}, MAPPING)
+    snap = llm_usage.snapshot("fulltext")
+    assert snap and snap["input_tokens"] == 9000
+    assert snap["cost_usd"] is not None, "jev must be priced so cost is a number"

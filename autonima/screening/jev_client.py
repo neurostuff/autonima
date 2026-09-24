@@ -73,7 +73,7 @@ class JevScreeningClient:
         criteria_mapping: Mapping[str, Mapping[str, str]],
         objective: Optional[str] = None,
     ) -> AbstractScreeningOutput:
-        decision, _ = self._gate(state, criteria_mapping, objective)
+        decision, _ = self._gate(state, criteria_mapping, objective, stage="abstract")
         return AbstractScreeningOutput(
             decision="INCLUDED" if decision.include else "EXCLUDED",
             confidence=decision.confidence,
@@ -89,7 +89,7 @@ class JevScreeningClient:
         objective: Optional[str] = None,
     ) -> FullTextScreeningOutput:
         decision, answers = self._gate(
-            state, criteria_mapping, objective,
+            state, criteria_mapping, objective, stage="fulltext",
             extra_questions={_INCOMPLETE_KEY: FULLTEXT_INCOMPLETE_QUESTION},
         )
         raw = (answers.get(_INCOMPLETE_KEY) or {}).get("noul")
@@ -110,6 +110,7 @@ class JevScreeningClient:
         state: Any,
         criteria_mapping: Optional[Mapping[str, Mapping[str, str]]],
         objective: Optional[str],
+        stage: str = "abstract",
         extra_questions: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Tuple[GateDecision, Dict[str, Any]]:
         # ConfigManager puts the CriteriaMapping DATACLASS on the stage config, while the
@@ -131,7 +132,7 @@ class JevScreeningClient:
             exclusion_threshold=self.exclusion_threshold,
             extra_questions=extra_questions,
         )
-        _record(decision)
+        _record(decision, stage)
         return decision, answers
 
 
@@ -158,16 +159,16 @@ def _explain(decision: GateDecision) -> str:
     return f"[jev] {body}"
 
 
-def _record(decision: GateDecision) -> None:
+def _record(decision: GateDecision, stage: str) -> None:
     """Feed Jev's token counts into the existing usage ledger.
 
-    `record` already understands the `input_tokens`/`output_tokens` shape Jev returns, and
-    `usage.py` prices `jev`, so the response dict goes straight through. Reusing the ledger
-    keeps cost comparable across backends instead of starting a second accounting system.
-    `record` never raises by contract.
+    The stage label MUST be the pipeline's own name -- `abstract`, `fulltext` -- because
+    `execution.py` snapshots usage with `llm_usage.snapshot(stage)` keyed on exactly those.
+    A private label like "jev_screening" records fine and then silently never appears in
+    execution_progress.json, which is how the first full run reported zero cost.
     """
     if decision.usage:
-        record_usage("jev_screening", "jev", dict(decision.usage))
+        record_usage(stage, "jev", dict(decision.usage))
 
 
 def build_state(study: Any, screening_type: str, full_text: Optional[str] = None) -> Dict[str, Any]:

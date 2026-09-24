@@ -265,9 +265,13 @@ class JevAnnotationClient:
 
     @staticmethod
     def _record(usage: Mapping[str, Any]) -> None:
-        """`record` reads `input_tokens`/`output_tokens` from a dict and never raises."""
+        """`record` reads input_tokens/output_tokens from a dict and never raises.
+
+        The label must be "annotation": execution.py snapshots usage per stage with exactly
+        the pipeline's stage names, so a private label records and is then never surfaced.
+        """
         if usage:
-            record_usage("jev_annotation", "jev", dict(usage))
+            record_usage("annotation", "jev", dict(usage))
 
 
 def _explain(decision) -> str:
