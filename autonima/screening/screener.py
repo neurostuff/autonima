@@ -450,6 +450,20 @@ class LLMScreener(ScreeningEngine):
             # Get criteria mapping from config
             criteria_mapping = config.get('criteria_mapping')
             
+            # Jev takes the criteria as separate typed questions, so it branches BEFORE the
+            # prompt is rendered -- building a prompt it never sends would be wasted work, and
+            # the prompt builder expects the CriteriaMapping dataclass while this path accepts
+            # either form. Everything after the call -- result shape, caching, reporting -- is
+            # identical for both backends.
+            if str(config.get("backend", "openai")).lower() == "jev":
+                return self._screen_with_jev(
+                    study=study,
+                    config=config,
+                    screening_type=screening_type,
+                    criteria_mapping=criteria_mapping,
+                    objective=objective,
+                )
+
             # Build prompt with inclusion/exclusion criteria from config
             if screening_type == "abstract":
                 prompt = PromptLibrary.get_abstract_screening_prompt(
@@ -769,6 +783,69 @@ class LLMScreener(ScreeningEngine):
         
         return results
     
+    def _screen_with_jev(
+        self,
+        study,
+        config,
+        screening_type: str,
+        criteria_mapping,
+        objective,
+    ):
+        """Screen one study through Jev, then rejoin the normal result path.
+
+        Deliberately mirrors the tail of `_screen_study` rather than refactoring it: keeping
+        the two backends' bookkeeping textually parallel makes a divergence obvious in review,
+        and this is an experiment that may not survive.
+        """
+        from .jev_client import JevScreeningClient, build_state
+
+        stage = config or {}
+        client = JevScreeningClient(
+            model=stage.get("model", "jev-latest"),
+            inclusion_threshold=float(stage.get("inclusion_threshold", 0.5)),
+            exclusion_threshold=float(stage.get("exclusion_threshold", 0.5)),
+        )
+
+        full_text = None
+        if screening_type != "abstract":
+            if not study.full_text_output_dir:
+                study.full_text_output_dir = str(self.result_dir)
+            study._full_text = None
+            full_text = study.full_text or ""
+
+        state = build_state(study, screening_type, full_text=full_text)
+        if screening_type == "abstract":
+            response = client.screen_abstract_structured(
+                state, criteria_mapping, objective=objective)
+        else:
+            response = client.screen_fulltext_structured(
+                state, criteria_mapping, objective=objective)
+            study.fulltext_incomplete = bool(response.fulltext_incomplete)
+
+        decision = self._get_status_for_decision(screening_type, response.decision)
+        inclusion_applied = response.inclusion_criteria_applied
+        exclusion_applied = response.exclusion_criteria_applied
+        if screening_type == "abstract":
+            study.abstract_inclusion_criteria_applied = inclusion_applied
+            study.abstract_exclusion_criteria_applied = exclusion_applied
+        else:
+            study.fulltext_inclusion_criteria_applied = inclusion_applied
+            study.fulltext_exclusion_criteria_applied = exclusion_applied
+
+        result = self._create_screening_result(
+            study, decision, response.reason, response.confidence,
+            stage.get("model", "jev-latest"), screening_type,
+            inclusion_applied, exclusion_applied,
+        )
+
+        result_dict = result.to_dict()
+        output_dir = self.result_dir / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        save_screening_result_with_lock(
+            output_dir / f"{screening_type}_screening_results.json", result_dict
+        )
+        return result
+
     async def screen_abstracts(
         self,
         studies: List[Study],
