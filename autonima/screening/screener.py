@@ -818,10 +818,12 @@ class LLMScreener(ScreeningEngine):
         state = build_state(study, screening_type, full_text=full_text)
         if screening_type == "abstract":
             response = client.screen_abstract_structured(
-                state, criteria_mapping, objective=objective)
+                state, criteria_mapping, objective=objective,
+                guidance=stage.get("additional_instructions"))
         else:
             response = client.screen_fulltext_structured(
-                state, criteria_mapping, objective=objective)
+                state, criteria_mapping, objective=objective,
+                guidance=stage.get("additional_instructions"))
             study.fulltext_incomplete = bool(response.fulltext_incomplete)
 
         decision = self._get_status_for_decision(screening_type, response.decision)

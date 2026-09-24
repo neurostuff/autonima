@@ -73,8 +73,10 @@ class JevScreeningClient:
         state: Any,
         criteria_mapping: Mapping[str, Mapping[str, str]],
         objective: Optional[str] = None,
+        guidance: Optional[str] = None,
     ) -> AbstractScreeningOutput:
-        decision, _ = self._gate(state, criteria_mapping, objective, stage="abstract")
+        decision, _ = self._gate(state, criteria_mapping, objective, stage="abstract",
+                                 guidance=guidance)
         return AbstractScreeningOutput(
             decision="INCLUDED" if decision.include else "EXCLUDED",
             confidence=decision.confidence,
@@ -89,9 +91,10 @@ class JevScreeningClient:
         state: Any,
         criteria_mapping: Mapping[str, Mapping[str, str]],
         objective: Optional[str] = None,
+        guidance: Optional[str] = None,
     ) -> FullTextScreeningOutput:
         decision, answers = self._gate(
-            state, criteria_mapping, objective, stage="fulltext",
+            state, criteria_mapping, objective, stage="fulltext", guidance=guidance,
             extra_questions={_INCOMPLETE_KEY: FULLTEXT_INCOMPLETE_QUESTION},
         )
         raw = (answers.get(_INCOMPLETE_KEY) or {}).get("noul")
@@ -114,6 +117,7 @@ class JevScreeningClient:
         criteria_mapping: Optional[Mapping[str, Mapping[str, str]]],
         objective: Optional[str],
         stage: str = "abstract",
+        guidance: Optional[str] = None,
         extra_questions: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Tuple[GateDecision, Dict[str, Any]]:
         # ConfigManager puts the CriteriaMapping DATACLASS on the stage config, while the
@@ -129,13 +133,15 @@ class JevScreeningClient:
             )
         # Full-text screening sends a whole article; long ones exceed the 32k state budget.
         # Reserve the longest question so the state-plus-question limit is respected too.
-        probe = build_criteria_questions(criteria_mapping, objective=objective)
+        probe = build_criteria_questions(criteria_mapping, objective=objective,
+                                         guidance=guidance)
         longest = max((estimate_tokens({k: q}) for k, q in probe.items()), default=0)
         state, _ = fit_state(state, reserve_tokens=longest)
         decision, answers = self.client.gate(
             state=state,
             criteria_mapping=criteria_mapping,
             objective=objective,
+            guidance=guidance,
             inclusion_threshold=self.inclusion_threshold,
             exclusion_threshold=self.exclusion_threshold,
             extra_questions=extra_questions,

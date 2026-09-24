@@ -45,8 +45,9 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-from ..backends.jev import (JevClient, JevError, apply_gate, estimate_tokens, fit_state,
-                            normalise_mapping, plan_chunks)
+from ..backends.jev import (JevClient, JevError, apply_gate, criterion_text,
+                            estimate_tokens, fit_state, normalise_mapping,
+                            plan_chunks)
 from ..llm.usage import record as record_usage
 from .schema import (
     AnalysisMetadata,
@@ -69,10 +70,10 @@ def mapping_for(criteria: AnnotationCriteriaConfig) -> Dict[str, Dict[str, str]]
     if mapping["inclusion"] or mapping["exclusion"]:
         return mapping
     return {
-        "inclusion": {f"I{i}": text
-                      for i, text in enumerate(criteria.inclusion_criteria or [], start=1)},
-        "exclusion": {f"E{i}": text
-                      for i, text in enumerate(criteria.exclusion_criteria or [], start=1)},
+        "inclusion": {f"I{i}": spec
+                      for i, spec in enumerate(criteria.inclusion_criteria or [], start=1)},
+        "exclusion": {f"E{i}": spec
+                      for i, spec in enumerate(criteria.exclusion_criteria or [], start=1)},
     }
 
 
@@ -132,9 +133,11 @@ class JevAnnotationClient:
         model: str = "jev-latest",
         inclusion_threshold: float = 0.5,
         exclusion_threshold: float = 0.5,
+        guidance: Optional[str] = None,
         client: Optional[JevClient] = None,
     ) -> None:
         self.client = client or JevClient(api_key=api_key, model=model)
+        self.guidance = guidance
         self.inclusion_threshold = inclusion_threshold
         self.exclusion_threshold = exclusion_threshold
 
@@ -160,7 +163,8 @@ class JevAnnotationClient:
             return []
 
         state = build_state(metadata, metadata_fields)
-        questions, index = self._build_questions(analyses, criteria_list, metadata_fields)
+        questions, index = self._build_questions(
+            analyses, criteria_list, metadata_fields, guidance=self.guidance)
         if not questions:
             logger.warning("No criteria to evaluate for study %s; returning no decisions",
                            getattr(metadata, "study_id", "?"))
@@ -176,6 +180,7 @@ class JevAnnotationClient:
         analyses: Sequence[AnalysisMetadata],
         criteria_list: Sequence[AnnotationCriteriaConfig],
         metadata_fields: Sequence[str],
+        guidance: Optional[str] = None,
     ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Tuple[str, str, str]]]:
         """Returns (questions, index) where index maps key -> (analysis_id, annotation, crit)."""
         questions: Dict[str, Dict[str, Any]] = {}
@@ -185,8 +190,12 @@ class JevAnnotationClient:
             described = describe_analysis(analysis, metadata_fields)
             for criteria in criteria_list:
                 mapping = mapping_for(criteria)
+                local = " ".join(x for x in (guidance, criteria.additional_instructions) if x)
                 for kind in ("inclusion", "exclusion"):
-                    for criterion_id, text in mapping[kind].items():
+                    for criterion_id, spec in mapping[kind].items():
+                        text = criterion_text(spec)
+                        t_desc = spec.get("true") if isinstance(spec, dict) else None
+                        f_desc = spec.get("false") if isinstance(spec, dict) else None
                         key = f"q{n}"
                         n += 1
                         instructions: Dict[str, Any] = {
@@ -199,12 +208,14 @@ class JevAnnotationClient:
                         }
                         if criteria.description:
                             instructions["target_contrast"] = criteria.description
+                        if local:
+                            instructions["guidance"] = local
                         questions[key] = {
                             "type": "noul",
                             "instructions": instructions,
                             "criteria": {
-                                "true": f"This analysis satisfies: {text}",
-                                "false": f"This analysis does not satisfy: {text}",
+                                "true": t_desc or f"This analysis satisfies: {text}",
+                                "false": f_desc or f"This analysis does not satisfy: {text}",
                             },
                         }
                         index[key] = (analysis.analysis_id, criteria.name, criterion_id)

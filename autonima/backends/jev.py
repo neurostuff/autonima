@@ -206,6 +206,7 @@ def normalise_mapping(criteria_mapping: Any) -> Dict[str, Dict[str, str]]:
             "inclusion": dict(getattr(criteria_mapping, "inclusion", {}) or {}),
             "exclusion": dict(getattr(criteria_mapping, "exclusion", {}) or {}),
         }
+    # values may be a plain string or a {statement, true, false} mapping; both pass through
     return {
         "inclusion": dict((criteria_mapping.get("inclusion") or {})),
         "exclusion": dict((criteria_mapping.get("exclusion") or {})),
@@ -215,6 +216,7 @@ def normalise_mapping(criteria_mapping: Any) -> Dict[str, Dict[str, str]]:
 def build_criteria_questions(
     criteria_mapping: Any,
     objective: Optional[str] = None,
+    guidance: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """One Noul question per criterion, keyed by the criterion ID autonima already assigns.
 
@@ -227,26 +229,55 @@ def build_criteria_questions(
     expects, rather than as an instruction to a chat model. `criteria` pins down what true and
     false mean so a criterion phrased as a noun phrase ("adult participants") is not read as a
     question about the study's topic.
+
+    A criterion may be a plain string, or a mapping carrying its own boundary cases:
+
+        {"statement": "...", "true": "counts when ...", "false": "does not count when ..."}
+
+    The docs are explicit that boundary cases belong in `criteria` rather than in the
+    statement, because jev-1.13 reads the statement literally and a caveat buried in it
+    becomes part of the proposition being judged.
+
+    `guidance` is instruction that is NOT a criterion -- labelling policy, how to read a
+    missing analysis name -- and it rides alongside every question instead of being scored as
+    though it were a property of the study. Putting such text in the criteria list is what
+    made an entire target contrast unselectable on the first real run.
     """
     criteria_mapping = normalise_mapping(criteria_mapping)
     questions: Dict[str, Dict[str, Any]] = {}
     for kind, prefix_key in (("inclusion", "inclusion"), ("exclusion", "exclusion")):
-        for criterion_id, text in (criteria_mapping.get(prefix_key) or {}).items():
+        for criterion_id, spec in (criteria_mapping.get(prefix_key) or {}).items():
+            text, t_desc, f_desc = _unpack_criterion(spec)
             instructions: Any = {
                 "criterion": text,
                 "question": "Is `criterion` true of the study described in the state?",
             }
             if objective:
                 instructions["review_objective"] = objective
+            if guidance:
+                instructions["guidance"] = guidance
             questions[criterion_id] = {
                 "type": "noul",
                 "instructions": instructions,
                 "criteria": {
-                    "true": f"The study satisfies: {text}",
-                    "false": f"The study does not satisfy, or does not report, {text}",
+                    "true": t_desc or f"The study satisfies: {text}",
+                    "false": f_desc or f"The study does not satisfy, or does not report, {text}",
                 },
             }
     return questions
+
+
+def _unpack_criterion(spec: Any) -> Tuple[str, Optional[str], Optional[str]]:
+    """(statement, true-description, false-description) from a string or a mapping."""
+    if isinstance(spec, Mapping):
+        statement = str(spec.get("statement") or spec.get("text") or "").strip()
+        return statement, spec.get("true"), spec.get("false")
+    return str(spec), None, None
+
+
+def criterion_text(spec: Any) -> str:
+    """The statement alone, for display and for the annotation path's own question builder."""
+    return _unpack_criterion(spec)[0]
 
 
 def apply_gate(
@@ -297,6 +328,14 @@ def apply_gate(
                 margin=0.0 if missing else abs(probability - threshold),
             ))
 
+    if not verdicts:
+        # all([]) is True, so an empty mapping would wave every item through. That is the same
+        # silently-lenient failure as a dropped answer, and it is reachable: a criteria set
+        # whose IDs the caller mis-parsed produces exactly this. Refuse instead.
+        raise JevError(
+            "apply_gate received no criteria; refusing to return a vacuous include. "
+            "Check that the criteria mapping's IDs match the answer keys."
+        )
     include = all(v.satisfied for v in verdicts)
     confidence = min((v.margin for v in verdicts), default=0.0) * 2.0  # margin 0.5 -> 1.0
     return GateDecision(
@@ -388,6 +427,7 @@ class JevClient:
         state: Any,
         criteria_mapping: Any,
         objective: Optional[str] = None,
+        guidance: Optional[str] = None,
         inclusion_threshold: float = 0.5,
         exclusion_threshold: float = 0.5,
         extra_questions: Optional[Mapping[str, Mapping[str, Any]]] = None,
@@ -397,7 +437,8 @@ class JevClient:
         `extra_questions` rides along in the same call -- used for `fulltext_incomplete`, which
         the chat path asks the model to self-report and which is cleaner as its own Noul.
         """
-        questions = dict(build_criteria_questions(criteria_mapping, objective=objective))
+        questions = dict(build_criteria_questions(criteria_mapping, objective=objective,
+                                                  guidance=guidance))
         if extra_questions:
             overlap = set(questions) & set(extra_questions)
             if overlap:

@@ -463,6 +463,9 @@ class ConfigManager:
                 # OpenAI, and why `model_params` never took effect for annotation at all.
                 model_params=annotation_dict.get('model_params'),
                 backend=annotation_dict.get('backend', 'openai'),
+                additional_instructions=annotation_dict.get(
+                    'additional_instructions'
+                ),
                 inclusion_threshold=annotation_dict.get('inclusion_threshold', 0.5),
                 exclusion_threshold=annotation_dict.get('exclusion_threshold', 0.5),
             )

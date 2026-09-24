@@ -289,8 +289,10 @@ def test_backend_jev_routes_through_the_jev_path(tmp_path, monkeypatch):
         def __init__(self, **kwargs):
             seen["init"] = kwargs
 
-        def screen_abstract_structured(self, state, criteria_mapping, objective=None):
+        def screen_abstract_structured(self, state, criteria_mapping, objective=None,
+                                       guidance=None):
             seen["state"], seen["mapping"], seen["objective"] = state, criteria_mapping, objective
+            seen["guidance"] = guidance
             from autonima.screening.schema import AbstractScreeningOutput
 
             return AbstractScreeningOutput(
@@ -425,7 +427,8 @@ def test_probabilities_survive_into_the_persisted_screening_result(tmp_path, mon
         def __init__(self, **kwargs):
             pass
 
-        def screen_abstract_structured(self, state, criteria_mapping, objective=None):
+        def screen_abstract_structured(self, state, criteria_mapping, objective=None,
+                                       guidance=None):
             from autonima.screening.schema import AbstractScreeningOutput
 
             return AbstractScreeningOutput(
@@ -440,3 +443,13 @@ def test_probabilities_survive_into_the_persisted_screening_result(tmp_path, mon
     assert result.criterion_probabilities["I2"] == 0.66
     assert "criterion_probabilities" in result.to_dict()
     assert result.to_dict()["criterion_probabilities"]["E1"] == 0.2
+
+
+def test_empty_criteria_refuses_rather_than_including_everything():
+    """all([]) is True. An empty mapping must not wave every item through.
+
+    Reachable in practice: a threshold sweep that mis-parses criterion IDs builds an empty
+    mapping and would otherwise report 100% selection at every threshold.
+    """
+    with pytest.raises(JevError):
+        apply_gate(nouls(I1=0.9), {"inclusion": {}, "exclusion": {}})

@@ -47,6 +47,7 @@ class AnnotationProcessor:
                 model=config.model or "jev-latest",
                 inclusion_threshold=float(getattr(config, "inclusion_threshold", 0.5) or 0.5),
                 exclusion_threshold=float(getattr(config, "exclusion_threshold", 0.5) or 0.5),
+                guidance=getattr(config, "additional_instructions", None),
             )
         else:
             self.client = AnnotationClient(max_retries=max_retries)

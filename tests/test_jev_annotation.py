@@ -403,6 +403,7 @@ def test_every_annotation_config_field_is_reachable_from_yaml(tmp_path):
         "metadata_fields": ["analysis_name"], "inclusion_criteria": ["i"],
         "exclusion_criteria": ["e"], "inclusion_threshold": 0.9,
         "exclusion_threshold": 0.1, "model_params": {"k": "v"},
+        "additional_instructions": "labelling policy that is not a criterion",
     }
     missing = set(AnnotationConfig.model_fields) - set(probe) - ignore
     assert not missing, f"AnnotationConfig gained fields with no loader coverage: {missing}"
