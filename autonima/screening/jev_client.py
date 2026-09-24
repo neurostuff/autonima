@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional, Tuple
 
-from ..backends.jev import GateDecision, JevClient, JevError
+from ..backends.jev import GateDecision, JevClient, JevError, normalise_mapping
 from ..llm.usage import record as record_usage
 from .schema import AbstractScreeningOutput, FullTextScreeningOutput
 
@@ -112,9 +112,11 @@ class JevScreeningClient:
         objective: Optional[str],
         extra_questions: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Tuple[GateDecision, Dict[str, Any]]:
-        if not criteria_mapping or not (
-            criteria_mapping.get("inclusion") or criteria_mapping.get("exclusion")
-        ):
+        # ConfigManager puts the CriteriaMapping DATACLASS on the stage config, while the
+        # executed YAML and the annotation path carry the dict. Normalise before touching it:
+        # calling .get() on the dataclass is what broke the first full-project run.
+        criteria_mapping = normalise_mapping(criteria_mapping)
+        if not (criteria_mapping["inclusion"] or criteria_mapping["exclusion"]):
             # Without criteria there is nothing to gate on. The chat path would still return a
             # verdict from the objective alone; this backend cannot and should not pretend to.
             raise JevError(
@@ -159,24 +161,13 @@ def _explain(decision: GateDecision) -> str:
 def _record(decision: GateDecision) -> None:
     """Feed Jev's token counts into the existing usage ledger.
 
-    `record` expects an object with `prompt_tokens`/`completion_tokens`; Jev reports
-    `input_tokens`/`output_tokens`, and output is free. Reusing the ledger keeps the cost
-    figures comparable across backends instead of starting a second accounting system.
+    `record` already understands the `input_tokens`/`output_tokens` shape Jev returns, and
+    `usage.py` prices `jev`, so the response dict goes straight through. Reusing the ledger
+    keeps cost comparable across backends instead of starting a second accounting system.
+    `record` never raises by contract.
     """
-    usage = decision.usage or {}
-    if not usage:
-        return
-
-    class _Usage:
-        prompt_tokens = int(usage.get("input_tokens", 0) or 0)
-        completion_tokens = int(usage.get("output_tokens", 0) or 0)
-        total_tokens = prompt_tokens + completion_tokens
-
-    try:
-        record_usage("jev_screening", "jev", _Usage())
-    except Exception:
-        # Usage accounting must never take a run down.
-        pass
+    if decision.usage:
+        record_usage("jev_screening", "jev", dict(decision.usage))
 
 
 def build_state(study: Any, screening_type: str, full_text: Optional[str] = None) -> Dict[str, Any]:

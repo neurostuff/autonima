@@ -340,3 +340,29 @@ def test_default_backend_is_unchanged(tmp_path):
     assert cfg.abstract.get("backend") == "openai"
     # the jev branch keys off the string, so anything else falls through to the chat client
     assert str(cfg.abstract.get("backend", "openai")).lower() != "jev"
+
+
+def test_adapter_accepts_the_criteria_mapping_dataclass():
+    """ConfigManager hands the screener the dataclass, not a dict.
+
+    Regression: the first full-project run failed on all 1,253 abstracts with
+    "'CriteriaMapping' object has no attribute 'get'". The low-level helpers normalised, the
+    adapter's own guard did not, and every adapter test here passed a dict.
+    """
+    from autonima.utils.criteria import CriteriaMapping
+
+    dc = CriteriaMapping(inclusion=MAPPING["inclusion"], exclusion=MAPPING["exclusion"])
+    transport, seen = transport_returning(nouls(I1=0.9, I2=0.9, E1=0.0, E2=0.0))
+    out = JevScreeningClient(client=JevClient(transport=transport, api_key="k")) \
+        .screen_abstract_structured({"title": "t"}, dc)
+    assert out.decision == "INCLUDED"
+    assert set(seen["payload"]["questions"]) == {"I1", "I2", "E1", "E2"}
+
+
+def test_adapter_rejects_an_empty_dataclass_mapping():
+    from autonima.utils.criteria import CriteriaMapping
+
+    transport, _ = transport_returning({})
+    with pytest.raises(JevError):
+        JevScreeningClient(client=JevClient(transport=transport, api_key="k")) \
+            .screen_abstract_structured({"title": "t"}, CriteriaMapping())

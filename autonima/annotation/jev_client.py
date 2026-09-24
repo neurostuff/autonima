@@ -265,18 +265,9 @@ class JevAnnotationClient:
 
     @staticmethod
     def _record(usage: Mapping[str, Any]) -> None:
-        if not usage:
-            return
-
-        class _Usage:
-            prompt_tokens = int(usage.get("input_tokens", 0) or 0)
-            completion_tokens = int(usage.get("output_tokens", 0) or 0)
-            total_tokens = prompt_tokens + completion_tokens
-
-        try:
-            record_usage("jev_annotation", "jev", _Usage())
-        except Exception:
-            pass
+        """`record` reads `input_tokens`/`output_tokens` from a dict and never raises."""
+        if usage:
+            record_usage("jev_annotation", "jev", dict(usage))
 
 
 def _explain(decision) -> str:
