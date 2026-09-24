@@ -115,6 +115,46 @@ flip the model correctly reports as one. That is the calibration the chat path c
 Two open questions are now closed: a full text **fits in `state`**, and the payload we build is
 accepted as specified.
 
+## Known failure modes we are walking into
+
+TypeSafe publish a [jaggedness page](https://docs.typesafe.ai/model-jaggedness/jev-1.13) for
+jev-1.13. Three of its nine documented failure modes describe this integration directly.
+
+**1. Literal reading** — *"answers the question you wrote, not the one you meant… when you look
+at a wrong answer and find yourself explaining what you really meant, that explanation is the
+missing half of the instruction."*
+
+This is exactly the `maintain` failure. Criteria such as `GLOBAL_I5` ("Assign every label that
+applies…") are instructions to a reader, not propositions, and a literal evaluator scores them
+near zero. A chat model silently absorbs them as guidance. **Criteria have to be rewritten as
+statements that can be true or false of one analysis**, with boundary cases moved into the
+Noul's `criteria.true` / `criteria.false`, and compound criteria split into two questions
+combined in code.
+
+**5. Large state full of irrelevant detail** — *"Accuracy falls as the state grows with content
+unrelated to the decision… Jev suffers from context rot."*
+
+We send an entire article — 60k characters, ~15k tokens — as the state for every question,
+when the evidence for any one criterion is usually a table caption, an analysis description and
+a paragraph of methods. This is the documented anti-pattern, and we are at the extreme of it.
+The recommended fix is to filter in code first, or to use a Noul to select relevant passages.
+**Untested here, and the most likely remaining explanation for Jev's conservatism** once the
+instruction-shaped criteria are fixed.
+
+**4. Indirection** — *"a question about a property of a property… costs accuracy."*
+
+Selection questions ask whether a criterion holds of an analysis named in the instructions,
+judged against an article in the state. That is a hop. Putting the analysis's own table and
+caption in the state, one call per analysis, trades calls for directness and is worth measuring.
+
+Two smaller ones worth knowing: **contradictory instructions and criteria** degrade accuracy,
+so the auto-generated `true`/`false` descriptions must read coherently for the criterion they
+wrap — they do not when the criterion is an instruction. And **structural invariants do not
+hold**: a Noul is absolute rather than relative, base rates differ sharply per criterion
+(observed means from 0.18 to 0.75 on the same corpus), so a single global threshold across all
+criteria is not obviously right. Per-criterion thresholds are a cheap thing to try, since
+sweeping costs nothing.
+
 ## Testing
 
 `tests/test_jev_backend.py` covers question construction, the gate arithmetic, transport
