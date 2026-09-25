@@ -851,8 +851,14 @@ class AnnotationProcessor:
                     
                     decision = AnnotationDecision(**item)
                     decisions.append(decision)
-                
-                return decisions
+
+                # Re-gate here rather than at each call site. This is the single door to
+                # cached decisions, and the NiMADS writer -- which is what actually reaches
+                # the maps -- loads through it directly without going near the filtering
+                # path. Re-gating only there meant a threshold change moved the returned
+                # decisions and left the written studyset untouched, so the run looked
+                # tuned and the maps were not.
+                return [self._regate(d) for d in decisions]
         except Exception as e:
             logger.warning(f"Failed to load cached annotation results: {e}")
         

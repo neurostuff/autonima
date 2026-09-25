@@ -473,3 +473,31 @@ def test_decisions_without_probabilities_pass_through_untouched():
     proc = AnnotationProcessor(AnnotationConfig(annotations=[criteria()],
                                                 inclusion_threshold=0.99))
     assert proc._regate(d) is d
+
+
+def test_loading_cached_results_applies_the_current_threshold(tmp_path, monkeypatch):
+    # The NiMADS writer -- what actually feeds the maps -- loads cached decisions directly,
+    # bypassing the filtering path. Re-gating only in the filter meant a threshold change
+    # moved the returned decisions and left the written studyset untouched.
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key-never-used")
+    import json
+    from autonima.annotation.processor import AnnotationProcessor
+    from autonima.annotation.schema import AnnotationConfig
+
+    out = tmp_path / "outputs"
+    out.mkdir()
+    (out / "annotation_results.json").write_text(json.dumps([{
+        "annotation_name": "reappraisal", "analysis_id": "a0", "study_id": "S1",
+        "include": False, "reasoning": "[jev] inclusion not met", "model_used": "jev-latest",
+        "criterion_probabilities": {"I1": 0.42, "I2": 0.38, "E1": 0.02},
+    }]))
+
+    strict = AnnotationProcessor(AnnotationConfig(
+        backend="jev", model="jev-latest", annotations=[criteria()],
+        inclusion_threshold=0.5))
+    assert strict._load_cached_results(str(tmp_path))[0].include is False
+
+    loose = AnnotationProcessor(AnnotationConfig(
+        backend="jev", model="jev-latest", annotations=[criteria()],
+        inclusion_threshold=0.3))
+    assert loose._load_cached_results(str(tmp_path))[0].include is True
