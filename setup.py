@@ -36,11 +36,16 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Topic :: Scientific/Engineering :: Medical Science Apps.",
     ],
-    python_requires=">=3.10",
+    python_requires=">=3.10,<3.12",
+    # Python 3.12 is NOT supported, for two independent reasons:
+    #   * pubget caps joblib at <=1.1.1, and joblib 1.1.1 imports distutils,
+    #     which 3.12 removed -- autonima.retrieval fails to import.
+    #   * the scikit-learn pulled in by that same chain imports ComplexWarning
+    #     from numpy.core.numeric, which numpy 2.0 removed.
+    # Both are upstream. Relaxing pubget's joblib cap is the first thing to fix.
     install_requires=[
         "pyyaml>=6.0",
         "pydantic>=2.0",
