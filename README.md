@@ -5,13 +5,6 @@ meta-analysis. It automates article screening against expert-defined eligibility
 criteria, parses heterogeneous coordinate tables into the distinct analyses that
 produced them, and selects individual analyses for quantitative synthesis.
 
-The distinction that matters is between an **article** and an **analysis**. A
-relevant paper often reports several experimental comparisons, only some of which
-address a given question — increases and decreases, patients and controls,
-whole-brain and region-of-interest. Automated synthesis frameworks have generally
-pooled every coordinate in an included paper. Autonima selects at the level of the
-individual analysis, which is where its accuracy comes from.
-
 Full documentation: https://neurostuff.github.io/autonima/
 
 ## The workflow
