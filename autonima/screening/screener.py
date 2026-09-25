@@ -16,6 +16,7 @@ from .prompts import (
     FULLTEXT_SCREENING_PROMPT_VERSION,
     PromptLibrary,
 )
+from ..backends.jev import POST_HOC_CONFIG_KEYS, regate
 from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
@@ -326,15 +327,43 @@ class LLMScreener(ScreeningEngine):
             if screening_type == "abstract"
             else FULLTEXT_SCREENING_PROMPT_VERSION
         )
+        # Thresholds are applied to stored probabilities AFTER the call, so they change how
+        # a cached answer is read, not what was asked. Keeping them out of the hash is what
+        # lets a threshold be re-tuned without paying for the corpus again.
+        hashable = {k: v for k, v in config.items()
+                    if k not in POST_HOC_CONFIG_KEYS}
         return {
             "schema_version": CACHE_SCHEMA_VERSION,
             "stage": screening_type,
             "stage_hash": stable_hash(
-                {**config, "prompt_version": prompt_version}
+                {**hashable, "prompt_version": prompt_version}
             ),
             "study_input_hash": self._study_input_hash(study, screening_type),
             "model": model,
         }
+
+    def _regate_cached(
+        self,
+        existing_result: Dict[str, Any],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Apply the configured thresholds to a cached result's stored probabilities."""
+        probabilities = existing_result.get("criterion_probabilities") or {}
+        include = regate(
+            probabilities,
+            float(config.get("inclusion_threshold", 0.5)),
+            float(config.get("exclusion_threshold", 0.5)),
+        )
+        if include is None:
+            return existing_result
+        screening_type = existing_result.get("screening_type", "abstract")
+        want = self._get_status_for_decision(
+            screening_type, "INCLUDED" if include else "EXCLUDED").value
+        if str(existing_result.get("decision", "")).strip().lower() == want:
+            return existing_result
+        updated = dict(existing_result)
+        updated["decision"] = want
+        return updated
 
     def _cached_signature_matches(
         self,
@@ -411,7 +440,8 @@ class LLMScreener(ScreeningEngine):
         model: str,
         screening_type: str,
         inclusion_criteria_applied: List[str] = None,
-        exclusion_criteria_applied: List[str] = None
+        exclusion_criteria_applied: List[str] = None,
+        criterion_probabilities: Dict[str, float] = None,
     ) -> ScreeningResult:
         """Create a ScreeningResult object."""
         return ScreeningResult(
@@ -423,6 +453,7 @@ class LLMScreener(ScreeningEngine):
             screening_type=screening_type,
             inclusion_criteria_applied=inclusion_criteria_applied or [],
             exclusion_criteria_applied=exclusion_criteria_applied or [],
+            criterion_probabilities=criterion_probabilities or {},
             cache_signature=self._screening_cache_signature(
                 study,
                 screening_type,
@@ -450,6 +481,20 @@ class LLMScreener(ScreeningEngine):
             # Get criteria mapping from config
             criteria_mapping = config.get('criteria_mapping')
             
+            # Jev takes the criteria as separate typed questions, so it branches BEFORE the
+            # prompt is rendered -- building a prompt it never sends would be wasted work, and
+            # the prompt builder expects the CriteriaMapping dataclass while this path accepts
+            # either form. Everything after the call -- result shape, caching, reporting -- is
+            # identical for both backends.
+            if str(config.get("backend", "openai")).lower() == "jev":
+                return self._screen_with_jev(
+                    study=study,
+                    config=config,
+                    screening_type=screening_type,
+                    criteria_mapping=criteria_mapping,
+                    objective=objective,
+                )
+
             # Build prompt with inclusion/exclusion criteria from config
             if screening_type == "abstract":
                 prompt = PromptLibrary.get_abstract_screening_prompt(
@@ -644,6 +689,11 @@ class LLMScreener(ScreeningEngine):
                     studies_to_screen.append(study)
                     continue
                 
+                # A cached result from a calibrated backend carries its probability vector,
+                # so the CURRENT threshold is applied to it here. Without this the signature
+                # would match and the old threshold's verdict would silently persist.
+                existing_result = self._regate_cached(existing_result, config)
+
                 # Normalize cached decisions to the current screening stage.
                 old_decision = str(existing_result["decision"]).strip().lower()
                 if (
@@ -690,7 +740,15 @@ class LLMScreener(ScreeningEngine):
                     existing_result["model_used"],
                     screening_type,
                     existing_result.get("inclusion_criteria_applied", []),
-                    existing_result.get("exclusion_criteria_applied", [])
+                    existing_result.get("exclusion_criteria_applied", []),
+                    # Carry the probability vector forward. Dropping it here silently
+                    # degrades a cached corpus on every re-save: the rows that were
+                    # recomputed keep their probabilities, the reused ones lose them, and
+                    # the threshold sweep the backend exists for stops working on exactly
+                    # the studies that did not change.
+                    criterion_probabilities=existing_result.get(
+                        "criterion_probabilities", {}
+                    ),
                 ))
             else:
                 studies_to_screen.append(study)
@@ -769,6 +827,72 @@ class LLMScreener(ScreeningEngine):
         
         return results
     
+    def _screen_with_jev(
+        self,
+        study,
+        config,
+        screening_type: str,
+        criteria_mapping,
+        objective,
+    ):
+        """Screen one study through Jev, then rejoin the normal result path.
+
+        Deliberately mirrors the tail of `_screen_study` rather than refactoring it: keeping
+        the two backends' bookkeeping textually parallel makes a divergence obvious in review,
+        and this is an experiment that may not survive.
+        """
+        from .jev_client import JevScreeningClient, build_state
+
+        stage = config or {}
+        client = JevScreeningClient(
+            model=stage.get("model", "jev-latest"),
+            inclusion_threshold=float(stage.get("inclusion_threshold", 0.5)),
+            exclusion_threshold=float(stage.get("exclusion_threshold", 0.5)),
+        )
+
+        full_text = None
+        if screening_type != "abstract":
+            if not study.full_text_output_dir:
+                study.full_text_output_dir = str(self.result_dir)
+            study._full_text = None
+            full_text = study.full_text or ""
+
+        state = build_state(study, screening_type, full_text=full_text)
+        if screening_type == "abstract":
+            response = client.screen_abstract_structured(
+                state, criteria_mapping, objective=objective,
+                guidance=stage.get("additional_instructions"))
+        else:
+            response = client.screen_fulltext_structured(
+                state, criteria_mapping, objective=objective,
+                guidance=stage.get("additional_instructions"))
+            study.fulltext_incomplete = bool(response.fulltext_incomplete)
+
+        decision = self._get_status_for_decision(screening_type, response.decision)
+        inclusion_applied = response.inclusion_criteria_applied
+        exclusion_applied = response.exclusion_criteria_applied
+        if screening_type == "abstract":
+            study.abstract_inclusion_criteria_applied = inclusion_applied
+            study.abstract_exclusion_criteria_applied = exclusion_applied
+        else:
+            study.fulltext_inclusion_criteria_applied = inclusion_applied
+            study.fulltext_exclusion_criteria_applied = exclusion_applied
+
+        result = self._create_screening_result(
+            study, decision, response.reason, response.confidence,
+            stage.get("model", "jev-latest"), screening_type,
+            inclusion_applied, exclusion_applied,
+            criterion_probabilities=response.criterion_probabilities,
+        )
+
+        result_dict = result.to_dict()
+        output_dir = self.result_dir / "outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        save_screening_result_with_lock(
+            output_dir / f"{screening_type}_screening_results.json", result_dict
+        )
+        return result
+
     async def screen_abstracts(
         self,
         studies: List[Study],

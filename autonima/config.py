@@ -455,7 +455,19 @@ class ConfigManager:
                 ),
                 exclusion_criteria=annotation_dict.get(
                     'exclusion_criteria', []
-                )
+                ),
+                # This constructor is an explicit allowlist, so every field added to
+                # AnnotationConfig has to be repeated here or it is silently dropped -- the
+                # YAML parses, validation passes, and the stage runs with the default. That is
+                # how `backend: jev` reached a full project run and still sent requests to
+                # OpenAI, and why `model_params` never took effect for annotation at all.
+                model_params=annotation_dict.get('model_params'),
+                backend=annotation_dict.get('backend', 'openai'),
+                additional_instructions=annotation_dict.get(
+                    'additional_instructions'
+                ),
+                inclusion_threshold=annotation_dict.get('inclusion_threshold', 0.5),
+                exclusion_threshold=annotation_dict.get('exclusion_threshold', 0.5),
             )
             
             return annotation_config

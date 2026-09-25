@@ -10,6 +10,7 @@ from tqdm import tqdm
 from .schema import AnnotationConfig, AnnotationDecision, AnalysisMetadata, AnnotationCriteriaConfig
 from .client import AnnotationClient
 from .prompts import ANNOTATION_PROMPT_VERSION
+from ..backends.jev import POST_HOC_CONFIG_KEYS, regate
 from ..models.types import Study
 from ..coordinates.schema import Analysis
 from ..coordinates.nimads_models import sanitize_analysis_name
@@ -36,12 +37,31 @@ class AnnotationProcessor:
             max_retries: Maximum number of retries for malformed LLM responses
         """
         self.config = config
-        self.client = AnnotationClient(max_retries=max_retries)
+        # Selecting the backend here, rather than at each call site, keeps every downstream
+        # path (caching, signatures, result writing) identical for both: the two clients share
+        # `make_decision`'s signature and return type, so nothing else has to know which is in
+        # play. `backend` defaults to openai, so an existing config behaves exactly as before.
+        if str(getattr(config, "backend", "openai") or "openai").lower() == "jev":
+            from .jev_client import JevAnnotationClient
+
+            self.client = JevAnnotationClient(
+                model=config.model or "jev-latest",
+                inclusion_threshold=float(getattr(config, "inclusion_threshold", 0.5) or 0.5),
+                exclusion_threshold=float(getattr(config, "exclusion_threshold", 0.5) or 0.5),
+                guidance=getattr(config, "additional_instructions", None),
+            )
+        else:
+            self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
+        # Thresholds are post-hoc over stored probabilities: they change how a cached answer
+        # is read, not what the model was asked. Excluding them means re-tuning a threshold
+        # reuses every cached decision instead of re-billing the corpus. `model_params` is
+        # excluded for the same reason -- it tunes the request envelope, not the question.
         self.stage_hash = stable_hash(
             {
-                **self.config.model_dump(),
+                **{k: v for k, v in self.config.model_dump().items()
+                   if k not in POST_HOC_CONFIG_KEYS and k != "model_params"},
                 "prompt_version": ANNOTATION_PROMPT_VERSION,
             }
         )
@@ -545,9 +565,25 @@ class AnnotationProcessor:
                 study is not None
                 and result.cache_signature == self._cache_signature(study, name)
             ):
-                filtered.append(result)
+                filtered.append(self._regate(result))
 
         return filtered
+
+    def _regate(self, result: AnnotationDecision) -> AnnotationDecision:
+        """Apply the CURRENT thresholds to a cached decision's stored probabilities.
+
+        The signature deliberately ignores thresholds, so without this a cached decision
+        would keep the verdict of whatever threshold produced it. Decisions from a backend
+        that stores no probabilities pass through untouched.
+        """
+        include = regate(
+            result.criterion_probabilities or {},
+            float(getattr(self.config, "inclusion_threshold", 0.5) or 0.5),
+            float(getattr(self.config, "exclusion_threshold", 0.5) or 0.5),
+        )
+        if include is None or include == bool(result.include):
+            return result
+        return result.model_copy(update={"include": include})
     
     def _get_annotations_with_complete_results_for_study(
         self,
@@ -815,8 +851,14 @@ class AnnotationProcessor:
                     
                     decision = AnnotationDecision(**item)
                     decisions.append(decision)
-                
-                return decisions
+
+                # Re-gate here rather than at each call site. This is the single door to
+                # cached decisions, and the NiMADS writer -- which is what actually reaches
+                # the maps -- loads through it directly without going near the filtering
+                # path. Re-gating only there meant a threshold change moved the returned
+                # decisions and left the written studyset untouched, so the run looked
+                # tuned and the maps were not.
+                return [self._regate(d) for d in decisions]
         except Exception as e:
             logger.warning(f"Failed to load cached annotation results: {e}")
         

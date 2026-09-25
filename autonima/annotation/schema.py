@@ -11,9 +11,13 @@ class AnnotationCriteriaConfig(BaseModel):
     """Configuration for a single annotation criteria."""
     name: str
     description: Optional[str] = None
-    inclusion_criteria: List[str] = []
-    exclusion_criteria: List[str] = []
-    criteria_mapping: Optional[Dict[str, Dict[str, str]]] = None
+    inclusion_criteria: List[Any] = []
+    exclusion_criteria: List[Any] = []
+    criteria_mapping: Optional[Dict[str, Dict[str, Any]]] = None
+    # Guidance that is NOT a criterion: labelling policy, how to read a missing analysis
+    # name. It reaches the model alongside every question for this target but is never
+    # scored as though it were a property of the study. Criteria lists are for propositions.
+    additional_instructions: Optional[str] = None
 
 
 class AnnotationConfig(BaseModel):
@@ -32,6 +36,15 @@ class AnnotationConfig(BaseModel):
     create_all_included_annotations: bool = True
     annotations: List[AnnotationCriteriaConfig] = []
     enabled: bool = True
+    # Decision backend: "openai" (chat model, generates a rationale) or "jev" (TypeSafe
+    # System One -- a calibrated probability per criterion, gate applied in code, no
+    # rationale). See docs/jev-backend.md.
+    backend: str = "openai"
+    inclusion_threshold: float = 0.5
+    exclusion_threshold: float = 0.5
+    # Project-level equivalent of the per-target field above, mirroring the screening stages'
+    # `additional_instructions`. Concatenated with the target's own when both are present.
+    additional_instructions: Optional[str] = None
     # Options: "single_analysis" (per-analysis) or
     # "multi_analysis" (whole study)
     prompt_type: str = "multi_analysis"
@@ -42,8 +55,10 @@ class AnnotationConfig(BaseModel):
         "study_title",
         "study_fulltext"
     ]
-    inclusion_criteria: List[str] = []
-    exclusion_criteria: List[str] = []
+    # A criterion is a statement, or a {statement, true, false} mapping carrying its
+    # own boundary cases. Typed List[Any] so both reach build_criteria_questions.
+    inclusion_criteria: List[Any] = []
+    exclusion_criteria: List[Any] = []
 
 
 class AnnotationDecision(BaseModel):
@@ -61,6 +76,9 @@ class AnnotationDecision(BaseModel):
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
     cache_signature: Optional[Dict[str, Any]] = None
+    # Criterion ID -> probability of truth, for calibrated backends only. Lets the selection
+    # threshold be re-swept offline without re-running the model.
+    criterion_probabilities: Dict[str, float] = {}
 
 
 class TableMetadata(BaseModel):

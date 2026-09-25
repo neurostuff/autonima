@@ -429,6 +429,11 @@ class ScreeningResult:
     inclusion_criteria_applied: List[str] = field(default_factory=list)
     exclusion_criteria_applied: List[str] = field(default_factory=list)
     cache_signature: Optional[Dict[str, Any]] = None
+    # Per-criterion probability of truth, keyed by criterion ID. Populated only by decision
+    # backends that produce calibrated probabilities (Jev); empty for chat models, which emit
+    # a verdict and prose. Persisting it is what makes the decision threshold re-tunable after
+    # a run: the gate is pure arithmetic over these numbers, so a sweep costs no API calls.
+    criterion_probabilities: Dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert screening result to dictionary."""
@@ -442,6 +447,7 @@ class ScreeningResult:
             "timestamp": self.timestamp.isoformat(),
             "inclusion_criteria_applied": self.inclusion_criteria_applied,
             "exclusion_criteria_applied": self.exclusion_criteria_applied,
+            "criterion_probabilities": self.criterion_probabilities,
             "cache_signature": self.cache_signature,
         }
 
