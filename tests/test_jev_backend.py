@@ -516,3 +516,26 @@ def test_execution_stage_hash_ignores_the_threshold():
     changed = {**base, "screening": {
         k: {**v, "inclusion_criteria": ["different"]} for k, v in base["screening"].items()}}
     assert stage_hashes(changed)["abstract"] != a["abstract"]
+
+
+def test_cached_results_keep_their_probabilities_on_reuse(tmp_path):
+    """A reused row must be re-saved with its probability vector intact.
+
+    Regression: the cached-result reconstruction dropped criterion_probabilities, so every
+    re-run degraded the corpus -- recomputed rows kept them, reused rows lost them, and the
+    sweep silently stopped working on the studies that had not changed. Found when a
+    full-text sweep reported 145 of 467 rows usable after a run that reused 322.
+    """
+    from autonima.models.types import ScreeningConfig, StudyStatus
+    from autonima.screening.screener import LLMScreener
+
+    probs = {"I1": 0.9, "I2": 0.8, "E1": 0.1, "E2": 0.05}
+    stage = {"model": "jev-latest", "backend": "jev", "criteria_mapping": MAPPING,
+             "inclusion_threshold": 0.5, "exclusion_threshold": 0.5}
+    s = LLMScreener(ScreeningConfig(abstract=dict(stage), fulltext=dict(stage)),
+                    output_dir=str(tmp_path))
+    rebuilt = s._create_screening_result(
+        _study(), StudyStatus.INCLUDED_ABSTRACT, "[jev] ok", 0.8, "jev-latest", "abstract",
+        ["I1", "I2"], [], criterion_probabilities=probs)
+    assert rebuilt.criterion_probabilities == probs
+    assert rebuilt.to_dict()["criterion_probabilities"] == probs

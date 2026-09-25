@@ -740,7 +740,15 @@ class LLMScreener(ScreeningEngine):
                     existing_result["model_used"],
                     screening_type,
                     existing_result.get("inclusion_criteria_applied", []),
-                    existing_result.get("exclusion_criteria_applied", [])
+                    existing_result.get("exclusion_criteria_applied", []),
+                    # Carry the probability vector forward. Dropping it here silently
+                    # degrades a cached corpus on every re-save: the rows that were
+                    # recomputed keep their probabilities, the reused ones lose them, and
+                    # the threshold sweep the backend exists for stops working on exactly
+                    # the studies that did not change.
+                    criterion_probabilities=existing_result.get(
+                        "criterion_probabilities", {}
+                    ),
                 ))
             else:
                 studies_to_screen.append(study)
