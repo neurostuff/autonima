@@ -3,7 +3,7 @@
 ## Base Install
 
 ```bash
-git clone git@github.com:adelavega/autonima.git
+git clone git@github.com:neurostuff/autonima.git
 cd autonima
 pip install -e .
 ```
