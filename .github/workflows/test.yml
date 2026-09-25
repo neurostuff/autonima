@@ -11,7 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", 3.11, 3.12]
+        # 3.12 is intentionally absent: it is broken upstream, not here.
+        # pubget caps joblib at <=1.1.1, whose distutils import 3.12 removed,
+        # and the scikit-learn resolved through the same chain imports
+        # ComplexWarning from numpy.core.numeric, which numpy 2.0 removed.
+        # Restore 3.12 (and add 3.13) once those caps are relaxed upstream.
+        python-version: ["3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v3
