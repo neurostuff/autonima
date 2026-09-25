@@ -453,3 +453,33 @@ def test_empty_criteria_refuses_rather_than_including_everything():
     """
     with pytest.raises(JevError):
         apply_gate(nouls(I1=0.9), {"inclusion": {}, "exclusion": {}})
+
+
+def test_screening_threshold_is_not_in_the_stage_hash(tmp_path):
+    from autonima.models.types import ScreeningConfig
+    from autonima.screening.screener import LLMScreener
+
+    def sig(tau):
+        stage = {"model": "jev-latest", "backend": "jev", "objective": "o",
+                 "criteria_mapping": MAPPING, "inclusion_threshold": tau,
+                 "exclusion_threshold": tau}
+        s = LLMScreener(ScreeningConfig(abstract=dict(stage), fulltext=dict(stage)),
+                        output_dir=str(tmp_path))
+        return s._screening_cache_signature(_study(), "abstract", stage)["stage_hash"]
+
+    assert sig(0.5) == sig(0.2)
+
+
+def test_cached_screening_result_is_regated(tmp_path):
+    from autonima.models.types import ScreeningConfig
+    from autonima.screening.screener import LLMScreener
+
+    cached = {"study_id": "1", "decision": "included_abstract", "screening_type": "abstract",
+              "criterion_probabilities": {"I1": 0.62, "I2": 0.58, "E1": 0.0, "E2": 0.0}}
+    stage = {"model": "jev-latest", "backend": "jev", "criteria_mapping": MAPPING,
+             "inclusion_threshold": 0.75, "exclusion_threshold": 0.5}
+    s = LLMScreener(ScreeningConfig(abstract=dict(stage), fulltext=dict(stage)),
+                    output_dir=str(tmp_path))
+    assert s._regate_cached(cached, stage)["decision"] == "excluded_abstract"
+    loose = {**stage, "inclusion_threshold": 0.3}
+    assert s._regate_cached(cached, loose)["decision"] == "included_abstract"

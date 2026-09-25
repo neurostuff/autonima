@@ -16,6 +16,7 @@ from .prompts import (
     FULLTEXT_SCREENING_PROMPT_VERSION,
     PromptLibrary,
 )
+from ..backends.jev import POST_HOC_CONFIG_KEYS, regate
 from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
 from ..utils import log_error_with_debug
@@ -326,15 +327,43 @@ class LLMScreener(ScreeningEngine):
             if screening_type == "abstract"
             else FULLTEXT_SCREENING_PROMPT_VERSION
         )
+        # Thresholds are applied to stored probabilities AFTER the call, so they change how
+        # a cached answer is read, not what was asked. Keeping them out of the hash is what
+        # lets a threshold be re-tuned without paying for the corpus again.
+        hashable = {k: v for k, v in config.items()
+                    if k not in POST_HOC_CONFIG_KEYS}
         return {
             "schema_version": CACHE_SCHEMA_VERSION,
             "stage": screening_type,
             "stage_hash": stable_hash(
-                {**config, "prompt_version": prompt_version}
+                {**hashable, "prompt_version": prompt_version}
             ),
             "study_input_hash": self._study_input_hash(study, screening_type),
             "model": model,
         }
+
+    def _regate_cached(
+        self,
+        existing_result: Dict[str, Any],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Apply the configured thresholds to a cached result's stored probabilities."""
+        probabilities = existing_result.get("criterion_probabilities") or {}
+        include = regate(
+            probabilities,
+            float(config.get("inclusion_threshold", 0.5)),
+            float(config.get("exclusion_threshold", 0.5)),
+        )
+        if include is None:
+            return existing_result
+        screening_type = existing_result.get("screening_type", "abstract")
+        want = self._get_status_for_decision(
+            screening_type, "INCLUDED" if include else "EXCLUDED").value
+        if str(existing_result.get("decision", "")).strip().lower() == want:
+            return existing_result
+        updated = dict(existing_result)
+        updated["decision"] = want
+        return updated
 
     def _cached_signature_matches(
         self,
@@ -660,6 +689,11 @@ class LLMScreener(ScreeningEngine):
                     studies_to_screen.append(study)
                     continue
                 
+                # A cached result from a calibrated backend carries its probability vector,
+                # so the CURRENT threshold is applied to it here. Without this the signature
+                # would match and the old threshold's verdict would silently persist.
+                existing_result = self._regate_cached(existing_result, config)
+
                 # Normalize cached decisions to the current screening stage.
                 old_decision = str(existing_result["decision"]).strip().lower()
                 if (

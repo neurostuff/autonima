@@ -462,3 +462,40 @@ def _body_text(response: Any) -> str:
         return str(response.json())[:400]
     except Exception:
         return str(getattr(response, "text", ""))[:400]
+
+
+# Config keys that change how a STORED answer is interpreted, never what the model was asked.
+# They must stay out of any cache signature: a calibrated backend returns probabilities, and
+# the threshold is applied to them afterwards, so re-tuning must not force a re-run. Excluding
+# them is what makes "sweep the threshold for free" true of the pipeline and not just of an
+# offline script.
+POST_HOC_CONFIG_KEYS = frozenset({
+    "inclusion_threshold", "exclusion_threshold", "incomplete_threshold",
+})
+
+
+def regate(
+    probabilities: Mapping[str, float],
+    inclusion_threshold: float,
+    exclusion_threshold: float,
+) -> Optional[bool]:
+    """Re-derive include/exclude from a stored probability vector.
+
+    Returns None when there is nothing to re-derive -- no probabilities, or IDs that do not
+    classify -- so callers can fall back to the cached verdict rather than inventing one.
+    Criterion IDs may be scope-prefixed (GLOBAL_I1, MAINTAIN_E1), so the I/E marker is read
+    from the tail.
+    """
+    if not probabilities:
+        return None
+    mapping: Dict[str, Dict[str, str]] = {"inclusion": {}, "exclusion": {}}
+    for cid in probabilities:
+        tail = str(cid).rsplit("_", 1)[-1]
+        if tail[:1] == "I":
+            mapping["inclusion"][cid] = cid
+        elif tail[:1] == "E":
+            mapping["exclusion"][cid] = cid
+    if not (mapping["inclusion"] or mapping["exclusion"]):
+        return None
+    answers = {k: {"type": "noul", "noul": v} for k, v in probabilities.items()}
+    return apply_gate(answers, mapping, inclusion_threshold, exclusion_threshold).include

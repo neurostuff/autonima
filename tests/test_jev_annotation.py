@@ -417,3 +417,59 @@ def test_every_annotation_config_field_is_reachable_from_yaml(tmp_path):
     loaded = ConfigManager().load_from_file(str(f))
     for key, want in probe.items():
         assert getattr(loaded.annotation, key) == want, f"{key} was dropped by the loader"
+
+
+# --- thresholds are post-hoc, not part of the cache key -------------------------------------
+
+def test_threshold_is_not_in_the_annotation_stage_hash(monkeypatch):
+    # Re-tuning a threshold must reuse cached decisions, not re-bill the corpus. A calibrated
+    # backend returns probabilities and the threshold is applied afterwards, so putting it in
+    # the signature would make "sweep for free" true of an offline script and false of the
+    # pipeline. No API call is made here; the key only satisfies the client constructor.
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key-never-used")
+    from autonima.annotation.processor import AnnotationProcessor
+    from autonima.annotation.schema import AnnotationConfig
+
+    base = dict(backend="jev", model="jev-latest", annotations=[criteria()])
+    a = AnnotationProcessor(AnnotationConfig(**base, inclusion_threshold=0.5))
+    b = AnnotationProcessor(AnnotationConfig(**base, inclusion_threshold=0.2))
+    assert a.stage_hash == b.stage_hash
+
+    # but something that changes what is ASKED must still invalidate
+    c = AnnotationProcessor(AnnotationConfig(**{**base, "prompt_type": "single_analysis"}))
+    assert a.stage_hash != c.stage_hash
+
+
+def test_cached_decision_is_regated_at_the_current_threshold(monkeypatch):
+    # Signature match must not mean the old threshold's verdict survives.
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key-never-used")
+    from autonima.annotation.processor import AnnotationProcessor
+    from autonima.annotation.schema import AnnotationConfig, AnnotationDecision
+
+    probs = {"I1": 0.62, "I2": 0.58, "E1": 0.05}
+    decided_at_05 = AnnotationDecision(
+        annotation_name="reappraisal", analysis_id="a0", study_id="S1",
+        include=True, reasoning="[jev] all criteria satisfied", model_used="jev-latest",
+        criterion_probabilities=probs,
+    )
+    strict = AnnotationProcessor(AnnotationConfig(
+        backend="jev", model="jev-latest", annotations=[criteria()],
+        inclusion_threshold=0.75))
+    assert strict._regate(decided_at_05).include is False
+
+    loose = AnnotationProcessor(AnnotationConfig(
+        backend="jev", model="jev-latest", annotations=[criteria()],
+        inclusion_threshold=0.3))
+    assert loose._regate(decided_at_05).include is True
+
+
+def test_decisions_without_probabilities_pass_through_untouched():
+    """The OpenAI arm stores no probabilities and must not be silently re-decided."""
+    from autonima.annotation.processor import AnnotationProcessor
+    from autonima.annotation.schema import AnnotationConfig, AnnotationDecision
+
+    d = AnnotationDecision(annotation_name="x", analysis_id="a", study_id="S",
+                           include=True, reasoning="model prose", model_used="gpt-5-mini")
+    proc = AnnotationProcessor(AnnotationConfig(annotations=[criteria()],
+                                                inclusion_threshold=0.99))
+    assert proc._regate(d) is d
