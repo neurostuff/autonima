@@ -16,6 +16,11 @@ Full documentation: https://neurostuff.github.io/autonima/
 
 ## The workflow
 
+<p align="center">
+  <img src="docs/assets/pipeline-overview.png" width="520"
+       alt="Autonima pipeline: expert-defined configuration, PubMed search, abstract and full-text screening, coordinate parsing, analysis selection, coordinate-based meta-analysis">
+</p>
+
 A project is one YAML file: a PubMed query, article-level inclusion and exclusion
 criteria, retrieval sources, parsing settings, and one set of contrast-specific
 criteria per target.

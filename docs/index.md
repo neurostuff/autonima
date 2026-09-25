@@ -14,6 +14,17 @@ individual analysis.
 
 ## The workflow
 
+<figure markdown="span">
+  ![Autonima pipeline: expert-defined configuration, PubMed search, abstract and full-text screening, coordinate parsing, analysis selection, coordinate-based meta-analysis](assets/pipeline-overview.png){ width="560" }
+  <figcaption>
+    One expert-defined configuration drives every stage. The two LLM screening
+    passes reduce the search results to eligible articles; coordinate parsing
+    then splits each article's tables into the distinct analyses that produced
+    them, and analysis selection assigns those to target contrasts. Only the
+    selected coordinates reach the meta-analysis.
+  </figcaption>
+</figure>
+
 A project is one YAML file: a PubMed query, article-level inclusion and exclusion
 criteria, retrieval sources, parsing settings, and one set of contrast-specific
 criteria per target. The pipeline executes these stages in order, caching each so
