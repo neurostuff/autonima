@@ -483,3 +483,36 @@ def test_cached_screening_result_is_regated(tmp_path):
     assert s._regate_cached(cached, stage)["decision"] == "excluded_abstract"
     loose = {**stage, "inclusion_threshold": 0.3}
     assert s._regate_cached(cached, loose)["decision"] == "included_abstract"
+
+
+def test_execution_stage_hash_ignores_the_threshold():
+    """The execution layer invalidates the artifact FILE, before the per-study cache is read.
+
+    Regression: excluding thresholds from the per-study signature alone was not enough -- the
+    screening stages splat their whole config block into the execution signature, so a
+    threshold change wiped the results file and the per-study cache was never consulted.
+    """
+    from autonima.execution import stage_hashes
+
+    base = {
+        "search": {"database": "pubmed", "query": "q", "email": "a@b.c"},
+        "screening": {
+            "abstract": {"model": "jev-latest", "backend": "jev", "objective": "o",
+                         "inclusion_criteria": ["c"], "inclusion_threshold": 0.5,
+                         "exclusion_threshold": 0.5},
+            "fulltext": {"model": "jev-latest", "backend": "jev", "objective": "o",
+                         "inclusion_criteria": ["c"], "inclusion_threshold": 0.5,
+                         "exclusion_threshold": 0.5},
+        },
+    }
+    tuned = {**base, "screening": {
+        k: {**v, "inclusion_threshold": 0.2, "exclusion_threshold": 0.2}
+        for k, v in base["screening"].items()}}
+    a, b = stage_hashes(base), stage_hashes(tuned)
+    assert a["abstract"] == b["abstract"]
+    assert a["fulltext"] == b["fulltext"]
+
+    # something that changes what is asked must still invalidate
+    changed = {**base, "screening": {
+        k: {**v, "inclusion_criteria": ["different"]} for k, v in base["screening"].items()}}
+    assert stage_hashes(changed)["abstract"] != a["abstract"]

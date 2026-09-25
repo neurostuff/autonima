@@ -280,6 +280,17 @@ def _pick(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
 # what makes the request legal at all -- so two runs differing only in it must share cache.
 DEPLOYMENT_KEYS = frozenset({"model_params"})
 
+# Keys that decide how a STORED answer is read rather than what was asked. A calibrated
+# backend returns a probability per criterion and the threshold is applied afterwards, so
+# re-tuning one must reuse every cached decision -- the per-study cache re-gates them on load.
+# These live here as well as in the per-study signature because the screening stages splat
+# their whole config block, and this layer invalidates the artifact file outright: without the
+# exclusion the per-study cache is never even consulted. Annotation already uses an allowlist
+# that omits them.
+POST_HOC_KEYS = frozenset({
+    "inclusion_threshold", "exclusion_threshold", "incomplete_threshold",
+})
+
 
 def _drop(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
     excluded = set(keys)
@@ -310,7 +321,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "abstract": {
-            **_drop(screening.get("abstract") or {}, DEPLOYMENT_KEYS),
+            **_drop(screening.get("abstract") or {}, DEPLOYMENT_KEYS | POST_HOC_KEYS),
             "prompt_version": ABSTRACT_SCREENING_PROMPT_VERSION,
         },
         "retrieval": _pick(
@@ -326,7 +337,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ],
         ),
         "fulltext": {
-            **_drop(screening.get("fulltext") or {}, DEPLOYMENT_KEYS),
+            **_drop(screening.get("fulltext") or {}, DEPLOYMENT_KEYS | POST_HOC_KEYS),
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
         },
         "parsing": _pick(
