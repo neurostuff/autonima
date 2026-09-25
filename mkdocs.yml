@@ -1,7 +1,7 @@
 site_name: Autonima
-site_url: https://adelavega.github.io/autonima/
-repo_url: https://github.com/adelavega/autonima
-repo_name: adelavega/autonima
+site_url: https://neurostuff.github.io/autonima/
+repo_url: https://github.com/neurostuff/autonima
+repo_name: neurostuff/autonima
 docs_dir: docs
 strict: true
 
@@ -33,6 +33,7 @@ nav:
   - Guides:
       - Configuration: guides/configuration.md
       - CLI Usage: guides/cli.md
+      - Web UI: guides/web-ui.md
       - Outputs: guides/outputs.md
       - Interpreting Outputs: guides/interpreting-outputs.md
       - Full-Text Sources: guides/full-text-sources.md

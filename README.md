@@ -1,20 +1,81 @@
 # Autonima
 
-Autonima is an LLM-assisted CLI for neuroimaging review workflows: search PubMed, screen studies, retrieve full text, parse coordinates, and export NiMADS artifacts for downstream meta-analysis.
+Autonima is a large language model (LLM)-guided framework for neuroimaging
+meta-analysis. It automates article screening against expert-defined eligibility
+criteria, parses heterogeneous coordinate tables into the distinct analyses that
+produced them, and selects individual analyses for quantitative synthesis.
 
-Full documentation: https://adelavega.github.io/autonima/
+The distinction that matters is between an **article** and an **analysis**. A
+relevant paper often reports several experimental comparisons, only some of which
+address a given question — increases and decreases, patients and controls,
+whole-brain and region-of-interest. Automated synthesis frameworks have generally
+pooled every coordinate in an included paper. Autonima selects at the level of the
+individual analysis, which is where its accuracy comes from.
+
+Full documentation: https://neurostuff.github.io/autonima/
+
+## The workflow
+
+A project is one YAML file: a PubMed query, article-level inclusion and exclusion
+criteria, retrieval sources, parsing settings, and one set of contrast-specific
+criteria per target.
+
+1. **Search** — PubMed through the Entrez API.
+2. **Abstract screening** — an LLM judges each record against the article-level
+   criteria, returning a decision, a criterion-by-criterion assessment and its
+   reasoning. Abstract criteria are usually more permissive, since an abstract
+   carries incomplete information.
+3. **Full-text retrieval** — PubMed Central via pubget, publisher text-mining
+   APIs (Elsevier, Springer Nature), and user-supplied HTML. Records with no
+   usable text are marked unavailable rather than rejected: a retrieval failure
+   is not an eligibility decision.
+4. **Full-text screening** — the same procedure against the complete criteria,
+   with the full text in context.
+5. **Coordinate parsing** — heuristics identify candidate tables; an LLM reads
+   each table with its caption and footnotes and separates it into the distinct
+   statistical analyses it reports, keyed on contrast, direction, group,
+   condition, session or any other explicitly labelled dimension.
+6. **Analysis selection** — every parsed analysis is evaluated against each
+   target's criteria in the context of its article, producing an
+   analysis × target inclusion matrix. One analysis may serve several targets.
+7. **Meta-analysis** — selected coordinates are written as a NiMADS studyset and
+   submitted to NiMARE (MKDA, ALE or KDA; FWE or FDR correction).
+
+Stage outputs are cached, so re-running resumes rather than repeating paid API
+calls.
+
+## Two ways to run it
+
+Both drive the same pipeline and produce identical outputs.
+
+**The CLI** runs one config, once, into one folder. Use it for scripted and
+reproducible work.
+
+```bash
+autonima run config.yaml
+```
+
+**The web UI** manages many projects over time — live progress, cancellation,
+cloning a project to make a variant, browsing meta-analysis artifacts, and
+storing API credentials. Use it while developing criteria.
+
+```bash
+autonima ui --workspace .
+```
+
+The CLI has no memory between invocations; the UI keeps a workspace. A project
+created in one can be run from the other. See the
+[Web UI guide](https://neurostuff.github.io/autonima/guides/web-ui/).
 
 ## Install
 
-Base install:
-
 ```bash
-git clone git@github.com:adelavega/autonima.git
+git clone git@github.com:neurostuff/autonima.git
 cd autonima
 pip install -e .
 ```
 
-Useful extras:
+Extras:
 
 ```bash
 pip install -e .[llm]          # screening and other LLM-backed workflows
@@ -26,48 +87,26 @@ pip install -e .[docs]         # local docs build
 
 ## Quickstart
 
-Generate a starting config:
-
 ```bash
-autonima create-sample-config > config.yaml
+autonima create-sample-config > config.yaml   # a starting config
+autonima validate config.yaml                 # check it before spending anything
+autonima run config.yaml                      # run the pipeline
+autonima meta config/outputs                  # meta-analyse the NiMADS output
 ```
 
-Validate it:
-
-```bash
-autonima validate config.yaml
-```
-
-Run the pipeline:
-
-```bash
-autonima run config.yaml
-```
-
-If you omit `OUTPUT_FOLDER`, the CLI derives it from the config filename stem. For example:
-
-- config: `projects/cue_reactivity/default.yaml`
-- default output folder: `projects/cue_reactivity/default/`
-
-You can still pass an explicit runtime output folder:
+Omitting `OUTPUT_FOLDER` derives it from the config filename stem, so
+`projects/cue_reactivity/default.yaml` writes to
+`projects/cue_reactivity/default/`. Pass one explicitly to override:
 
 ```bash
 autonima run config.yaml runs/my_review
 ```
 
-Run meta-analysis on the generated NiMADS outputs:
+`run-search` and `run-abstract` execute the pipeline only as far as those stages,
+which is useful for checking a query or a criteria set cheaply before committing
+to full-text retrieval.
 
-```bash
-autonima meta runs/my_review/outputs
-```
-
-Launch the local web UI:
-
-```bash
-autonima ui --workspace .
-```
-
-## Minimal Config Example
+## Minimal config
 
 ```yaml
 search:
@@ -105,8 +144,20 @@ annotation:
   enabled: false
 ```
 
-For the full sample config and field-by-field guidance, see:
+Model identifiers and API endpoints are configurable, so any OpenAI-compatible
+provider can be used.
 
-- https://adelavega.github.io/autonima/getting-started/quickstart/
-- https://adelavega.github.io/autonima/guides/configuration/
-- https://adelavega.github.io/autonima/guides/cli/
+## Documentation
+
+- [Quickstart](https://neurostuff.github.io/autonima/getting-started/quickstart/)
+- [Configuration](https://neurostuff.github.io/autonima/guides/configuration/)
+- [CLI usage](https://neurostuff.github.io/autonima/guides/cli/)
+- [Web UI](https://neurostuff.github.io/autonima/guides/web-ui/)
+- [Full-text sources](https://neurostuff.github.io/autonima/guides/full-text-sources/)
+- [Meta-analysis](https://neurostuff.github.io/autonima/guides/meta-analysis/)
+- [Interpreting outputs](https://neurostuff.github.io/autonima/guides/interpreting-outputs/)
+
+## Citation
+
+Autonima v0.1.0 is the version evaluated in the AutoNIMA manuscript. See
+[releases](https://github.com/neurostuff/autonima/releases).
