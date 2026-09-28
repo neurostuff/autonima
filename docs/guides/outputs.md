@@ -94,7 +94,7 @@ Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-orien
 ## `outputs/nimads_annotation.json`
 
 - NiMADS artifacts used by `autonima meta`
-- pass the containing folder to `autonima meta`, usually `<output-folder>/outputs`
+- pass `<output-folder>/outputs`, or `<output-folder>` itself, to `autonima meta`
 
 ## `retrieval/pubget_data/`
 

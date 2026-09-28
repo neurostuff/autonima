@@ -1,5 +1,11 @@
 # Autonima Architecture Plan
 
+> **Historical.** This is the original design plan, last revised in October 2025, and it
+> no longer matches the code. It describes an `output/` module, PRISMA diagram generation
+> and CLI commands that were never built, and it predates the web UI, the execution cache
+> and analysis-level annotation. For how Autonima works now, see the
+> [documentation](docs/index.md) and the [CLI guide](docs/guides/cli.md).
+
 ## Overview
 
 Autonima is an LLM-powered framework for automating systematic literature reviews and meta-analyses in neuroimaging. It follows the PRISMA framework and automates the workflow from literature search to final inclusion of studies.

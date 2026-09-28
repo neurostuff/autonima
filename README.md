@@ -23,10 +23,11 @@ criteria per target.
    criteria, returning a decision, a criterion-by-criterion assessment and its
    reasoning. Abstract criteria are usually more permissive, since an abstract
    carries incomplete information.
-3. **Full-text retrieval** — PubMed Central via pubget, publisher text-mining
-   APIs (Elsevier, Springer Nature), and user-supplied HTML. Records with no
-   usable text are marked unavailable rather than rejected: a retrieval failure
-   is not an eligibility decision.
+3. **Full-text retrieval** — PubMed Central via pubget, plus any local corpus
+   registered as a [full-text source](docs/guides/full-text-sources.md), such as
+   HTML already downloaded from publisher text-mining APIs. Autonima does not call
+   publisher APIs itself. Records with no usable text are marked unavailable
+   rather than rejected: a retrieval failure is not an eligibility decision.
 4. **Full-text screening** — the same procedure against the complete criteria,
    with the full text in context.
 5. **Coordinate parsing** — heuristics identify candidate tables; an LLM reads

@@ -34,7 +34,7 @@ a re-run resumes rather than repeating paid API calls.
 |---|---|
 | **Search** | PubMed through the Entrez API |
 | **Abstract screening** | an LLM judges each record against the article-level criteria, returning a decision, a criterion-by-criterion assessment and its reasoning |
-| **Full-text retrieval** | PubMed Central via pubget, publisher text-mining APIs, user-supplied HTML |
+| **Full-text retrieval** | PubMed Central via pubget, plus local full-text sources such as HTML already downloaded from publisher text-mining APIs |
 | **Full-text screening** | the same procedure against the complete criteria, with the full text in context |
 | **Coordinate parsing** | heuristics find candidate tables; an LLM separates each into the distinct statistical analyses it reports |
 | **Analysis selection** | every analysis is evaluated against each target's criteria, producing an analysis × target inclusion matrix |

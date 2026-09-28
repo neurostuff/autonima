@@ -10,16 +10,19 @@ pip install -e .[meta]
 
 ## Input Folder
 
-`autonima meta` expects the folder that directly contains:
+`autonima meta` accepts either the run's output folder or the folder that directly contains:
 
 - `nimads_studyset.json`
 - `nimads_annotation.json`
 
-For standard pipeline runs, that is usually:
+For standard pipeline runs, that is:
 
 ```text
 <output-folder>/outputs
 ```
+
+Passing `<output-folder>` itself also works. Either way, results are written to
+`meta_analysis_results/` beside the NiMADS files.
 
 ## Basic Usage
 
