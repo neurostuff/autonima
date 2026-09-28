@@ -66,7 +66,7 @@ This is separate from the `output.directory` value stored in the YAML. The CLI w
 
 ## 5. Run Meta-Analysis
 
-`autonima meta` expects the folder containing `nimads_studyset.json` and `nimads_annotation.json`, which usually means the pipeline `outputs/` directory:
+`autonima meta` takes either the run's output folder or its `outputs/` directory, which holds `nimads_studyset.json` and `nimads_annotation.json`:
 
 ```bash
 autonima meta projects/cue_reactivity/default/outputs

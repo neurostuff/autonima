@@ -38,40 +38,41 @@ class CoordinateProcessor:
             table: The ActivationTable to process
             
         Returns:
-            List of analyses extracted from the table
+            List of analyses extracted from the table. Empty only when the table has no
+            readable content.
+
+        Raises:
+            Exception: whatever loading or parsing raised. This used to be swallowed and
+            returned as ``[]``, which made a rate-limited table indistinguishable from one
+            with no analyses, and the caller cached it as such.
         """
-        try:
-            # Load the raw table content using the table's method
-            table.load_raw_table()
-            
-            # If we couldn't load the raw table content, return empty list
-            if table.raw_table is None:
-                logger.warning(f"No valid table path found for table: {table.table_id}")
-                return []
-            
-            # Use the raw_table content directly
-            table_text = table.raw_table
-            
-            # Create a prompt for the table
-            prompt = self._create_table_prompt(
-                table_text,
-                table_caption=table.table_caption or "",
-                table_foot=table.table_foot or ""
-            )
-            
-            # Parse the table
-            result = self.client.parse_analyses(prompt, model=self.model,
-                                                model_params=self.model_params)
-            
-            # Set the table_id for each analysis
-            for analysis in result.analyses:
-                analysis.table_id = table.table_id
-            
-            return result.analyses
-            
-        except Exception as e:
-            logger.warning(f"Error processing table {table.table_id}: {e}")
+        # Load the raw table content using the table's method
+        table.load_raw_table()
+
+        # If we couldn't load the raw table content, return empty list
+        if table.raw_table is None:
+            logger.warning(f"No valid table path found for table: {table.table_id}")
             return []
+
+        # Use the raw_table content directly
+        table_text = table.raw_table
+
+        # Create a prompt for the table
+        prompt = self._create_table_prompt(
+            table_text,
+            table_caption=table.table_caption or "",
+            table_foot=table.table_foot or ""
+        )
+
+        # Parse the table
+        result = self.client.parse_analyses(prompt, model=self.model,
+                                            model_params=self.model_params)
+
+        # Set the table_id for each analysis
+        for analysis in result.analyses:
+            analysis.table_id = table.table_id
+
+        return result.analyses
     
     def _create_table_prompt(
         self,

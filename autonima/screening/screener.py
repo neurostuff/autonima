@@ -573,11 +573,12 @@ class LLMScreener(ScreeningEngine):
                 screening_type
             )
             
-            # Save failed result to file
+            # Save failed result to file, beside the successful ones. Writing it to the run root
+            # left a stray copy there that nothing ever reads.
             result_dict = result.to_dict()
-            results_file = (
-                self.result_dir / f"{screening_type}_screening_results.json"
-            )
+            output_dir = self.result_dir / "outputs"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            results_file = output_dir / f"{screening_type}_screening_results.json"
             save_screening_result_with_lock(results_file, result_dict)
             
             return result
@@ -651,6 +652,12 @@ class LLMScreener(ScreeningEngine):
                     and self.force_reextract_incomplete_fulltext
                     and old_decision == StudyStatus.FULLTEXT_INCOMPLETE.value
                 ):
+                    studies_to_screen.append(study)
+                    continue
+                # A failure is not a decision. Its signature matches because the inputs have
+                # not changed, but reusing it would turn one rate limit into a permanent
+                # "screened, neither included nor excluded".
+                if old_decision == StudyStatus.SCREENING_FAILED.value:
                     studies_to_screen.append(study)
                     continue
                 if old_decision in {

@@ -644,7 +644,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
     from an Autonima systematic review pipeline.
 
     Arguments:
-        OUTPUT_FOLDER   Output folder containing NiMADS files
+        OUTPUT_FOLDER   Run output folder, or its outputs/ folder holding the NiMADS files
 
     Options:
         --estimator              CBMA estimator to use (ale, mkdadensity, kda)

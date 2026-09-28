@@ -1,9 +1,11 @@
 """FastAPI app for Autonima local web UI."""
 
+import hmac
 import os
 import webbrowser
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Optional
+from secrets import token_urlsafe
+from typing import Any, Dict, Iterable, Optional
 
 import yaml
 
@@ -11,15 +13,34 @@ from autonima.config import ConfigManager, ConfigurationError
 
 from .preferences import PreferencesManager
 from .runs import RunManager
-from .secrets import SECRETS_KEYS, SecretsManager
+from .secrets import SECRETS_KEYS, SENSITIVE_SECRETS_KEYS, SecretsManager
 from .state import WorkspaceState
+
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+WILDCARD_HOSTS = frozenset({"", "0.0.0.0", "::"})
+TOKEN_QUERY_PARAM = "token"
+TOKEN_HEADER = "X-Autonima-Token"
+
+UNAUTHORIZED_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Autonima UI</title></head>
+<body style="font-family: sans-serif; max-width: 40em; margin: 4em auto;">
+<h1>Access token required</h1>
+<p>Open the address that <code>autonima ui</code> printed when it started. It ends in
+<code>?token=&hellip;</code>, and the token changes every time the server is launched.</p>
+</body></html>
+"""
 
 
 def _ensure_fastapi_imports():
     try:
-        from fastapi import FastAPI, HTTPException, Query
-        from fastapi.middleware.cors import CORSMiddleware
-        from fastapi.responses import FileResponse
+        from fastapi import FastAPI, HTTPException, Query, Request
+        from fastapi.responses import (
+            FileResponse,
+            HTMLResponse,
+            JSONResponse,
+            PlainTextResponse,
+            RedirectResponse,
+        )
         from fastapi.staticfiles import StaticFiles
         from pydantic import BaseModel, Field
     except ImportError as exc:
@@ -31,11 +52,34 @@ def _ensure_fastapi_imports():
         "FastAPI": FastAPI,
         "HTTPException": HTTPException,
         "Query": Query,
-        "CORSMiddleware": CORSMiddleware,
+        "Request": Request,
         "FileResponse": FileResponse,
+        "HTMLResponse": HTMLResponse,
+        "JSONResponse": JSONResponse,
+        "PlainTextResponse": PlainTextResponse,
+        "RedirectResponse": RedirectResponse,
         "StaticFiles": StaticFiles,
         "BaseModel": BaseModel,
         "Field": Field,
+    }
+
+
+def _tokens_match(offered: str, expected: str) -> bool:
+    return hmac.compare_digest(offered.encode("utf-8"), expected.encode("utf-8"))
+
+
+def _session_cookie_name(port: Optional[int]) -> str:
+    # Browsers do not isolate cookies by port, so two UIs on one machine would overwrite each
+    # other's session under a shared name.
+    return f"autonima_ui_{port or 'default'}"
+
+
+def _public_secret_values(values: Dict[str, str]) -> Dict[str, str]:
+    """Secret values the page may display. API keys never leave the server."""
+    return {
+        key: values.get(key, "")
+        for key in SECRETS_KEYS
+        if key not in SENSITIVE_SECRETS_KEYS
     }
 
 
@@ -53,14 +97,27 @@ def create_app(
     workspace_root: Path,
     env_path: Optional[Path] = None,
     preferences_path: Optional[Path] = None,
+    access_token: Optional[str] = None,
+    allowed_hosts: Optional[Iterable[str]] = None,
 ):
-    """Create FastAPI app instance."""
+    """Create FastAPI app instance.
+
+    ``access_token`` gates every request: a GET carrying ``?token=`` is exchanged for a
+    session cookie, and anything else must present that cookie or the ``X-Autonima-Token``
+    header. ``allowed_hosts`` rejects requests whose Host header names anything else, which
+    is what defeats DNS rebinding. Both default to off for embedding and tests;
+    ``run_ui_server`` always sets a token.
+    """
     deps = _ensure_fastapi_imports()
     FastAPI = deps["FastAPI"]
     HTTPException = deps["HTTPException"]
     Query = deps["Query"]
-    CORSMiddleware = deps["CORSMiddleware"]
+    Request = deps["Request"]
     FileResponse = deps["FileResponse"]
+    HTMLResponse = deps["HTMLResponse"]
+    JSONResponse = deps["JSONResponse"]
+    PlainTextResponse = deps["PlainTextResponse"]
+    RedirectResponse = deps["RedirectResponse"]
     StaticFiles = deps["StaticFiles"]
     BaseModel = deps["BaseModel"]
     Field = deps["Field"]
@@ -136,13 +193,47 @@ def create_app(
     run_manager = RunManager(state=state, secrets_provider=secrets.load)
 
     app = FastAPI(title="Autonima UI", version="0.1.0")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # No CORS middleware: the page is served from this origin, so it never needs one, and
+    # a permissive policy is what let any open website read these endpoints.
+    trusted_hosts = frozenset(allowed_hosts) if allowed_hosts is not None else None
+
+    @app.middleware("http")
+    async def require_access(request: Request, call_next):
+        if trusted_hosts is not None and (request.url.hostname or "") not in trusted_hosts:
+            return PlainTextResponse("Invalid Host header", status_code=400)
+        if access_token is None:
+            return await call_next(request)
+
+        cookie_name = _session_cookie_name(request.url.port)
+        offered = request.query_params.get(TOKEN_QUERY_PARAM)
+        if (
+            offered is not None
+            and request.method == "GET"
+            and _tokens_match(offered, access_token)
+        ):
+            # Trade the URL token for a cookie and drop it from the address bar. SameSite=Strict
+            # keeps other sites' requests from carrying the cookie.
+            target = request.url.remove_query_params(TOKEN_QUERY_PARAM)
+            location = target.path + (f"?{target.query}" if target.query else "")
+            response = RedirectResponse(location, status_code=303)
+            response.set_cookie(
+                cookie_name,
+                access_token,
+                httponly=True,
+                samesite="strict",
+                path="/",
+            )
+            return response
+
+        presented = request.cookies.get(cookie_name) or request.headers.get(TOKEN_HEADER)
+        if presented and _tokens_match(presented, access_token):
+            return await call_next(request)
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(
+                {"detail": "Missing or invalid access token"},
+                status_code=401,
+            )
+        return HTMLResponse(UNAUTHORIZED_PAGE, status_code=401)
 
     static_dir = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -574,19 +665,19 @@ def create_app(
 
     @app.get("/api/settings/secrets")
     async def get_secrets():
-        values = secrets.load()
-        masked = secrets.load_masked()
         return {
-            "masked": masked,
-            "values": {key: values.get(key, "") for key in SECRETS_KEYS},
+            "masked": secrets.load_masked(),
+            "values": _public_secret_values(secrets.load()),
         }
 
     @app.put("/api/settings/secrets")
     async def put_secrets(payload: SecretsUpdate):
-        updates = payload.model_dump()
+        # Only keys the request names are touched. The page never holds the stored API keys,
+        # so a save that omits one must leave it alone rather than erase it.
+        updates = payload.model_dump(exclude_unset=True)
         saved = secrets.save(updates)
         return {
-            "saved": {key: saved.get(key, "") for key in SECRETS_KEYS},
+            "saved": _public_secret_values(saved),
             "masked": secrets.load_masked(),
         }
 
@@ -623,9 +714,28 @@ def run_ui_server(
         ) from exc
 
     workspace_path = Path(workspace).expanduser() if workspace else Path.cwd()
-    app = create_app(workspace_path)
+    access_token = token_urlsafe(32)
+    # A loopback-bound server only answers to loopback names. Binding a wildcard address is an
+    # explicit choice to be reachable by other names, so the token alone guards it there.
+    allowed_hosts = None if host in WILDCARD_HOSTS else LOOPBACK_HOSTS | {host}
+    app = create_app(
+        workspace_path,
+        access_token=access_token,
+        allowed_hosts=allowed_hosts,
+    )
+
+    display_host = "127.0.0.1" if host in WILDCARD_HOSTS else host
+    if ":" in display_host:
+        display_host = f"[{display_host}]"
+    url = f"http://{display_host}:{port}/?{TOKEN_QUERY_PARAM}={access_token}"
+    print(
+        f"\nAutonima UI: {url}\n"
+        "The token in this address is the only way in, and it changes on every launch. "
+        "Do not share it.\n",
+        flush=True,
+    )
 
     if open_browser:
-        webbrowser.open(f"http://{host}:{port}", new=1)
+        webbrowser.open(url, new=1)
 
     uvicorn.run(app, host=host, port=port, log_level=os.getenv("AUTONIMA_UI_LOG_LEVEL", "info"))

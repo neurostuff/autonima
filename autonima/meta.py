@@ -66,6 +66,19 @@ def find_nimads_files(output_folder):
     return str(studyset_file), str(annotation_file)
 
 
+def resolve_nimads_folder(output_folder) -> Path:
+    """Return the folder that holds the NiMADS files, given a run folder or its outputs/.
+
+    The README, the CLI help and the guides all pass ``<run>/outputs``, while the web UI
+    passes the run folder itself. This used to append ``outputs/`` unconditionally, so
+    following the docs looked for ``<run>/outputs/outputs/`` and failed.
+    """
+    folder = Path(output_folder)
+    if (folder / "nimads_studyset.json").exists():
+        return folder
+    return folder / "outputs"
+
+
 def load_include_ids(include_ids_file: Optional[os.PathLike]) -> Optional[Set[str]]:
     """
     Load study IDs (PMIDs) to include from a text file.
@@ -391,8 +404,12 @@ def run_meta_analyses(
     debug=False,
     generate_reports=False,
 ):
-    """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
-    output_folder = Path(output_folder) / "outputs"
+    """Run meta-analyses on all boolean annotation columns in the NiMADS files.
+
+    ``output_folder`` may be the run folder or its ``outputs/`` folder. Results are written
+    to ``meta_analysis_results/`` beside the NiMADS files either way.
+    """
+    output_folder = resolve_nimads_folder(output_folder)
     studyset_file, annotation_file = find_nimads_files(output_folder)
 
     output_dir = Path(output_folder) / "meta_analysis_results"
@@ -420,7 +437,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run meta-analyses on autonima output")
     parser.add_argument(
         "output_folder",
-        help="Path to the autonima output folder containing NiMADS files",
+        help="Run output folder, or its outputs/ folder holding the NiMADS files",
     )
 
     parser.add_argument(

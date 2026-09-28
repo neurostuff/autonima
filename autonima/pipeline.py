@@ -882,6 +882,9 @@ class AutonimaPipeline:
             for study in self.results.studies
         }
         self._coordinate_cache_loaded = 0
+        # pmid -> table_ids whose parse raised. Those studies are kept out of the cache so
+        # the next run retries them instead of reusing their surviving tables as complete.
+        self._coordinate_failed_tables: Dict[str, List[str]] = {}
 
         # Load cached coordinate parsing results
         await self._load_cached_coordinate_results()
@@ -956,6 +959,9 @@ class AutonimaPipeline:
                     
                 except Exception as e:
                     logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                    self._coordinate_failed_tables.setdefault(study.pmid, []).append(
+                        table.table_id
+                    )
                     continue
         else:
             # Parallel processing over all tables
@@ -990,17 +996,31 @@ class AutonimaPipeline:
                 if table_analyses is not None:
                     study.analyses.extend(table_analyses)
                     processed_count += 1
- 
+                else:
+                    self._coordinate_failed_tables.setdefault(study.pmid, []).append(
+                        study.activation_tables[table_index].table_id
+                    )
+
         # Save coordinate parsing results
         await self._save_coordinate_parsing_results()
- 
+
+        failed_tables = self._coordinate_failed_tables
+        tables_failed = sum(len(ids) for ids in failed_tables.values())
         logger.info(
             f"Coordinate parsing completed: {processed_count} tables processed from {len(studies_with_tables)} studies"
         )
+        if tables_failed:
+            logger.warning(
+                f"Coordinate parsing failed for {tables_failed} tables in "
+                f"{len(failed_tables)} studies. Their foci are missing from this run's "
+                "outputs; the studies were not cached and will be re-parsed next run."
+            )
         self.results.execution_stats["coordinate_parsing"] = {
             "enabled": True,
             "studies_with_tables": len(studies_with_tables),
             "tables_processed": processed_count,
+            "tables_failed": tables_failed,
+            "failed_tables": {pmid: ids for pmid, ids in sorted(failed_tables.items())},
             "studies_reused": self._coordinate_cache_loaded,
         }
  
@@ -1220,10 +1240,13 @@ class AutonimaPipeline:
     async def _save_coordinate_parsing_results(self):
         """Save coordinate parsing results to cache."""
         try:
-            # Get studies with parsed analyses
+            # Get studies with parsed analyses. A study with any failed table is left out: its
+            # signature would match next run and its surviving tables would pass for all of them.
+            failed_pmids = set(getattr(self, "_coordinate_failed_tables", {}))
             studies_with_analyses = [
                 s for s in self.results.studies
                 if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
+                and s.pmid not in failed_pmids
             ]
             
             if not studies_with_analyses:
