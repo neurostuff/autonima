@@ -9,9 +9,20 @@ pip install -e .[ui]
 autonima ui --workspace .
 ```
 
-The app binds to `127.0.0.1:8765` by default and opens a browser. It is a local
-tool: there is no authentication, and it should not be bound to a public
-interface.
+The app binds to `127.0.0.1:8765` by default and opens a browser. On launch it
+prints an address ending in `?token=…`. That token is generated fresh each time,
+and it is the only way in: opening the address trades it for a session cookie,
+and every other request without that cookie is refused. If the browser did not
+open, or you closed the tab, copy the printed address rather than typing the bare
+host and port.
+
+This keeps other websites open in the same browser, and other users on a shared
+machine such as a cluster login node, from reading your API keys or starting runs.
+Stored API keys are also never sent back to the page. The settings form shows
+them masked, and leaving a key's field blank keeps the stored value.
+
+It is still a local tool. To reach it from another machine, forward the port over
+SSH (`ssh -L 8765:127.0.0.1:8765 host`) rather than binding a public interface.
 
 | Option | Default | |
 |---|---|---|

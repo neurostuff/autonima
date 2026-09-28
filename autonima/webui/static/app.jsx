@@ -1,4 +1,6 @@
 const { useEffect, useMemo, useRef, useState } = React;
+// Mirrors SENSITIVE_SECRETS_KEYS in webui/secrets.py.
+const SENSITIVE_SECRET_KEYS = new Set(["OPENAI_API_KEY", "PUBGET_API_KEY"]);
 const DEFAULT_ANNOTATION_METADATA_FIELDS = [
   "analysis_name",
   "analysis_description",
@@ -2352,9 +2354,16 @@ function App() {
 
   async function saveSecrets() {
     try {
+      // The server never sends stored API keys back, so their inputs start empty. Only send a
+      // key the user actually typed; an omitted key is left as it is.
+      const payload = Object.fromEntries(
+        Object.entries(secrets).filter(
+          ([key, value]) => !SENSITIVE_SECRET_KEYS.has(key) || String(value || "").trim()
+        )
+      );
       await api("/api/settings/secrets", {
         method: "PUT",
-        body: JSON.stringify(secrets),
+        body: JSON.stringify(payload),
       });
       await refreshSecrets();
       setStatusMsg({ type: "ok", text: "Secrets saved to ~/.autonima.env." });
@@ -2889,7 +2898,11 @@ function App() {
                   <input
                     type={key.includes("KEY") ? "password" : "text"}
                     value={secrets[key] || ""}
-                    placeholder={maskedSecrets[key] || ""}
+                    placeholder={
+                      SENSITIVE_SECRET_KEYS.has(key) && maskedSecrets[key]
+                        ? `${maskedSecrets[key]} (stored; type to replace)`
+                        : maskedSecrets[key] || ""
+                    }
                     onChange={(e) => setSecrets((prev) => ({ ...prev, [key]: e.target.value }))}
                   />
                 </div>
