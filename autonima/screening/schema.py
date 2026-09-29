@@ -1,7 +1,7 @@
 """Pydantic models for screening output schema."""
 
 from pydantic import BaseModel
-from typing import Literal, List
+from typing import Dict, Literal, List
 
 
 class AbstractScreeningOutput(BaseModel):
@@ -11,6 +11,9 @@ class AbstractScreeningOutput(BaseModel):
     reason: str
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
+    # Criterion ID -> probability of truth. Only calibrated backends fill this; chat models
+    # leave it empty. See ScreeningResult.criterion_probabilities.
+    criterion_probabilities: Dict[str, float] = {}
 
 
 class FullTextScreeningOutput(BaseModel):
@@ -21,3 +24,4 @@ class FullTextScreeningOutput(BaseModel):
     fulltext_incomplete: bool = False
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
+    criterion_probabilities: Dict[str, float] = {}

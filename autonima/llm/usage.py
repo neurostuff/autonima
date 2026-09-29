@@ -46,6 +46,10 @@ MODEL_PRICES_ENV = "AUTONIMA_MODEL_PRICES"
 # "gpt-5-mini-2025-08-07" resolves via the "gpt-5-mini" entry.
 DEFAULT_PRICES: Dict[str, Dict[str, float]] = {
     "gpt-5-mini": {"input": 0.25, "cached_input": 0.03, "output": 2.00},
+    # TypeSafe System One. Output is free ("too cheap to meter"), so the output column is a
+    # real zero rather than an unknown -- recording it as 0.0 keeps cost_usd a number instead
+    # of null, which is the whole point of pricing a model here.
+    "jev": {"input": 0.042, "cached_input": 0.042, "output": 0.0},
 }
 
 _LOCK = threading.Lock()
