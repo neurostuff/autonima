@@ -1,0 +1,75 @@
+name: Publish to PyPI
+
+# Publishing is irreversible: a version number cannot be reused once uploaded,
+# even after deletion. So this runs only when a GitHub Release is published, and
+# it refuses to upload if the tag and the package version disagree.
+#
+# Authentication is PyPI Trusted Publishing (OpenID Connect). There is no API
+# token in this repository or in Actions secrets: PyPI verifies the workflow's
+# identity directly. Configure it once at
+# https://pypi.org/manage/project/autonima/settings/publishing/ with:
+#
+#     Owner:            neurostuff
+#     Repository:       autonima
+#     Workflow name:    publish.yml
+#     Environment:      pypi
+#
+# For a first upload of a brand-new project name, use PyPI's "pending publisher"
+# form at https://pypi.org/manage/account/publishing/ with the same values.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check metadata renders on PyPI
+        run: python -m twine check dist/*
+
+      - name: Refuse to publish if the tag and the package version disagree
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(python -c 'import re,pathlib; print(re.search(r"__version__\s*=\s*[\"\x27]([^\"\x27]+)", pathlib.Path("autonima/__init__.py").read_text()).group(1))')"
+          echo "tag=$tag package=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag $tag does not match autonima.__version__ $pkg"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # required for trusted publishing; no token needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

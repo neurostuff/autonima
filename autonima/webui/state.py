@@ -11,9 +11,22 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 
+CONFIG_SUFFIXES = frozenset({".yaml", ".yml"})
+
+
 def utc_now_iso() -> str:
     """Return an ISO timestamp in UTC."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def require_config_suffix(path: Path) -> None:
+    """Refuse to treat anything but a YAML file as a project config.
+
+    Saving a spec overwrites the project's config file, so a project registered against
+    ``~/.bashrc`` would turn the spec editor into a way to rewrite it.
+    """
+    if path.suffix.lower() not in CONFIG_SUFFIXES:
+        raise ValueError(f"Project config must be a .yaml or .yml file: {path}")
 
 
 @dataclass
@@ -128,6 +141,7 @@ class WorkspaceState:
 
         if config_path:
             config_file = Path(config_path).expanduser().resolve()
+            require_config_suffix(config_file)
         else:
             config_file = project_folder / "config.yaml"
             if not config_file.exists():
@@ -284,6 +298,8 @@ class WorkspaceState:
             raise KeyError(f"Project not found: {project_id}")
 
         config_path = Path(project["config_path"])
+        # Checked again here, not only at registration: projects.json may predate the check.
+        require_config_suffix(config_path)
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(yaml_text, encoding="utf-8")
 

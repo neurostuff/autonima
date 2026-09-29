@@ -66,6 +66,19 @@ def find_nimads_files(output_folder):
     return str(studyset_file), str(annotation_file)
 
 
+def resolve_nimads_folder(output_folder) -> Path:
+    """Return the folder that holds the NiMADS files, given a run folder or its outputs/.
+
+    The README, the CLI help and the guides all pass ``<run>/outputs``, while the web UI
+    passes the run folder itself. This used to append ``outputs/`` unconditionally, so
+    following the docs looked for ``<run>/outputs/outputs/`` and failed.
+    """
+    folder = Path(output_folder)
+    if (folder / "nimads_studyset.json").exists():
+        return folder
+    return folder / "outputs"
+
+
 def load_include_ids(include_ids_file: Optional[os.PathLike]) -> Optional[Set[str]]:
     """
     Load study IDs (PMIDs) to include from a text file.
@@ -157,6 +170,18 @@ def _analysis_ids_for_column(annotation_data, column):
     ]
 
 
+def _unknown_analysis_count(annotation_data, column):
+    """Count analyses whose decision for a column is null: annotation failed, not excluded."""
+    return sum(
+        1
+        for note in annotation_data.get("notes", [])
+        if isinstance(note, dict)
+        and isinstance(note.get("note"), dict)
+        and column in note["note"]
+        and note["note"][column] is None
+    )
+
+
 def _analysis_has_valid_coordinates(analysis) -> bool:
     """Return True when an analysis has at least one finite (x, y, z) point."""
     points = getattr(analysis, "points", None) or []
@@ -214,6 +239,15 @@ def run_meta_analysis_for_column(
         return None
 
     analysis_ids = _analysis_ids_for_column(annotation_data, column)
+    unknown = _unknown_analysis_count(annotation_data, column)
+    if unknown:
+        # Left out because they were never decided, not because they were excluded. Say so,
+        # or the map silently loses them the way the old False default did.
+        print(
+            f"Warning: {unknown} analyses have no decision for column {column} "
+            "(annotation failed) and are left out of this meta-analysis. "
+            "Re-run the pipeline to retry them."
+        )
     if not analysis_ids:
         print(f"No studies found for column {column}. Skipping.")
         return None
@@ -391,8 +425,12 @@ def run_meta_analyses(
     debug=False,
     generate_reports=False,
 ):
-    """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
-    output_folder = Path(output_folder) / "outputs"
+    """Run meta-analyses on all boolean annotation columns in the NiMADS files.
+
+    ``output_folder`` may be the run folder or its ``outputs/`` folder. Results are written
+    to ``meta_analysis_results/`` beside the NiMADS files either way.
+    """
+    output_folder = resolve_nimads_folder(output_folder)
     studyset_file, annotation_file = find_nimads_files(output_folder)
 
     output_dir = Path(output_folder) / "meta_analysis_results"
@@ -420,7 +458,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run meta-analyses on autonima output")
     parser.add_argument(
         "output_folder",
-        help="Path to the autonima output folder containing NiMADS files",
+        help="Run output folder, or its outputs/ folder holding the NiMADS files",
     )
 
     parser.add_argument(

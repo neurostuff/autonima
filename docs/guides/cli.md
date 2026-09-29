@@ -117,9 +117,9 @@ projects/cue_reactivity/default/
 
 ## Run Meta-Analysis
 
-`autonima meta` expects the folder containing `nimads_studyset.json` and `nimads_annotation.json`.
+`autonima meta` takes the folder containing `nimads_studyset.json` and `nimads_annotation.json`, or the run folder above it.
 
-For standard pipeline output, that is usually the `outputs/` directory:
+For standard pipeline output, that is the `outputs/` directory:
 
 ```bash
 autonima meta projects/cue_reactivity/default/outputs

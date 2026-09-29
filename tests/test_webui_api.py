@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
@@ -110,9 +112,178 @@ def test_webui_api_secrets_roundtrip(tmp_path):
     read = client.get("/api/settings/secrets")
     assert read.status_code == 200
     values = read.json().get("values", {})
-    assert values.get("OPENAI_API_KEY") == "sk-test-key"
     assert values.get("OPENAI_API_GATEWAY") == "https://gateway.example/v1"
     assert values.get("NCBI_EMAIL") == "test@example.com"
+    # Credentials are stored but only ever returned masked.
+    assert "OPENAI_API_KEY" not in values
+    assert "PUBGET_API_KEY" not in values
+    assert "sk-test-key" not in read.text
+    assert "pubget-xyz" not in read.text
+    assert "sk-test-key" not in write.text
+    assert read.json()["masked"]["OPENAI_API_KEY"].startswith("sk-")
+    assert "OPENAI_API_KEY=sk-test-key" in (tmp_path / ".autonima.env").read_text()
+
+
+def test_webui_api_secrets_save_leaves_omitted_keys_alone(tmp_path):
+    """The page never holds stored API keys, so saving without one must not erase it."""
+    env_path = tmp_path / ".autonima.env"
+    app = create_app(tmp_path, env_path=env_path)
+    client = TestClient(app)
+    client.put(
+        "/api/settings/secrets",
+        json={"OPENAI_API_KEY": "sk-test-key", "NCBI_EMAIL": "old@example.com"},
+    )
+
+    client.put("/api/settings/secrets", json={"NCBI_EMAIL": "new@example.com"})
+
+    stored = env_path.read_text()
+    assert "OPENAI_API_KEY=sk-test-key" in stored
+    assert "NCBI_EMAIL=new@example.com" in stored
+
+
+def test_webui_api_requires_token_when_configured(tmp_path):
+    app = create_app(
+        tmp_path,
+        env_path=tmp_path / ".autonima.env",
+        access_token="secret-token",
+    )
+    client = TestClient(app, base_url="http://127.0.0.1:8765")
+
+    assert client.get("/api/workspace").status_code == 401
+    assert client.get("/api/settings/secrets").status_code == 401
+    assert client.get("/").status_code == 401
+    assert client.get("/?token=wrong").status_code == 401
+    assert client.get("/api/workspace", headers={"X-Autonima-Token": "wrong"}).status_code == 401
+
+    entry = client.get("/?token=secret-token&view=projects", follow_redirects=False)
+    assert entry.status_code == 303
+    assert entry.headers["location"] == "/?view=projects"
+    cookie = entry.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=strict" in cookie
+
+    # The client now carries the session cookie.
+    assert client.get("/api/workspace").status_code == 200
+    assert client.get("/").status_code == 200
+
+    fresh = TestClient(app, base_url="http://127.0.0.1:8765")
+    assert fresh.get(
+        "/api/workspace", headers={"X-Autonima-Token": "secret-token"}
+    ).status_code == 200
+
+
+def test_webui_api_session_cookie_is_per_port(tmp_path):
+    """Browsers share cookies across ports, so each UI's session must have its own name."""
+    app = create_app(tmp_path, env_path=tmp_path / ".autonima.env", access_token="t")
+    client = TestClient(app, base_url="http://127.0.0.1:8765")
+    client.get("/?token=t", follow_redirects=False)
+
+    assert "autonima_ui_8765" in client.cookies
+    other_port = TestClient(app, base_url="http://127.0.0.1:9000")
+    other_port.cookies.set("autonima_ui_8765", "t")
+    assert other_port.get("/api/workspace").status_code == 401
+
+
+def test_webui_api_rejects_unexpected_host(tmp_path):
+    """A rebinding page reaches the server under its own name, not a loopback one."""
+    app = create_app(
+        tmp_path,
+        env_path=tmp_path / ".autonima.env",
+        allowed_hosts={"127.0.0.1", "localhost", "::1"},
+    )
+
+    assert TestClient(app, base_url="http://127.0.0.1:8765").get("/api/workspace").status_code == 200
+    assert TestClient(app, base_url="http://localhost:8765").get("/api/workspace").status_code == 200
+    rebound = TestClient(app, base_url="http://attacker.example:8765")
+    assert rebound.get("/api/workspace").status_code == 400
+
+
+def test_webui_api_sends_no_cors_headers(tmp_path):
+    app = create_app(tmp_path, env_path=tmp_path / ".autonima.env")
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/settings/secrets",
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert "access-control-allow-origin" not in response.headers
+
+    preflight = client.options(
+        "/api/settings/secrets",
+        headers={
+            "Origin": "https://attacker.example",
+            "Access-Control-Request-Method": "PUT",
+        },
+    )
+    assert "access-control-allow-origin" not in preflight.headers
+
+
+def test_webui_api_refuses_non_yaml_project_config(tmp_path):
+    target = tmp_path / "bashrc"
+    target.write_text("export PATH=/usr/bin\n", encoding="utf-8")
+    app = create_app(tmp_path, env_path=tmp_path / ".autonima.env")
+    client = TestClient(app)
+
+    imported = client.post("/api/projects/import", json={"config_path": str(target)})
+    assert imported.status_code == 400
+    created = client.post("/api/projects", json={"config_path": str(target)})
+    assert created.status_code == 400
+    assert target.read_text(encoding="utf-8") == "export PATH=/usr/bin\n"
+
+
+def test_webui_api_spec_save_refuses_non_yaml_registered_before_the_check(tmp_path):
+    """projects.json written by an older version may already point at a non-YAML file."""
+    target = tmp_path / "bashrc"
+    target.write_text("export PATH=/usr/bin\n", encoding="utf-8")
+    app = create_app(tmp_path, env_path=tmp_path / ".autonima.env")
+    client = TestClient(app)
+    project_id = client.post("/api/projects", json={"name": "legacy"}).json()["id"]
+
+    projects_file = tmp_path / ".autonima-ui" / "projects.json"
+    payload = json.loads(projects_file.read_text(encoding="utf-8"))
+    for project in payload["projects"]:
+        if project["id"] == project_id:
+            project["config_path"] = str(target)
+    projects_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    saved = client.put(
+        f"/api/projects/{project_id}/spec",
+        json={"yaml_text": "echo pwned\n"},
+    )
+    assert saved.status_code == 400
+    assert target.read_text(encoding="utf-8") == "export PATH=/usr/bin\n"
+
+
+def test_run_ui_server_always_sets_a_token(tmp_path, monkeypatch, capsys):
+    import sys
+    import types
+
+    import autonima.webui.app as webui_app
+
+    captured = {}
+    real_create_app = webui_app.create_app
+
+    def recording_create_app(*args, **kwargs):
+        captured.update(kwargs)
+        return real_create_app(*args, **kwargs)
+
+    opened = []
+    monkeypatch.setattr(webui_app, "create_app", recording_create_app)
+    monkeypatch.setattr(webui_app.webbrowser, "open", lambda url, new=0: opened.append(url))
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=lambda *a, **k: None))
+
+    webui_app.run_ui_server(str(tmp_path), host="127.0.0.1", port=8765, open_browser=True)
+
+    token = captured["access_token"]
+    assert token and len(token) >= 32
+    assert "127.0.0.1" in captured["allowed_hosts"]
+    assert opened == [f"http://127.0.0.1:8765/?token={token}"]
+    assert f"?token={token}" in capsys.readouterr().out
+
+    captured.clear()
+    webui_app.run_ui_server(str(tmp_path), host="0.0.0.0", port=8765, open_browser=False)
+    assert captured["access_token"] and captured["access_token"] != token
+    assert captured["allowed_hosts"] is None
 
 
 def test_webui_api_preferences_roundtrip(tmp_path):

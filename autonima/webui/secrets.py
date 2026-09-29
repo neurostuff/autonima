@@ -12,6 +12,13 @@ SECRETS_KEYS = [
     "NCBI_EMAIL",
 ]
 
+# Keys whose values are never sent back to the browser, only their masked form. The gateway
+# URL and contact email are settings the page has to show; these are credentials.
+SENSITIVE_SECRETS_KEYS = frozenset({
+    "OPENAI_API_KEY",
+    "PUBGET_API_KEY",
+})
+
 
 class SecretsManager:
     """Manage keys stored in ~/.autonima.env."""
