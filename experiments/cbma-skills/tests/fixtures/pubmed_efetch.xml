@@ -1,0 +1,57 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2024//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_240101.dtd">
+<PubmedArticleSet>
+<PubmedArticle>
+  <MedlineCitation Status="MEDLINE" Owner="NLM">
+    <PMID Version="1">11111111</PMID>
+    <Article PubModel="Print">
+      <Journal><Title>NeuroImage</Title><JournalIssue><PubDate><Year>2019</Year></PubDate></JournalIssue></Journal>
+      <ArticleTitle>Effects of <i>BDNF</i> Val66Met on working memory in schizophrenia: an fMRI study</ArticleTitle>
+      <ELocationID EIdType="doi" ValidYN="Y">10.1016/J.NEUROIMAGE.2019.001</ELocationID>
+      <Abstract>
+        <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">Working memory deficits are core to schizophrenia.</AbstractText>
+        <AbstractText Label="METHODS" NlmCategory="METHODS">Thirty patients and 30 controls performed an <i>n</i>-back task during fMRI.</AbstractText>
+        <AbstractText Label="RESULTS" NlmCategory="RESULTS">Patients showed reduced DLPFC activation.</AbstractText>
+      </Abstract>
+      <AuthorList><Author><LastName>Smith</LastName><Initials>J</Initials></Author><Author><CollectiveName>WM Consortium</CollectiveName></Author></AuthorList>
+      <Language>eng</Language>
+      <PublicationTypeList><PublicationType UI="D016428">Journal Article</PublicationType></PublicationTypeList>
+    </Article>
+    <MeshHeadingList><MeshHeading><DescriptorName UI="D012559">Schizophrenia</DescriptorName></MeshHeading></MeshHeadingList>
+  </MedlineCitation>
+  <PubmedData>
+    <ArticleIdList><ArticleId IdType="pubmed">11111111</ArticleId><ArticleId IdType="pmc">PMC7000001</ArticleId></ArticleIdList>
+    <ReferenceList><Reference><Citation>Cited paper</Citation><ArticleIdList><ArticleId IdType="doi">10.9999/cited.paper</ArticleId></ArticleIdList></Reference></ReferenceList>
+  </PubmedData>
+</PubmedArticle>
+<PubmedArticle>
+  <MedlineCitation Status="MEDLINE" Owner="NLM">
+    <PMID Version="1">22222222</PMID>
+    <Article PubModel="Print">
+      <Journal><Title>Brain</Title><JournalIssue><PubDate><MedlineDate>2001 Spring</MedlineDate></PubDate></JournalIssue></Journal>
+      <ArticleTitle>A review of prefrontal function</ArticleTitle>
+      <AuthorList><Author><LastName>Doe</LastName><Initials>A</Initials></Author></AuthorList>
+      <PublicationTypeList><PublicationType UI="D016454">Review</PublicationType></PublicationTypeList>
+    </Article>
+  </MedlineCitation>
+  <PubmedData>
+    <ArticleIdList><ArticleId IdType="pubmed">22222222</ArticleId></ArticleIdList>
+    <ReferenceList><Reference><Citation>x</Citation><ArticleIdList><ArticleId IdType="doi">10.9999/should.not.be.used</ArticleId></ArticleIdList></Reference></ReferenceList>
+  </PubmedData>
+</PubmedArticle>
+<PubmedArticle>
+  <MedlineCitation Status="MEDLINE" Owner="NLM">
+    <PMID Version="1">33333333</PMID>
+    <Article PubModel="Print">
+      <Journal><Title>Hum Brain Mapp</Title><JournalIssue><PubDate><Year>2015</Year></PubDate></JournalIssue></Journal>
+      <ArticleTitle>Load-dependent prefrontal activation in first-episode psychosis</ArticleTitle>
+      <Abstract><AbstractText>Patients with first-episode schizophrenia performed a Sternberg task during fMRI.</AbstractText></Abstract>
+      <AuthorList><Author><LastName>Roe</LastName><Initials>B</Initials></Author></AuthorList>
+      <PublicationTypeList><PublicationType UI="D016428">Journal Article</PublicationType></PublicationTypeList>
+    </Article>
+  </MedlineCitation>
+  <PubmedData>
+    <ArticleIdList><ArticleId IdType="pubmed">33333333</ArticleId><ArticleId IdType="doi">10.1002/hbm.33333</ArticleId></ArticleIdList>
+  </PubmedData>
+</PubmedArticle>
+</PubmedArticleSet>

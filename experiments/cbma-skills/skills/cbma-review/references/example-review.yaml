@@ -1,0 +1,68 @@
+# A starting point. Copy to REVIEW/review.yaml and edit with the user.
+name: wm_schizophrenia
+objective: >
+  Identify task-based fMRI studies of working memory in adults with schizophrenia
+  that report whole-brain activation coordinates, for a coordinate-based
+  meta-analysis of patient-control differences.
+
+search:
+  query: >-
+    (schizophreni*[tiab]) AND ("working memory"[tiab] OR n-back[tiab] OR "sternberg"[tiab])
+    AND (fMRI[tiab] OR "functional magnetic resonance"[tiab] OR "functional MRI"[tiab])
+  date_from: 1995/01/01
+  email: your.email@example.org
+
+screening:
+  abstract:
+    inclusion:
+      - Human participants with schizophrenia or schizoaffective disorder
+      - Task-based functional neuroimaging (fMRI)
+      - A working-memory task
+    exclusion:
+      - Review, meta-analysis, commentary, editorial or protocol without new data
+      - Animal study
+  fulltext:
+    inclusion:
+      - Adults (18+) with a DSM or ICD diagnosis of schizophrenia or schizoaffective disorder
+      - A healthy control group scanned with the same task
+      - A working-memory task during fMRI
+      - Whole-brain results reported as stereotaxic peak coordinates (MNI or Talairach)
+    exclusion:
+      - Results reported only for regions of interest, with no whole-brain coordinates
+      - Review, meta-analysis or reanalysis of previously published data only
+
+fulltext:
+  sources:
+    - type: pmc
+    # - type: local
+    #   name: publisher_html
+    #   path: /data/publisher_html
+    #   pattern: "**/*.html"
+    #   id_from: filename
+    #   id_kind: pmid
+
+extraction:
+  drop_unverified: true
+
+selection:
+  global:
+    inclusion:
+      - Whole-brain analysis (not restricted to a region of interest)
+    exclusion:
+      - Conjunction analysis
+      - Correlation with a behavioural or clinical covariate
+  targets:
+    - name: patients_gt_controls
+      description: Working-memory activation greater in patients than controls
+      inclusion:
+        - Between-group contrast with patients greater than controls
+        - The contrast involves a working-memory condition (task > baseline or load effect)
+    - name: controls_gt_patients
+      description: Working-memory activation greater in controls than patients
+      inclusion:
+        - Between-group contrast with controls greater than patients
+        - The contrast involves a working-memory condition (task > baseline or load effect)
+
+meta:
+  estimator: mkdadensity
+  corrector: fdr
