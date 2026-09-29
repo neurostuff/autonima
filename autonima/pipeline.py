@@ -278,6 +278,8 @@ class AutonimaPipeline:
             return {
                 "decisions": stats.get("decisions", 0) if isinstance(stats, dict) else 0,
                 "annotations": annotation_count,
+                "failed": stats.get("failed", 0) if isinstance(stats, dict) else 0,
+                "failed_studies": stats.get("failed_studies", 0) if isinstance(stats, dict) else 0,
             }
         if stage == "output":
             stats = self.results.execution_stats.get("prisma_stats", {})
@@ -1531,9 +1533,23 @@ class AutonimaPipeline:
                 )
                 
                 if annotation_results:
+                    # Custom annotations run on every full-text-included study with
+                    # analyses (the same set _execute_annotation_phase selects), so an
+                    # absent decision there is unknown rather than an exclusion.
+                    unknown_when_missing = {}
+                    if getattr(self.config.annotation, 'enabled', True):
+                        included_ids = {
+                            s.pmid for s in self.results.studies
+                            if s.status == StudyStatus.INCLUDED_FULLTEXT and s.analyses
+                        }
+                        unknown_when_missing = {
+                            annotation.name: included_ids
+                            for annotation in self.config.annotation.annotations
+                        }
                     # Create annotations from results
                     annotations = create_annotations_from_results(
-                        studyset_id, studyset, annotation_results
+                        studyset_id, studyset, annotation_results,
+                        unknown_when_missing=unknown_when_missing,
                     )
                     
                     # Save all annotations to a single file

@@ -437,6 +437,12 @@ def build_stage_status(
             counters["annotation"] = {
                 "decisions": len(annotation_data),
                 "annotations": len(annotation_names),
+                # Rows recorded for pairs no decision could be made for (include is null).
+                "failed": sum(
+                    1
+                    for item in annotation_data
+                    if isinstance(item, dict) and "include" in item and item["include"] is None
+                ),
             }
 
         final_data = _safe_read_json(outputs_dir / "final_results.json")

@@ -1239,6 +1239,10 @@ function App() {
       addStage("annotation", "Analysis annotations", [
         { key: "decisions", label: "Decisions", value: data.annotation.decisions, tone: "include" },
         { key: "annotations", label: "Annotations", value: data.annotation.annotations, tone: "total" },
+        // Only shown when something failed; those pairs export as null, not excluded.
+        ...(data.annotation.failed
+          ? [{ key: "failed", label: "Failed", value: data.annotation.failed, tone: "incomplete" }]
+          : []),
       ]);
     }
     addStatusStage("annotation", "Analysis annotations");

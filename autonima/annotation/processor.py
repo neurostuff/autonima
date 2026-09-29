@@ -22,6 +22,16 @@ from ..execution import (
 
 logger = logging.getLogger(__name__)
 
+# API errors can carry a whole response body; the stored reason only needs to say what broke.
+_MAX_ERROR_CHARS = 500
+
+
+def _describe_error(error: Exception) -> str:
+    text = f"{type(error).__name__}: {error}"
+    if len(text) > _MAX_ERROR_CHARS:
+        text = text[:_MAX_ERROR_CHARS] + "..."
+    return text
+
 
 class AnnotationProcessor:
     """Processor for annotating analyses based on LLM decisions."""
@@ -240,6 +250,20 @@ class AnnotationProcessor:
                 ) not in processed_keys
             ),
         }
+        failed = [decision for decision in eligible_results if decision.failed]
+        failed_studies = {decision.study_id for decision in failed}
+        self.cache_stats["failed"] = len(failed)
+        self.cache_stats["failed_studies"] = len(failed_studies)
+        if failed:
+            logger.warning(
+                "Annotation could not decide %d analysis-annotation pairs across %d "
+                "studies (e.g. %s). They are exported as null, not as excluded, and are "
+                "retried on the next run. Reasons are in annotation_results.json under "
+                "'error'.",
+                len(failed),
+                len(failed_studies),
+                ", ".join(sorted(failed_studies)[:5]),
+            )
         return eligible_results
     
     def _create_all_analyses_annotations(
@@ -369,14 +393,16 @@ class AnnotationProcessor:
                     existing_results or [], study.pmid,
                     self.config.annotations, study
                 )
-            
-            # Get annotations that need processing for this study
-            annotations_to_process = [a for a in self.config.annotations if a.name not in study_annotations_complete]
-            
-            if not annotations_to_process:
+
+            if len(study_annotations_complete) == len(self.config.annotations):
                 continue
-            
-            studies_to_process.append((study, annotations_to_process))
+
+            # Any gap re-annotates all of the study's custom annotations together, never a
+            # subset. The save replaces a study's custom decisions as a block, so reprocessing
+            # a subset deleted the rest and the study then flip-flopped between runs. And a
+            # multi-analysis prompt can carry rules across annotations (one subtype per study)
+            # that a call seeing only some of them cannot honour.
+            studies_to_process.append((study, list(self.config.annotations)))
         
         if not studies_to_process:
             return []
@@ -391,15 +417,17 @@ class AnnotationProcessor:
         if self.num_workers <= 1 or len(studies_to_process) <= 1:
             # Serial processing
             for study, annotations_to_process in tqdm(studies_to_process, desc="Processing studies"):
+                error = None
                 try:
                     study_decisions = self._process_single_study_annotations(
                         study, self.config.metadata_fields, annotations_to_process, model
                     )
-                    self._sign_decisions(study, study_decisions)
-                    decisions.extend(study_decisions)
                 except Exception as e:
                     logger.error(f"Error processing annotations for study {study.pmid}: {e}")
-                    # Continue processing other studies
+                    study_decisions, error = [], _describe_error(e)
+                decisions.extend(self._with_failures(
+                    study, annotations_to_process, study_decisions, model, error
+                ))
         else:
             # Parallel processing
             with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
@@ -411,19 +439,60 @@ class AnnotationProcessor:
                 
                 # Collect results
                 for future in tqdm(as_completed(future_to_study), total=len(studies_to_process), desc="Processing studies"):
+                    study, annotations_to_process = future_to_study[future]
+                    error = None
                     try:
                         study_decisions = future.result()
-                        study, _ = future_to_study[future]
-                        self._sign_decisions(study, study_decisions)
-                        decisions.extend(study_decisions)
                     except Exception as e:
-                        study, annotations_to_process = future_to_study[future]
-                        log_error_with_debug(logger, 
+                        log_error_with_debug(logger,
                             f"Error processing annotations for study {study.pmid}: {e}"
-                        )   
-                        # Continue processing other studies
-        
+                        )
+                        study_decisions, error = [], _describe_error(e)
+                    decisions.extend(self._with_failures(
+                        study, annotations_to_process, study_decisions, model, error
+                    ))
+
         return decisions
+
+    def _with_failures(
+        self,
+        study: Study,
+        annotations: List[AnnotationCriteriaConfig],
+        decisions: List[AnnotationDecision],
+        model: str,
+        error: Optional[str] = None,
+    ) -> List[AnnotationDecision]:
+        """Sign a study's decisions, adding an explicit failure for every pair left undecided.
+
+        A pair is undecided when the call raised (`error` is set and there are no decisions)
+        or when the response simply left it out. Either way it is recorded rather than
+        omitted: an absent decision reached the NiMADS export as False, so a study whose call
+        threw was indistinguishable from one the model had excluded from every contrast.
+        Failures carry the current signature, so a retry replaces them, but never count as
+        complete, so the next run retries them.
+        """
+        decided = {
+            (decision.analysis_id, decision.annotation_name)
+            for decision in decisions
+            if not decision.failed
+        }
+        reason = error or "the response contained no decision for this analysis"
+        filled = list(decisions)
+        for i, _ in enumerate(study.analyses):
+            analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+            for annotation in annotations:
+                if (analysis_id, annotation.name) in decided:
+                    continue
+                filled.append(AnnotationDecision(
+                    annotation_name=annotation.name,
+                    analysis_id=analysis_id,
+                    study_id=study.pmid,
+                    include=None,
+                    reasoning=f"Annotation failed: {reason}",
+                    model_used=model,
+                    error=reason,
+                ))
+        return self._sign_decisions(study, filled)
     
     def _process_single_study_annotations(self, study: Study, metadata_fields: List[str], annotations_to_process: List[AnnotationCriteriaConfig], model: str) -> List[AnnotationDecision]:
         """
@@ -585,10 +654,13 @@ class AnnotationProcessor:
         for annotation in all_annotations:
             cached = annotation_results.get(annotation.name, [])
             expected_signature = self._cache_signature(study, annotation.name)
+            # A recorded failure is a signed row but not an answer, so it keeps the
+            # annotation incomplete and the next run retries it.
             if (
                 len(cached) == expected_count
                 and all(
                     result.cache_signature == expected_signature
+                    and not result.failed
                     for result in cached
                 )
             ):
