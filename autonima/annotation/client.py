@@ -198,7 +198,8 @@ class AnnotationClient:
         for attempt in range(self.max_retries):
             try:
                 return self._make_decision_attempt(
-                    metadata, criteria_list, metadata_fields, model, prompt_type
+                    metadata, criteria_list, metadata_fields, model, prompt_type,
+                    model_params=model_params,
                 )
             except (ValueError, KeyError, TypeError) as e:
                 last_exception = e

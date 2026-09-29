@@ -170,6 +170,18 @@ def _analysis_ids_for_column(annotation_data, column):
     ]
 
 
+def _unknown_analysis_count(annotation_data, column):
+    """Count analyses whose decision for a column is null: annotation failed, not excluded."""
+    return sum(
+        1
+        for note in annotation_data.get("notes", [])
+        if isinstance(note, dict)
+        and isinstance(note.get("note"), dict)
+        and column in note["note"]
+        and note["note"][column] is None
+    )
+
+
 def _analysis_has_valid_coordinates(analysis) -> bool:
     """Return True when an analysis has at least one finite (x, y, z) point."""
     points = getattr(analysis, "points", None) or []
@@ -227,6 +239,15 @@ def run_meta_analysis_for_column(
         return None
 
     analysis_ids = _analysis_ids_for_column(annotation_data, column)
+    unknown = _unknown_analysis_count(annotation_data, column)
+    if unknown:
+        # Left out because they were never decided, not because they were excluded. Say so,
+        # or the map silently loses them the way the old False default did.
+        print(
+            f"Warning: {unknown} analyses have no decision for column {column} "
+            "(annotation failed) and are left out of this meta-analysis. "
+            "Re-run the pipeline to retry them."
+        )
     if not analysis_ids:
         print(f"No studies found for column {column}. Skipping.")
         return None

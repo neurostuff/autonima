@@ -51,7 +51,10 @@ class AnnotationDecision(BaseModel):
     annotation_name: str
     analysis_id: str
     study_id: str
-    include: bool
+    # None means no decision was made: the call failed or the response left this pair out.
+    # It is exported as null, never as False -- a failure that reads as "excluded" is
+    # indistinguishable from a real exclusion, and silently drops the analysis from the maps.
+    include: Optional[bool]
     reasoning: str
     confidence: Optional[float] = None
     model_used: str
@@ -61,6 +64,12 @@ class AnnotationDecision(BaseModel):
     inclusion_criteria_applied: List[str] = []
     exclusion_criteria_applied: List[str] = []
     cache_signature: Optional[Dict[str, Any]] = None
+    # Why no decision was made, when include is None.
+    error: Optional[str] = None
+
+    @property
+    def failed(self) -> bool:
+        return self.include is None
 
 
 class TableMetadata(BaseModel):

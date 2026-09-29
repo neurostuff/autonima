@@ -1,7 +1,7 @@
 """NiMADS data models for neuroimaging meta-analysis."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 from .schema import Analysis, CoordinatePoint
 
 
@@ -325,16 +325,22 @@ def create_default_annotation(studyset_id: str, studyset: Studyset) -> Annotatio
 def create_annotations_from_results(
     studyset_id: str,
     studyset: Studyset,
-    annotation_results: List['autonima.annotation.schema.AnnotationDecision']
+    annotation_results: List['autonima.annotation.schema.AnnotationDecision'],
+    unknown_when_missing: Optional[Dict[str, Set[str]]] = None,
 ) -> List[Annotation]:
     """
     Create a single consolidated annotation from annotation results.
-    
+
     Args:
         studyset_id: ID of the studyset
         studyset: The studyset
         annotation_results: List of annotation decisions
-        
+        unknown_when_missing: Annotation name -> IDs of the studies whose analyses were
+            all supposed to receive a decision for it. An analysis of such a study with no
+            decision is exported as null (unknown). Every other absent pair is False: the
+            annotation never applied to it, e.g. a custom annotation on a study that was
+            excluded at full text.
+
     Returns:
         List containing a single annotation with multiple note_keys
     """
@@ -348,6 +354,15 @@ def create_annotations_from_results(
         analysis.id
         for study in studyset.studies
         for analysis in study.analyses
+    }
+    expected_analysis_ids = {
+        annotation_name: {
+            analysis.id
+            for study in studyset.studies
+            if study.id in study_ids
+            for analysis in study.analyses
+        }
+        for annotation_name, study_ids in (unknown_when_missing or {}).items()
     }
 
     # Group annotation results by annotation name and analysis_id
@@ -389,9 +404,14 @@ def create_annotations_from_results(
         # For each annotation type, check if this analysis was included
         for annotation_name in annotations_by_name.keys():
             if analysis_id in annotations_by_name[annotation_name]:
+                # None for a recorded failure: unknown, not excluded.
                 note_data[annotation_name] = annotations_by_name[annotation_name][analysis_id]
+            elif analysis_id in expected_analysis_ids.get(annotation_name, ()):
+                # Should have been decided and was not, e.g. the call raised before
+                # failures were recorded. Unknown, so it cannot pass as an exclusion.
+                note_data[annotation_name] = None
             else:
-                # Default to False if no decision was made for this analysis-annotation pair
+                # The annotation never applied to this analysis.
                 note_data[annotation_name] = False
         
         note = NoteCollection(
