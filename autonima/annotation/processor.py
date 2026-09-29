@@ -23,6 +23,30 @@ from ..execution import (
 
 logger = logging.getLogger(__name__)
 
+# Config fields added after corpora were cached, with the default that reproduces the old
+# behaviour exactly. They enter the stage hash only once set: hashing a field that is still at
+# its default invalidated every decision in every earlier run the moment the field appeared.
+_NEUTRAL_DEFAULTS = {"backend": "openai", "additional_instructions": None}
+_NEUTRAL_CRITERION_DEFAULTS = {"additional_instructions": None}
+
+
+def _hashable_config(dumped: Dict[str, Any]) -> Dict[str, Any]:
+    """The annotation config as it enters the stage hash."""
+    hashable = {
+        k: v for k, v in dumped.items()
+        if k not in POST_HOC_CONFIG_KEYS
+        and k != "model_params"
+        and not (k in _NEUTRAL_DEFAULTS and v == _NEUTRAL_DEFAULTS[k])
+    }
+    hashable["annotations"] = [
+        {
+            k: v for k, v in criterion.items()
+            if not (k in _NEUTRAL_CRITERION_DEFAULTS and v == _NEUTRAL_CRITERION_DEFAULTS[k])
+        }
+        for criterion in hashable.get("annotations") or []
+    ]
+    return hashable
+
 
 class AnnotationProcessor:
     """Processor for annotating analyses based on LLM decisions."""
@@ -60,8 +84,7 @@ class AnnotationProcessor:
         # excluded for the same reason -- it tunes the request envelope, not the question.
         self.stage_hash = stable_hash(
             {
-                **{k: v for k, v in self.config.model_dump().items()
-                   if k not in POST_HOC_CONFIG_KEYS and k != "model_params"},
+                **_hashable_config(self.config.model_dump()),
                 "prompt_version": ANNOTATION_PROMPT_VERSION,
             }
         )
