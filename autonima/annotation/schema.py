@@ -110,6 +110,10 @@ class AnalysisMetadata(BaseModel):
     study_publication_date: Optional[str] = None
     study_fulltext: Optional[str] = None
     custom_fields: Dict[str, Any] = {}
+    # What study_fulltext is when a document source supplied it, for the prompt to name it.
+    # Excluded from model_dump, which the annotation cache hash reads, so adding it left
+    # article-run hashes unchanged; the processor folds the document into the hash itself.
+    study_document_description: Optional[str] = Field(default=None, exclude=True)
 
 
 class StudyAnalysisGroup(BaseModel):
@@ -123,6 +127,8 @@ class StudyAnalysisGroup(BaseModel):
     study_fulltext: Optional[str] = None
     tables: List[TableMetadata] = []
     analyses: List[AnalysisMetadata] = []
+    # As on AnalysisMetadata: named by the prompt, excluded from the hash.
+    study_document_description: Optional[str] = Field(default=None, exclude=True)
 
 
 # ---------- helpers ----------

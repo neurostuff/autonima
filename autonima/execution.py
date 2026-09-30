@@ -21,6 +21,7 @@ from .cache_versions import (
     ANNOTATION_PROMPT_VERSION,
     ABSTRACT_SCREENING_PROMPT_VERSION,
     CACHE_SCHEMA_VERSION,
+    DOCUMENT_PROMPT_VERSION,
     FULLTEXT_SCREENING_PROMPT_VERSION,
 )
 from .coordinates.prompts import COORDINATE_PARSING_PROMPT_VERSION
@@ -43,7 +44,7 @@ CLEAR_CACHE_STAGES = {
 STAGE_ARTIFACTS: Dict[str, List[str]] = {
     "search": ["search_results.json"],
     "abstract": ["abstract_screening_results.json"],
-    "retrieval": ["fulltext_retrieval_results.json"],
+    "retrieval": ["fulltext_retrieval_results.json", "documents_unavailable.csv"],
     "fulltext": ["fulltext_screening_results.json"],
     "parsing": ["coordinate_parsing_results.json"],
     "annotation": ["annotation_results.json"],
@@ -295,6 +296,16 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     parsing = config.get("parsing") or {}
     annotation = config.get("annotation") or {}
     output = config.get("output") or {}
+    # Records enter the signatures only when enabled, so an article run hashes exactly as it
+    # did before records existed and keeps every cache it has.
+    documents = retrieval.get("records") or {}
+    retrieval_documents: Dict[str, Any] = {}
+    document_prompt: Dict[str, Any] = {}
+    if documents.get("enabled"):
+        retrieval_documents = {
+            "records": _pick(documents, ["kind", "root", "description"]),
+        }
+        document_prompt = {"document_prompt_version": DOCUMENT_PROMPT_VERSION}
 
     return {
         "search": _pick(
@@ -324,10 +335,12 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
                 "load_excluded",
                 "full_text_sources",
             ],
-        ),
+        )
+        | retrieval_documents,
         "fulltext": {
             **_drop(screening.get("fulltext") or {}, DEPLOYMENT_KEYS),
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
+            **document_prompt,
         },
         "parsing": _pick(
             parsing or retrieval,
@@ -347,7 +360,8 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
                 "exclusion_criteria",
             ],
         )
-        | {"prompt_version": ANNOTATION_PROMPT_VERSION},
+        | {"prompt_version": ANNOTATION_PROMPT_VERSION}
+        | document_prompt,
         "output": _pick(
             output,
             ["prisma_diagram", "formats", "nimads", "export_excluded_studies"],

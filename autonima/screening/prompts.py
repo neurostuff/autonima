@@ -192,6 +192,22 @@ EXCLUSION CRITERIA:
         additional_instructions_text = ""
         if additional_instructions:
             additional_instructions_text = f"\n{additional_instructions}\n"
+
+        # A study read from a document source is screened from that document, and the prompt
+        # must not tell the model it is reading the article.
+        document = getattr(study, "document", None)
+        if document is not None:
+            return PromptLibrary._get_document_screening_prompt(
+                study=study,
+                content=content,
+                document_description=document.description,
+                inclusion_text=inclusion_text,
+                exclusion_text=exclusion_text,
+                objective=objective,
+                confidence_instruction=confidence_instruction,
+                reason_instruction=reason_instruction,
+                additional_instructions_text=additional_instructions_text,
+            )
         
         instructions = f"""
 INSTRUCTIONS FOR FULL-TEXT SCREENING:
@@ -231,6 +247,90 @@ inclusion_criteria_applied, and exclusion_criteria_applied fields.
 STUDY INFORMATION:
 Title: {study.title}
 Full Text Content: {content}
+Authors: {', '.join(study.authors)}
+Journal: {study.journal}
+Publication Date: {study.publication_date}
+DOI: {study.doi or 'Not available'}
+
+META-ANALYSIS OBJECTIVE:
+{objective or 'Not provided'}
+
+INCLUSION CRITERIA:
+{inclusion_text}
+
+EXCLUSION CRITERIA:
+{exclusion_text}
+
+{instructions}
+""".strip()
+
+        return prompt
+
+    @staticmethod
+    def _get_document_screening_prompt(
+        study: Study,
+        content: str,
+        document_description: str,
+        inclusion_text: str,
+        exclusion_text: str,
+        objective: str,
+        confidence_instruction: str,
+        reason_instruction: str,
+        additional_instructions_text: str,
+    ) -> str:
+        """Full-text screening prompt for a study read from a document source.
+
+        The article prompt's instruction 8 asks whether introduction, methods, results and
+        discussion are present. A derived document has none of them and would be flagged
+        incomplete every time, so here incompleteness means only that the document itself
+        reports the article could not be read.
+        """
+        base_prompt = PromptLibrary.get_base_prompt()
+
+        instructions = f"""
+INSTRUCTIONS FOR FULL-TEXT SCREENING FROM A STUDY DOCUMENT:
+1. Ensure the study addresses the review objective
+2. Carefully evaluate the study document against each inclusion criterion
+3. Verify that ALL inclusion criteria are met
+4. Check that NO exclusion criteria are violated
+5. Pay special attention to study design, methods, participants, and outcomes
+6. If the study meets all criteria, INCLUDE it
+7. EXCLUDE if ANY exclusion criterion is met OR if ANY inclusion criterion is not met
+8. Set fulltext_incomplete=true ONLY when the study document itself shows that the
+   article could not be read -- for example, it reports a publisher access notice, or
+   states that the article body was unavailable to whatever produced the document.
+   Do NOT set it because the document has no introduction, methods, results or
+   discussion sections, or because a field is empty or marked as not reported: the
+   document is a derived representation of the article, and it is as complete as the
+   process that produced it.
+{confidence_instruction}{reason_instruction}
+{additional_instructions_text}
+
+IMPORTANT: In your response, you must fully encode criteria coverage using IDs.
+- inclusion_criteria_applied: include ALL inclusion criteria IDs that are satisfied.
+- exclusion_criteria_applied: include ALL exclusion criteria IDs that are met.
+- Always populate BOTH arrays for every decision (included or excluded). Use []
+  only when none apply.
+- For excluded studies, the reason must explicitly name:
+  (a) exclusion IDs met (if any),
+  (b) inclusion IDs met, and
+  (c) inclusion IDs not met.
+When fulltext_incomplete=true, this flag takes precedence in downstream logic.
+Respond with the exact JSON format specified, including fulltext_incomplete,
+inclusion_criteria_applied, and exclusion_criteria_applied fields.
+""".strip()
+
+        prompt = f"""
+{base_prompt}
+
+ABOUT THE STUDY DOCUMENT:
+The study document below is not the article's full text. It stands in for the full
+text in this review, so judge every criterion from what the document reports.
+Document: {document_description}
+
+STUDY INFORMATION:
+Title: {study.title}
+Study Document: {content}
 Authors: {', '.join(study.authors)}
 Journal: {study.journal}
 Publication Date: {study.publication_date}

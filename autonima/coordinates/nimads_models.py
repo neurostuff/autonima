@@ -493,6 +493,15 @@ def sanitize_analysis_name(name: Optional[str]) -> Optional[str]:
     return sanitized if sanitized else None
 
 
+def host_analysis_id(study_id: str, index: int) -> str:
+    """The id autonima gives analysis ``index`` of a study, wherever it names one.
+
+    Annotation decisions, NiMADS notes and document analysis references all key on it, so it
+    is defined once.
+    """
+    return sanitize_analysis_name(f"{study_id}_analysis_{index}")
+
+
 def sanitize_studyset_dict(studyset_dict: dict) -> dict:
     """
     Sanitize all analysis names and IDs in a studyset dictionary before output.

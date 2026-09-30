@@ -82,6 +82,15 @@ Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-orien
 - PMIDs where full-text screening returned `fulltext_incomplete`
 - includes `full_text_path` to help locate/fix the problematic source text
 
+## `outputs/documents_unavailable.csv`
+
+- written when `retrieval.records` is enabled: one row per study with no usable record, and the reason
+- see [Records](records.md)
+
+## `documents/`
+
+- the records a run read in place of full text, with analysis references resolved to autonima's ids
+
 ## `outputs/criteria_mapping.json`
 
 - generated mapping of screening criteria IDs used in downstream results

@@ -30,6 +30,7 @@ from .retrieval.utils import (
 )
 from .utils import log_error_with_debug
 from .annotation.processor import AnnotationProcessor
+from .documents import attach_documents, create_document_source
 from .execution import (
     CACHE_SCHEMA_VERSION,
     complete_execution_manifest,
@@ -54,6 +55,16 @@ def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
     with open(temp_file, 'w') as f:
         json.dump(data, f, indent=2)
     os.replace(temp_file, file_path)
+
+
+def _analyses_transported(study: Study) -> bool:
+    """True when a document source supplied the study's analyses.
+
+    Such analyses are what the document's references point at, positionally. Replacing them
+    -- by re-parsing the tables, or from a parsing cache -- would silently re-point every
+    reference, so the parsing stage leaves them alone.
+    """
+    return study.document is not None and study.document.provides_analyses
 
 
 class AutonimaPipeline:
@@ -101,6 +112,7 @@ class AutonimaPipeline:
         self._abstract_screener = None
         self._fulltext_screener = None
         self._retriever = None
+        self._document_source = None
 
         # Ensure output directory exists
         output_dir = Path(self.config.output.directory)
@@ -211,11 +223,15 @@ class AutonimaPipeline:
         if stage == "retrieval":
             stats = self.results.execution_stats.get("retrieval", {})
             if isinstance(stats, dict) and stats:
-                return {
+                counters = {
                     "fulltext_candidates": stats.get("total_considered", 0),
                     "available": stats.get("retrieved_or_cached", 0),
                     "missing": stats.get("missing_full_text", 0),
                 }
+                if "documents_attached" in stats:
+                    counters["documents_attached"] = stats["documents_attached"]
+                    counters["documents_unavailable"] = stats["documents_unavailable"]
+                return counters
             return {}
         if stage == "fulltext":
             fulltext_results = self.results.fulltext_screening_results
@@ -315,6 +331,9 @@ class AutonimaPipeline:
         # Initialize retrieval engine
         n_jobs = getattr(self.config.retrieval, 'n_jobs', 1)
         self._retriever = PubGetRetriever(n_jobs=n_jobs)
+
+        if self.config.documents.enabled:
+            self._document_source = create_document_source(self.config.documents)
 
         # Save criteria mapping early in pipeline
         from .utils.criteria import save_criteria_mapping
@@ -576,6 +595,111 @@ class AutonimaPipeline:
             }
             return
 
+        documents = self._document_source
+        if documents is not None and documents.provides_analyses:
+            # The documents carry both the text and the analyses, so nothing retrieved from
+            # the article would survive attachment.
+            logger.info(
+                "Retrieval: '%s' documents supply text and analyses; skipping article retrieval",
+                documents.kind,
+            )
+            studies_from_user_sources = []
+        else:
+            studies_from_user_sources = await self._retrieve_articles(
+                studies_to_process, pmids_set, load_excluded
+            )
+
+        document_report = None
+        if documents is not None:
+            document_report = attach_documents(
+                studies_to_process,
+                documents,
+                output_dir=self.config.output.directory,
+            )
+
+        # Save intermediary results
+        output_dir = Path(self.config.output.directory)
+        retrieval_results_file = output_dir / "outputs" / "fulltext_retrieval_results.json"
+
+        def _study_has_coordinates(study) -> bool:
+            """Return True when at least one valid coordinate point is present."""
+            for analysis in study.analyses or []:
+                for point in getattr(analysis, "points", []) or []:
+                    coordinates = getattr(point, "coordinates", None)
+                    if (
+                        isinstance(coordinates, list)
+                        and len(coordinates) == 3
+                    ):
+                        return True
+            return False
+
+        retrieval_data = {
+            "studies_with_fulltext": [
+                {
+                    "pmid": study.pmid,
+                    "pmcid": study.pmcid,
+                    "title": study.title,
+                    "retrieved_at": (
+                        study.retrieved_at.isoformat()
+                        if study.retrieved_at else None
+                    ),
+                    "status": study.status.value,
+                    "full_text_path": study.full_text_path,
+                    "fulltext_available": study.fulltext_available,
+                    "coordinates_found": _study_has_coordinates(study),
+                }
+                for study in self.results.studies
+                if study.fulltext_available or study.pmcid
+            ],
+            "timestamp": datetime.now().isoformat(),
+            "cache_signature": {
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "stage": "retrieval",
+                "stage_hash": self.stage_hashes.get("retrieval"),
+            },
+        }
+        with open(retrieval_results_file, 'w') as f:
+            json.dump(retrieval_data, f, indent=2)
+
+        retrieved_count = len([
+            s for s in self.results.studies
+            if s.fulltext_available
+        ])
+        unavailable_studies = [
+            study for study in studies_to_process
+            if not study.fulltext_available
+        ]
+        unavailable_count = len(unavailable_studies)
+
+        logger.info(
+            "Retrieval completed: %s texts available, %s missing full text",
+            retrieved_count,
+            unavailable_count,
+        )
+        self.results.execution_stats["retrieval"] = {
+            "scope": scope,
+            "total_considered": len(studies_to_process),
+            "local_found": len(studies_from_user_sources),
+            "retrieved_or_cached": retrieved_count,
+            "missing_full_text": unavailable_count,
+        }
+        if document_report is not None:
+            self.results.execution_stats["retrieval"].update({
+                "documents_kind": documents.kind,
+                "documents_attached": document_report.attached,
+                "documents_unavailable": len(document_report.unavailable),
+            })
+
+    async def _retrieve_articles(
+        self,
+        studies_to_process: List[Study],
+        pmids_set: set,
+        load_excluded: bool,
+    ) -> List[Study]:
+        """Retrieve article full texts from local sources, then PubGet.
+
+        Returns the studies found in user-provided full-text sources.
+        """
         # Check for existing full texts from user-provided sources
         studies_from_user_sources = []
         studies_to_retrieve = studies_to_process[:]
@@ -724,72 +848,7 @@ class AutonimaPipeline:
             # Validate retrieval
             self._retriever.validate_retrieval(studies_to_retrieve, retrieval_dir)
 
-        # Save intermediary results
-        output_dir = Path(self.config.output.directory)
-        retrieval_results_file = output_dir / "outputs" / "fulltext_retrieval_results.json"
-
-        def _study_has_coordinates(study) -> bool:
-            """Return True when at least one valid coordinate point is present."""
-            for analysis in study.analyses or []:
-                for point in getattr(analysis, "points", []) or []:
-                    coordinates = getattr(point, "coordinates", None)
-                    if (
-                        isinstance(coordinates, list)
-                        and len(coordinates) == 3
-                    ):
-                        return True
-            return False
-
-        retrieval_data = {
-            "studies_with_fulltext": [
-                {
-                    "pmid": study.pmid,
-                    "pmcid": study.pmcid,
-                    "title": study.title,
-                    "retrieved_at": (
-                        study.retrieved_at.isoformat()
-                        if study.retrieved_at else None
-                    ),
-                    "status": study.status.value,
-                    "full_text_path": study.full_text_path,
-                    "fulltext_available": study.fulltext_available,
-                    "coordinates_found": _study_has_coordinates(study),
-                }
-                for study in self.results.studies
-                if study.fulltext_available or study.pmcid
-            ],
-            "timestamp": datetime.now().isoformat(),
-            "cache_signature": {
-                "schema_version": CACHE_SCHEMA_VERSION,
-                "stage": "retrieval",
-                "stage_hash": self.stage_hashes.get("retrieval"),
-            },
-        }
-        with open(retrieval_results_file, 'w') as f:
-            json.dump(retrieval_data, f, indent=2)
-
-        retrieved_count = len([
-            s for s in self.results.studies
-            if s.fulltext_available
-        ])
-        unavailable_studies = [
-            study for study in studies_to_process
-            if not study.fulltext_available
-        ]
-        unavailable_count = len(unavailable_studies)
-
-        logger.info(
-            "Retrieval completed: %s texts available, %s missing full text",
-            retrieved_count,
-            unavailable_count,
-        )
-        self.results.execution_stats["retrieval"] = {
-            "scope": scope,
-            "total_considered": len(studies_to_process),
-            "local_found": len(studies_from_user_sources),
-            "retrieved_or_cached": retrieved_count,
-            "missing_full_text": unavailable_count,
-        }
+        return studies_from_user_sources
 
     async def _execute_fulltext_screening(self):
         """Execute full-text screening phase."""
@@ -895,6 +954,7 @@ class AutonimaPipeline:
         studies_with_tables = [
             s for s in self.results.studies
             if s.status == StudyStatus.INCLUDED_FULLTEXT and s.activation_tables and not any([a.parsed for a in s.analyses])
+            and not _analyses_transported(s)
         ]
 
         if not studies_with_tables:
@@ -1199,7 +1259,11 @@ class AutonimaPipeline:
             loaded_count = 0
             
             for study in self.results.studies:
-                if study.pmid in cached_studies and not any(a.parsed for a in study.analyses):
+                if (
+                    study.pmid in cached_studies
+                    and not any(a.parsed for a in study.analyses)
+                    and not _analyses_transported(study)
+                ):
                     cached_study = cached_studies[study.pmid]
                     if cached_study.get("cache_signature") != self._coordinate_cache_signature(study):
                         continue
