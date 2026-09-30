@@ -100,9 +100,15 @@ class ConfigManager:
                         screening_dict['fulltext']
                     )
 
+            if 'documents' in config_dict:
+                raise ConfigurationError(
+                    "The top-level 'documents' section is now 'retrieval.records'"
+                )
             retrieval_config = RetrievalConfig()
+            records_dict = None
             if 'retrieval' in config_dict:
-                retrieval_dict = config_dict['retrieval']
+                retrieval_dict = dict(config_dict['retrieval'] or {})
+                records_dict = retrieval_dict.pop('records', None)
                 # Handle backward compatibility for single full_text_source
                 if 'full_text_source' in retrieval_dict:
                     if retrieval_dict['full_text_source'] is not None:
@@ -126,7 +132,7 @@ class ConfigManager:
                 output=output_config,
                 parsing=ParsingConfig(**config_dict.get('parsing', {})),
                 annotation=self._load_annotation_config(config_dict.get('annotation', {})),
-                documents=self._load_documents_config(config_dict.get('documents')),
+                documents=self._load_documents_config(records_dict),
             )
 
             # Assign IDs to criteria
@@ -292,16 +298,16 @@ class ConfigManager:
         self._validate_documents_config(config)
 
     def _load_documents_config(self, documents_dict: Any) -> DocumentsConfig:
-        """Load the ``documents`` section, rejecting keys it does not define."""
+        """Load ``retrieval.records``, rejecting keys it does not define."""
         if documents_dict is None:
             return DocumentsConfig()
         if not isinstance(documents_dict, dict):
-            raise ConfigurationError("documents section must be a mapping")
+            raise ConfigurationError("retrieval.records must be a mapping")
         allowed = set(DocumentsConfig.__dataclass_fields__)
         unknown = sorted(set(documents_dict) - allowed)
         if unknown:
             raise ConfigurationError(
-                f"Unknown documents key(s): {', '.join(unknown)}. "
+                f"Unknown retrieval.records key(s): {', '.join(unknown)}. "
                 f"Allowed: {', '.join(sorted(allowed))}"
             )
         return DocumentsConfig(**documents_dict)
@@ -316,18 +322,18 @@ class ConfigManager:
 
         if documents.kind not in SOURCE_KINDS:
             raise ConfigurationError(
-                f"documents.kind must be one of: {', '.join(sorted(SOURCE_KINDS))}"
+                f"retrieval.records.kind must be one of: {', '.join(sorted(SOURCE_KINDS))}"
             )
         if not documents.root or not str(documents.root).strip():
-            raise ConfigurationError("documents.root is required when documents are enabled")
+            raise ConfigurationError("retrieval.records.root is required when records are enabled")
         if not Path(documents.root).expanduser().is_dir():
-            raise ConfigurationError(f"documents.root is not a directory: {documents.root}")
+            raise ConfigurationError(f"retrieval.records.root is not a directory: {documents.root}")
 
         if SOURCE_KINDS[documents.kind].provides_analyses and config.parsing.parse_coordinates:
             # Re-parsing the article would replace the analyses the documents refer to, and
             # attach each reference to whichever contrast now sits at its position.
             raise ConfigurationError(
-                f"documents.kind '{documents.kind}' supplies each study's analyses, so "
+                f"retrieval.records.kind '{documents.kind}' supplies each study's analyses, so "
                 "parsing.parse_coordinates must be false"
             )
 
@@ -340,7 +346,7 @@ class ConfigManager:
             # Without it annotation never reads the document: a text-kind run would annotate
             # from exactly the inputs of the article run it is being compared against.
             raise ConfigurationError(
-                "documents are enabled but annotation.metadata_fields does not include "
+                "retrieval.records is enabled but annotation.metadata_fields does not include "
                 "'study_fulltext', so annotation would never read them"
             )
 

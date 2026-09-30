@@ -84,12 +84,12 @@ Use the [Interpreting Outputs](./interpreting-outputs.md) guide for a task-orien
 
 ## `outputs/documents_unavailable.csv`
 
-- written when `documents` is enabled: one row per study with no usable document, and the reason
-- see [Documents](documents.md)
+- written when `retrieval.records` is enabled: one row per study with no usable record, and the reason
+- see [Records](records.md)
 
 ## `documents/`
 
-- the documents a run read in place of full text, with analysis references resolved to autonima's ids
+- the records a run read in place of full text, with analysis references resolved to autonima's ids
 
 ## `outputs/criteria_mapping.json`
 

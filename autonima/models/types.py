@@ -358,15 +358,15 @@ class ParsingConfig:
 
 @dataclass
 class DocumentsConfig:
-    """Configuration for documents that stand in for each article's full text.
+    """Configuration for records that stand in for each article's full text (``retrieval.records``).
 
-    A document source is a directory holding one serialized document per study -- an
-    extraction record, a summary, any text -- that full-text screening and annotation read in
-    place of the article. A ``records`` source also holds each study's analyses, so they
-    travel with the document instead of being parsed from the article's tables.
+    A record source is a directory holding one serialized document per study -- an extraction
+    record, a summary, any text -- that full-text screening and annotation read in place of the
+    article. An ``analyses`` source also holds each study's analyses, so they travel with the
+    record instead of being parsed from the article's tables.
     """
     enabled: bool = False
-    kind: str = "text"  # "text" | "records"
+    kind: str = "text"  # "text" | "analyses"
     root: Optional[str] = None
     # One line saying what the documents are, e.g. "a structured extraction record of the
     # article". It replaces "full text" wherever a prompt names what the model is reading.
@@ -416,11 +416,11 @@ class PipelineConfig:
                     result[key] = value
             return result
 
-        # Emitted only when enabled, so a config that never uses documents serializes -- and
-        # therefore hashes -- exactly as it did before documents existed.
-        documents = (
+        # Emitted only when enabled, so a config that never uses records serializes -- and
+        # therefore hashes -- exactly as it did before records existed.
+        records = (
             {
-                "documents": {
+                "records": {
                     "enabled": self.documents.enabled,
                     "kind": self.documents.kind,
                     "root": self.documents.root,
@@ -456,6 +456,7 @@ class PipelineConfig:
                 "full_text_sources": self.retrieval.full_text_sources,
                 "parse_coordinates": self.retrieval.parse_coordinates,
                 "coordinate_model": self.retrieval.coordinate_model,
+                **records,
             },
             "parsing": {
                 "parse_coordinates": self.parsing.parse_coordinates,
@@ -488,7 +489,6 @@ class PipelineConfig:
                 "nimads": self.output.nimads,
                 "export_excluded_studies": self.output.export_excluded_studies,
             },
-            **documents,
         }
 
 

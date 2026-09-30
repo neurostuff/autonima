@@ -3,10 +3,10 @@
 Layout, one file per study, named by PMID::
 
     <root>/12345678.md               the document (.md, .txt, .json, .yaml or .yml)
-    <root>/12345678.analyses.json    records sources only: the analyses it refers to
+    <root>/12345678.analyses.json    `analyses` sources only: the analyses it refers to
 
 Documents are read verbatim; a serialized schema is passed to the model as it was written.
-The analyses file is described in ``docs/guides/documents.md``.
+The analyses file is described in ``docs/guides/records.md``.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def _optional_text(value: Any, *, field: str, where: str) -> Optional[str]:
 
 
 class FolderDocumentSource(DocumentSource):
-    """``kind: text`` -- documents only. Coordinates still come from the article."""
+    """``retrieval.records.kind: text`` -- records only. Coordinates still come from the article."""
 
     kind = "text"
     provides_analyses = False
@@ -116,9 +116,9 @@ class FolderDocumentSource(DocumentSource):
 
 
 class FolderRecordSource(FolderDocumentSource):
-    """``kind: records`` -- documents plus the analyses they refer to."""
+    """``retrieval.records.kind: analyses`` -- records plus the analyses they refer to."""
 
-    kind = "records"
+    kind = "analyses"
     provides_analyses = True
 
     def analyses_path(self, ref: DocumentRef) -> Path:

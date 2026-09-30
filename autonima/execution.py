@@ -296,14 +296,14 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     parsing = config.get("parsing") or {}
     annotation = config.get("annotation") or {}
     output = config.get("output") or {}
-    # Documents enter the signatures only when enabled, so an article run hashes exactly as
-    # it did before documents existed and keeps every cache it has.
-    documents = config.get("documents") or {}
+    # Records enter the signatures only when enabled, so an article run hashes exactly as it
+    # did before records existed and keeps every cache it has.
+    documents = retrieval.get("records") or {}
     retrieval_documents: Dict[str, Any] = {}
     document_prompt: Dict[str, Any] = {}
     if documents.get("enabled"):
         retrieval_documents = {
-            "documents": _pick(documents, ["kind", "root", "description"]),
+            "records": _pick(documents, ["kind", "root", "description"]),
         }
         document_prompt = {"document_prompt_version": DOCUMENT_PROMPT_VERSION}
 

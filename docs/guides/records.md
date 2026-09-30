@@ -1,47 +1,53 @@
-# Documents
+# Records
 
-A document source replaces each article's full text with a document that another tool
-produced from it: a structured extraction record, a summary, a compressed rendering. Full-text
-screening and annotation read the document instead of the article. Nothing else in the
-pipeline changes.
+A record source replaces each article's full text with a record that another tool produced
+from it: a structured extraction record, a summary, a compressed rendering. Full-text
+screening and annotation read the record instead of the article. Nothing else in the pipeline
+changes.
 
-Autonima doesn't produce documents. It reads a directory that some other tool wrote before
-the run, so any tool can supply one by writing the layout below.
+Autonima doesn't produce records. It reads a directory that some other tool wrote before the
+run, so any tool can supply one by writing the layout below.
 
 ## Two kinds
 
 | kind | the source supplies | coordinates come from |
 |---|---|---|
 | `text` | one document per study | the article, retrieved and parsed as usual |
-| `records` | one document per study, plus the analyses it refers to | the source; the article is not retrieved |
+| `analyses` | one document per study, plus the analyses it refers to | the source; the article is not retrieved |
 
-Use `text` when the document is only something to read, like a summary. Use `records` when the
-document describes the study's analyses individually. Its analyses must then travel with it.
+Use `text` when the record is only something to read, like a summary. Use `analyses` when the
+record describes the study's analyses individually. Its analyses must then travel with it.
 Re-parsing the article's tables would produce a different list, and every reference in the
 document would point at the wrong contrast without anything noticing.
 
 ## Configuration
 
+Records are configured under `retrieval`:
+
 ```yaml
-documents:
-  enabled: true
-  kind: records               # text | records
-  root: /data/records/arm1    # the directory described below
-  description: "a structured extraction record of the article"
+retrieval:
+  records:
+    enabled: true
+    kind: analyses              # text | analyses
+    root: /data/records/arm1    # the directory described below
+    description: "a structured extraction record of the article"
 ```
 
-`description` says what the documents are. Prompts show it wherever they would otherwise say
+`description` says what the records are. Prompts show it wherever they would otherwise say
 "full text", so a summary and an extraction record read differently to the model. If you
 leave it out, a generic description is used.
 
 These combinations are refused when the config loads, before the search stage runs:
 
-- `kind: records` together with `parsing.parse_coordinates: true`. The records already hold
+- `kind: analyses` together with `parsing.parse_coordinates: true`. The records already hold
   the analyses, and re-parsing them is the silent mis-attachment described above.
 - `annotation.annotations` configured without `study_fulltext` in
-  `annotation.metadata_fields`. Annotation would never read the documents, so a `text` run
+  `annotation.metadata_fields`. Annotation would never read the records, so a `text` run
   would annotate exactly as the article run did.
-- a `root` that is not a directory, an unknown `kind`, or an unknown key under `documents`.
+- a `root` that is not a directory, an unknown `kind`, or an unknown key under
+  `retrieval.records`.
+- a top-level `documents:` section, the name this block had before it moved under
+  `retrieval`.
 
 ## Directory layout
 
@@ -50,7 +56,7 @@ The directory is flat, with files named by PMID:
 ```text
 <root>/
 ├── 12345678.md               the document: .md, .txt, .json, .yaml or .yml
-└── 12345678.analyses.json    records only: the analyses the document refers to
+└── 12345678.analyses.json    `analyses` only: the analyses the document refers to
 ```
 
 The document is passed to the model verbatim, so a JSON or YAML record goes in exactly as it
@@ -119,7 +125,7 @@ Documents are attached at the end of the retrieval stage. For each study:
 - the document, with its references resolved, is written to `<output>/documents/<pmid>.<ext>`,
   and `full_text_path` points at it. Every full-text cache check hashes that file, so changing
   a document re-screens only the studies it affects.
-- for `records`, the source's analyses and tables replace anything retrieval left, and they
+- for `analyses`, the source's analyses and tables replace anything retrieval left, and they
   are marked as ingested, so coordinate parsing never touches them.
 
 A study with no usable document is treated like one whose full text wasn't retrieved. It isn't
@@ -151,4 +157,4 @@ itself reports that the article couldn't be read. A derived document never has t
 and it's as complete as the process that produced it.
 
 Annotation prompts label the document in the same way. Studies without a document get the
-exact prompts, and keep the exact cache signatures, that they had before documents existed.
+exact prompts, and keep the exact cache signatures, that they had before records existed.

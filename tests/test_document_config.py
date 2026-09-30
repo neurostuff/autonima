@@ -28,7 +28,7 @@ def _sample() -> dict:
 
 def _with_documents(tmp_path, **documents) -> dict:
     config = _sample()
-    config["documents"] = {"enabled": True, "kind": "text", "root": str(tmp_path), **documents}
+    config["retrieval"]["records"] = {"enabled": True, "kind": "text", "root": str(tmp_path), **documents}
     config["annotation"]["metadata_fields"] = ["analysis_name", "study_title", "study_fulltext"]
     config["annotation"]["annotations"] = [
         {"name": "wm", "inclusion_criteria": ["Working memory task"]}
@@ -47,14 +47,14 @@ def test_article_config_stage_hashes_are_unchanged():
 def test_disabled_documents_serialize_to_nothing():
     config = _load(_sample())
     assert config.documents.enabled is False
-    assert "documents" not in config.to_dict()
+    assert "records" not in config.to_dict()["retrieval"]
 
 
 def test_enabling_documents_changes_only_the_stages_that_read_them(tmp_path):
     config = _with_documents(tmp_path)
     config["parsing"]["parse_coordinates"] = True  # allowed for a text source
     baseline = deepcopy(config)
-    del baseline["documents"]
+    del baseline["retrieval"]["records"]
 
     before = stage_hashes(_load(baseline))
     after = stage_hashes(_load(config))
@@ -73,18 +73,18 @@ def test_valid_documents_config_loads(tmp_path):
     config = _load(_with_documents(tmp_path, description="a summary"))
     assert config.documents.kind == "text"
     assert config.documents.description == "a summary"
-    assert config.to_dict()["documents"]["root"] == str(tmp_path)
+    assert config.to_dict()["retrieval"]["records"]["root"] == str(tmp_path)
 
 
 @pytest.mark.parametrize(
     "change, message",
     [
-        (lambda c, p: c["documents"].update(dir=str(p)), "Unknown documents key"),
-        (lambda c, p: c["documents"].update(kind="pondie"), "documents.kind must be one of"),
-        (lambda c, p: c["documents"].pop("root"), "documents.root is required"),
-        (lambda c, p: c["documents"].update(root=str(p / "nope")), "not a directory"),
+        (lambda c, p: c["retrieval"]["records"].update(dir=str(p)), "Unknown retrieval.records key"),
+        (lambda c, p: c["retrieval"]["records"].update(kind="pondie"), "retrieval.records.kind must be one of"),
+        (lambda c, p: c["retrieval"]["records"].pop("root"), "retrieval.records.root is required"),
+        (lambda c, p: c["retrieval"]["records"].update(root=str(p / "nope")), "not a directory"),
         (
-            lambda c, p: c["documents"].update(kind="records"),
+            lambda c, p: c["retrieval"]["records"].update(kind="analyses"),
             "parsing.parse_coordinates must be false",
         ),
         (
@@ -101,10 +101,10 @@ def test_invalid_documents_config_is_refused_at_load(tmp_path, change, message):
         _load(config)
 
 
-def test_records_config_loads_without_coordinate_parsing(tmp_path):
-    config = _with_documents(tmp_path, kind="records")
+def test_analyses_config_loads_without_coordinate_parsing(tmp_path):
+    config = _with_documents(tmp_path, kind="analyses")
     config["parsing"]["parse_coordinates"] = False
-    assert _load(config).documents.kind == "records"
+    assert _load(config).documents.kind == "analyses"
 
 
 def test_study_fulltext_is_not_required_without_llm_annotations(tmp_path):
@@ -112,3 +112,10 @@ def test_study_fulltext_is_not_required_without_llm_annotations(tmp_path):
     config["annotation"]["metadata_fields"] = ["analysis_name"]
     config["annotation"].pop("annotations", None)
     assert _load(config).documents.enabled is True
+
+
+def test_top_level_documents_section_is_refused(tmp_path):
+    config = _sample()
+    config["documents"] = {"enabled": True, "kind": "text", "root": str(tmp_path)}
+    with pytest.raises(ConfigurationError, match="now 'retrieval.records'"):
+        _load(config)

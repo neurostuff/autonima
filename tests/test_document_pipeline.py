@@ -41,8 +41,8 @@ def _pipeline(tmp_path, kind, root, **overrides):
     config = yaml.safe_load(get_sample_config_text())
     config["search"]["pmids_list"] = ["111", "222"]
     config["output"]["directory"] = str(tmp_path / "run")
-    config["parsing"]["parse_coordinates"] = kind != "records"
-    config["documents"] = {"enabled": True, "kind": kind, "root": str(root)}
+    config["parsing"]["parse_coordinates"] = kind != "analyses"
+    config["retrieval"]["records"] = {"enabled": True, "kind": kind, "root": str(root)}
     for section, values in overrides.items():
         config[section].update(values)
     pipeline = AutonimaPipeline(ConfigManager().load_from_dict(deepcopy(config)))
@@ -66,20 +66,20 @@ def _csv_rows(path):
         return list(csv.DictReader(stream))
 
 
-def test_records_source_replaces_article_retrieval(tmp_path):
+def test_analyses_source_replaces_article_retrieval(tmp_path):
     root = tmp_path / "records"
     _write_record(root)
-    pipeline = _pipeline(tmp_path, "records", root)
+    pipeline = _pipeline(tmp_path, "analyses", root)
 
     async def fail(*args, **kwargs):
-        raise AssertionError("a records source must not retrieve articles")
+        raise AssertionError("an analyses source must not retrieve articles")
 
     pipeline._retrieve_articles = fail
     asyncio.run(pipeline._execute_retrieval_phase())
 
     with_document, without = pipeline.results.studies
     assert with_document.fulltext_available is True
-    assert with_document.full_text_source == "document:records"
+    assert with_document.full_text_source == "document:analyses"
     assert [a.name for a in with_document.analyses] == ["faces > shapes", "shapes > faces"]
     assert without.fulltext_available is False and without.analyses == []
 
@@ -111,7 +111,7 @@ def test_text_source_still_retrieves_articles(tmp_path):
 def test_fulltext_screening_reads_the_document(tmp_path):
     root = tmp_path / "records"
     _write_record(root)
-    pipeline = _pipeline(tmp_path, "records", root)
+    pipeline = _pipeline(tmp_path, "analyses", root)
     asyncio.run(pipeline._execute_retrieval_phase())
 
     response = MagicMock(
@@ -139,7 +139,7 @@ def test_fulltext_screening_reads_the_document(tmp_path):
 def test_transported_analyses_are_never_reparsed(tmp_path):
     root = tmp_path / "records"
     _write_record(root)
-    pipeline = _pipeline(tmp_path, "records", root)
+    pipeline = _pipeline(tmp_path, "analyses", root)
     asyncio.run(pipeline._execute_retrieval_phase())
     study = pipeline.results.studies[0]
     study.status = StudyStatus.INCLUDED_FULLTEXT
@@ -157,7 +157,7 @@ def test_transported_analyses_are_never_reparsed(tmp_path):
 def test_outputs_account_for_documents(tmp_path):
     root = tmp_path / "records"
     _write_record(root)
-    pipeline = _pipeline(tmp_path, "records", root, output={"nimads": True})
+    pipeline = _pipeline(tmp_path, "analyses", root, output={"nimads": True})
     asyncio.run(pipeline._execute_retrieval_phase())
     pipeline.results.studies[0].status = StudyStatus.INCLUDED_FULLTEXT
 
@@ -167,7 +167,7 @@ def test_outputs_account_for_documents(tmp_path):
     outputs = tmp_path / "run" / "outputs"
     missing = _csv_rows(outputs / "missing_fulltexts.csv")
     assert [(r["pmid"], r["type"], r["source"]) for r in missing] == [
-        ("222", "unavailable", "document:records")
+        ("222", "unavailable", "document:analyses")
     ]
     final = json.loads((outputs / "final_results.json").read_text())
     document = final["studies"][0]["document"]
@@ -180,10 +180,10 @@ def test_outputs_account_for_documents(tmp_path):
     assert {p["space"] for a in analyses for p in a["points"]} == {"MNI"}
 
 
-@pytest.mark.parametrize("kind", ["text", "records"])
+@pytest.mark.parametrize("kind", ["text", "analyses"])
 def test_skipped_abstract_screening_still_counts_missing_documents(tmp_path, kind):
     root = tmp_path / "source"
-    if kind == "records":
+    if kind == "analyses":
         _write_record(root)
     else:
         root.mkdir()

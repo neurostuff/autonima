@@ -62,6 +62,15 @@ retrieval:
   #     # coordinates_path_templates:
   #     #   - "coordinates.json"
   #     processed_data_path: "/path/to/processed/pubget_like_data"
+  # records:
+  #   # Optional: read a record another tool produced from each article (an extraction
+  #   # record, a summary) in place of its full text, for full-text screening and annotation.
+  #   # See docs/guides/records.md for the directory layout.
+  #   enabled: true
+  #   kind: "text"  # "text": records only. "analyses": records plus their analyses,
+  #                 # which requires parsing.parse_coordinates: false.
+  #   root: "/path/to/records"  # One file per study, named <pmid>.md (or .txt/.json/.yaml).
+  #   description: "a structured extraction record of the article"  # Shown to the model.
 
 screening:
   abstract:
@@ -147,12 +156,3 @@ annotation:
   #       - "Resting-state or passive viewing"
   #       - "Non-cognitive motor-only tasks"
 
-# Optional: read a document another tool produced from each article (an extraction record,
-# a summary) in place of its full text, for full-text screening and annotation.
-# See docs/guides/documents.md for the directory layout.
-# documents:
-#   enabled: true
-#   kind: "text"  # "text": documents only. "records": documents plus their analyses,
-#                 # which requires parsing.parse_coordinates: false.
-#   root: "/path/to/documents"  # One file per study, named <pmid>.md (or .txt/.json/.yaml).
-#   description: "a structured extraction record of the article"  # Shown to the model.
