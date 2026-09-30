@@ -87,6 +87,45 @@ class ActivationTable:
 
 
 @dataclass
+class StudyDocument:
+    """The document a study is read from in place of its article's full text.
+
+    Holds identity and hashes, never the body: the body lives in the materialized file that
+    ``Study.full_text_path`` points at, so ``Study.full_text`` and every full-text cache hash
+    pick it up unchanged.
+    """
+    study_id: str  # The source's own key for the study. Opaque to autonima.
+    kind: str
+    description: str  # What the document is. Shown to the model in place of "full text".
+    source_path: str
+    content_hash: str  # sha256 of the source file's bytes
+    provides_analyses: bool = False
+    analyses_path: Optional[str] = None
+    analyses_hash: Optional[str] = None
+    # Index-aligned with Study.analyses when provides_analyses: the source's key for each
+    # analysis, the id autonima gave it, and its own serialized record, if the source has one.
+    analysis_keys: List[str] = field(default_factory=list)
+    analysis_ids: List[str] = field(default_factory=list)
+    analysis_documents: List[Optional[str]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "study_id": self.study_id,
+            "kind": self.kind,
+            "description": self.description,
+            "source_path": self.source_path,
+            "content_hash": self.content_hash,
+            "provides_analyses": self.provides_analyses,
+            "analyses_path": self.analyses_path,
+            "analyses_hash": self.analyses_hash,
+            "analyses": [
+                {"key": key, "analysis_id": analysis_id}
+                for key, analysis_id in zip(self.analysis_keys, self.analysis_ids)
+            ],
+        }
+
+
+@dataclass
 class Study:
     """Represents a single study in the systematic review."""
     pmid: str
@@ -128,6 +167,8 @@ class Study:
         default_factory=list
     )
     full_text_output_dir: Optional[str] = None  # Full text output dir
+    # Set when a document source supplies what the LLM reads instead of the article.
+    document: Optional[StudyDocument] = None
     _full_text: Optional[str] = None  # Cached full text content
 
     def __post_init__(self) -> None:
@@ -211,7 +252,8 @@ class Study:
             "fulltext_inclusion_criteria_applied":
                 self.fulltext_inclusion_criteria_applied,
             "fulltext_exclusion_criteria_applied":
-                self.fulltext_exclusion_criteria_applied
+                self.fulltext_exclusion_criteria_applied,
+            "document": self.document.to_dict() if self.document else None,
         }
     
     @property
@@ -315,6 +357,23 @@ class ParsingConfig:
 
 
 @dataclass
+class DocumentsConfig:
+    """Configuration for documents that stand in for each article's full text.
+
+    A document source is a directory holding one serialized document per study -- an
+    extraction record, a summary, any text -- that full-text screening and annotation read in
+    place of the article. A ``records`` source also holds each study's analyses, so they
+    travel with the document instead of being parsed from the article's tables.
+    """
+    enabled: bool = False
+    kind: str = "text"  # "text" | "records"
+    root: Optional[str] = None
+    # One line saying what the documents are, e.g. "a structured extraction record of the
+    # article". It replaces "full text" wherever a prompt names what the model is reading.
+    description: Optional[str] = None
+
+
+@dataclass
 class OutputConfig:
     """Configuration for the output phase."""
     directory: str = "results"
@@ -333,6 +392,7 @@ class PipelineConfig:
     output: OutputConfig
     parsing: ParsingConfig = field(default_factory=ParsingConfig)
     annotation: AnnotationConfig = field(default_factory=AnnotationConfig)
+    documents: DocumentsConfig = field(default_factory=DocumentsConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary representation."""
@@ -355,7 +415,22 @@ class PipelineConfig:
                 else:
                     result[key] = value
             return result
-        
+
+        # Emitted only when enabled, so a config that never uses documents serializes -- and
+        # therefore hashes -- exactly as it did before documents existed.
+        documents = (
+            {
+                "documents": {
+                    "enabled": self.documents.enabled,
+                    "kind": self.documents.kind,
+                    "root": self.documents.root,
+                    "description": self.documents.description,
+                }
+            }
+            if self.documents.enabled
+            else {}
+        )
+
         return {
             "search": {
                 "database": self.search.database,
@@ -413,6 +488,7 @@ class PipelineConfig:
                 "nimads": self.output.nimads,
                 "export_excluded_studies": self.output.export_excluded_studies,
             },
+            **documents,
         }
 
 

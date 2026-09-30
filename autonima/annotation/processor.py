@@ -10,9 +10,11 @@ from tqdm import tqdm
 from .schema import AnnotationConfig, AnnotationDecision, AnalysisMetadata, AnnotationCriteriaConfig
 from .client import AnnotationClient
 from .prompts import ANNOTATION_PROMPT_VERSION
+from ..cache_versions import DOCUMENT_PROMPT_VERSION
+from ..documents.source import IdentityError
 from ..models.types import Study
 from ..coordinates.schema import Analysis
-from ..coordinates.nimads_models import sanitize_analysis_name
+from ..coordinates.nimads_models import host_analysis_id
 from ..utils import log_error_with_debug
 from ..execution import (
     CACHE_SCHEMA_VERSION,
@@ -72,6 +74,12 @@ class AnnotationProcessor:
         payload = {"study_analysis_group": group}
         if "study_fulltext" in self.config.metadata_fields:
             payload["study_fulltext_hash"] = study_full_text_content_hash(study)
+        if study.document is not None:
+            payload["document"] = {
+                "kind": study.document.kind,
+                "description": study.document.description,
+                "prompt_version": DOCUMENT_PROMPT_VERSION,
+            }
         return stable_hash(payload)
 
     def _cache_signature(self, study: Study, annotation_name: str) -> dict:
@@ -286,7 +294,7 @@ class AnnotationProcessor:
         for study in studies:
             for i, analysis in enumerate(study.analyses):
                 # Create a unique analysis ID (sanitized)
-                analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+                analysis_id = host_analysis_id(study.pmid, i)
                 
                 # Create decision for the annotation
                 decision = AnnotationDecision(
@@ -347,7 +355,7 @@ class AnnotationProcessor:
             for study in studies_to_process:
                 for i, analysis in enumerate(study.analyses):
                     # Create a unique analysis ID (sanitized)
-                    analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+                    analysis_id = host_analysis_id(study.pmid, i)
                     
                     # Create decision for the annotation
                     decision = AnnotationDecision(
@@ -479,7 +487,7 @@ class AnnotationProcessor:
         reason = error or "the response contained no decision for this analysis"
         filled = list(decisions)
         for i, _ in enumerate(study.analyses):
-            analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+            analysis_id = host_analysis_id(study.pmid, i)
             for annotation in annotations:
                 if (analysis_id, annotation.name) in decided:
                     continue
@@ -525,10 +533,12 @@ class AnnotationProcessor:
             # Process each analysis individually (single_analysis mode)
             for i, analysis in enumerate(study.analyses):
                 # Create a unique analysis ID (sanitized)
-                analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+                analysis_id = host_analysis_id(study.pmid, i)
                 
                 # Extract metadata for the analysis
-                metadata = self._extract_analysis_metadata(study, analysis, analysis_id, metadata_fields)
+                metadata = self._extract_analysis_metadata(
+                    study, analysis, analysis_id, metadata_fields, analysis_index=i
+                )
                 
                 # Make multi-annotation decision for this analysis
                 analysis_decisions = self.client.make_decision(
@@ -687,7 +697,8 @@ class AnnotationProcessor:
         study: Study,
         analysis: Analysis,
         analysis_id: str,
-        metadata_fields: Optional[List[str]] = None
+        metadata_fields: Optional[List[str]] = None,
+        analysis_index: Optional[int] = None,
     ) -> AnalysisMetadata:
         """
         Extract metadata for an analysis from a study.
@@ -764,10 +775,35 @@ class AnnotationProcessor:
                 if field in field_getters:
                     kwargs[field] = field_getters[field]()
         
+        if study.document is not None:
+            kwargs["study_document_description"] = study.document.description
+        # Set only when present, so custom_fields stays {} -- and the hash unchanged -- for
+        # every study that has no per-analysis record.
+        if (
+            analysis_index is not None
+            and (metadata_fields is None or "analysis_document" in metadata_fields)
+        ):
+            analysis_document = self._analysis_document(study, analysis_index)
+            if analysis_document:
+                kwargs["custom_fields"] = {"analysis_document": analysis_document}
+
         # Create the metadata object
         metadata = AnalysisMetadata(**kwargs)
         
         return metadata
+
+    def _analysis_document(self, study: Study, index: int) -> Optional[str]:
+        """The document source's own record for analysis ``index``, if it supplied one."""
+        document = study.document
+        if document is None or not document.analysis_documents:
+            return None
+        if len(document.analysis_documents) != len(study.analyses):
+            raise IdentityError(
+                f"Study {study.pmid}: its document source supplied "
+                f"{len(document.analysis_documents)} analyses but the study now has "
+                f"{len(study.analyses)}; they were changed after the documents were attached"
+            )
+        return document.analysis_documents[index]
 
     def _safe_get_study_fulltext(self, study: Study) -> Optional[str]:
         """Best-effort full-text fetch for optional prompt fields."""
@@ -812,6 +848,8 @@ class AnnotationProcessor:
             study_kwargs['study_fulltext'] = self._safe_get_study_fulltext(
                 study
             )
+        if study.document is not None:
+            study_kwargs['study_document_description'] = study.document.description
         
         # Build table metadata
         tables = []
@@ -833,9 +871,9 @@ class AnnotationProcessor:
         analyses = []
         for i, analysis in enumerate(study.analyses):
             # Create sanitized analysis ID
-            analysis_id = sanitize_analysis_name(f"{study.pmid}_analysis_{i}")
+            analysis_id = host_analysis_id(study.pmid, i)
             analysis_metadata = self._extract_analysis_metadata(
-                study, analysis, analysis_id, metadata_fields
+                study, analysis, analysis_id, metadata_fields, analysis_index=i
             )
             analyses.append(analysis_metadata)
         

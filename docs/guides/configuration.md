@@ -141,6 +141,25 @@ Important interaction:
 
 - Use either `processed_data_path` or `coordinates_path_templates` for a source, not both.
 
+## `documents` (optional)
+
+Purpose: have full-text screening and annotation read a document produced from each article
+(such as an extraction record or a summary) instead of the article itself.
+
+Fields:
+
+- `enabled`
+  Type: boolean, default `false`
+- `kind`
+  Type: string, `"text"` or `"records"`
+  `records` also supplies each study's analyses, and requires `parsing.parse_coordinates: false`
+- `root`
+  Type: path to a directory holding one `<pmid>.md` (or `.txt`, `.json`, `.yaml`) per study
+- `description`
+  Type: string. Says what the documents are; prompts show it in place of "full text"
+
+See [Documents](documents.md) for the directory layout and how missing documents are reported.
+
 ## `screening.abstract`
 
 Purpose: define the first screening pass over abstracts.

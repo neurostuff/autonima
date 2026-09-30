@@ -39,6 +39,13 @@ def create_study_multi_annotation_prompt(
             f"Study Abstract: {study_group.study_abstract}"
         )
     if ("study_fulltext" in metadata_fields
+          and study_group.study_fulltext
+          and study_group.study_document_description):
+        study_metadata.append(
+            f"Study Document ({study_group.study_document_description}; in place of "
+            f"the full text): {study_group.study_fulltext}"
+        )
+    elif ("study_fulltext" in metadata_fields
           and study_group.study_fulltext):
         study_metadata.append(
             f"Study Full Text: {study_group.study_fulltext}"
@@ -68,6 +75,9 @@ def create_study_multi_annotation_prompt(
                 analysis_lines.append(f"- Name: {analysis.analysis_name}")
             if "analysis_description" in metadata_fields and analysis.analysis_description:
                 analysis_lines.append(f"- Description: {analysis.analysis_description}")
+            analysis_document = analysis.custom_fields.get("analysis_document")
+            if "analysis_document" in metadata_fields and analysis_document:
+                analysis_lines.append(f"- Analysis Document: {analysis_document}")
             table_section.append("\n".join(analysis_lines))
 
         table_sections.append("\n".join(table_section))
@@ -326,7 +336,16 @@ def create_single_study_annotation_prompt(
         date_str = metadata.study_publication_date
         metadata_lines.append(f"- Study Publication Date: {date_str}")
     
-    if "study_fulltext" in metadata_fields and metadata.study_fulltext:
+    if (
+        "study_fulltext" in metadata_fields
+        and metadata.study_fulltext
+        and metadata.study_document_description
+    ):
+        metadata_lines.append(
+            f"- Study Document ({metadata.study_document_description}; in place of "
+            f"the full text): {metadata.study_fulltext}"
+        )
+    elif "study_fulltext" in metadata_fields and metadata.study_fulltext:
         metadata_lines.append(
             f"- Study Full Text: {metadata.study_fulltext}"
         )

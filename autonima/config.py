@@ -13,7 +13,8 @@ from .models.types import (
     ScreeningConfig,
     RetrievalConfig,
     ParsingConfig,
-    OutputConfig
+    OutputConfig,
+    DocumentsConfig,
 )
 from .utils.criteria import CriteriaIDAssigner, save_criteria_mapping
 
@@ -124,7 +125,8 @@ class ConfigManager:
                 retrieval=retrieval_config,
                 output=output_config,
                 parsing=ParsingConfig(**config_dict.get('parsing', {})),
-                annotation=self._load_annotation_config(config_dict.get('annotation', {}))
+                annotation=self._load_annotation_config(config_dict.get('annotation', {})),
+                documents=self._load_documents_config(config_dict.get('documents')),
             )
 
             # Assign IDs to criteria
@@ -286,6 +288,61 @@ class ConfigManager:
                     raise ConfigurationError(
                         "coordinates_path_templates and processed_data_path are mutually exclusive for each source"
                     )
+
+        self._validate_documents_config(config)
+
+    def _load_documents_config(self, documents_dict: Any) -> DocumentsConfig:
+        """Load the ``documents`` section, rejecting keys it does not define."""
+        if documents_dict is None:
+            return DocumentsConfig()
+        if not isinstance(documents_dict, dict):
+            raise ConfigurationError("documents section must be a mapping")
+        allowed = set(DocumentsConfig.__dataclass_fields__)
+        unknown = sorted(set(documents_dict) - allowed)
+        if unknown:
+            raise ConfigurationError(
+                f"Unknown documents key(s): {', '.join(unknown)}. "
+                f"Allowed: {', '.join(sorted(allowed))}"
+            )
+        return DocumentsConfig(**documents_dict)
+
+    def _validate_documents_config(self, config: PipelineConfig) -> None:
+        """Refuse document configurations that would run but mean something else."""
+        documents = config.documents
+        if not documents.enabled:
+            return
+
+        from .documents import SOURCE_KINDS
+
+        if documents.kind not in SOURCE_KINDS:
+            raise ConfigurationError(
+                f"documents.kind must be one of: {', '.join(sorted(SOURCE_KINDS))}"
+            )
+        if not documents.root or not str(documents.root).strip():
+            raise ConfigurationError("documents.root is required when documents are enabled")
+        if not Path(documents.root).expanduser().is_dir():
+            raise ConfigurationError(f"documents.root is not a directory: {documents.root}")
+
+        if SOURCE_KINDS[documents.kind].provides_analyses and config.parsing.parse_coordinates:
+            # Re-parsing the article would replace the analyses the documents refer to, and
+            # attach each reference to whichever contrast now sits at its position.
+            raise ConfigurationError(
+                f"documents.kind '{documents.kind}' supplies each study's analyses, so "
+                "parsing.parse_coordinates must be false"
+            )
+
+        annotation = config.annotation
+        if (
+            annotation.enabled
+            and annotation.annotations
+            and "study_fulltext" not in (annotation.metadata_fields or [])
+        ):
+            # Without it annotation never reads the document: a text-kind run would annotate
+            # from exactly the inputs of the article run it is being compared against.
+            raise ConfigurationError(
+                "documents are enabled but annotation.metadata_fields does not include "
+                "'study_fulltext', so annotation would never read them"
+            )
 
     def get_config(self) -> PipelineConfig:
         """Get the currently loaded configuration."""

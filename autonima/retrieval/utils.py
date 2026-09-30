@@ -48,8 +48,9 @@ def _load_full_text(study: Study,  output_dir: str = None) -> Optional[str]:
         if study.full_text_path:
             full_text_file = Path(study.full_text_path)
             if full_text_file.exists():
-                # If it's a text file, read it directly
-                if full_text_file.suffix.lower() == '.txt':
+                # Plain text, and the serialized documents a document source materializes,
+                # are read verbatim.
+                if full_text_file.suffix.lower() in {'.txt', '.md', '.json', '.yaml', '.yml'}:
                     with open(full_text_file, 'r', encoding='utf-8') as f:
                         return f.read()
                 elif full_text_file.suffix.lower() == '.html':

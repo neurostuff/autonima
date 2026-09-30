@@ -18,6 +18,7 @@ from .prompts import (
 )
 from .openai_client import ScreeningLLMClient as GenericLLMClient
 from ..models.types import Study, ScreeningConfig, ScreeningResult, StudyStatus
+from ..cache_versions import DOCUMENT_PROMPT_VERSION
 from ..utils import log_error_with_debug
 from ..execution import (
     CACHE_SCHEMA_VERSION,
@@ -308,6 +309,15 @@ class LLMScreener(ScreeningEngine):
                 study,
                 self.result_dir,
             )
+            # full_text_hash already covers the document's text. What it cannot see is the
+            # document prompt, which names what the document is. Added only for document
+            # studies, so an article study's hash is unchanged.
+            if study.document is not None:
+                payload["document"] = {
+                    "kind": study.document.kind,
+                    "description": study.document.description,
+                    "prompt_version": DOCUMENT_PROMPT_VERSION,
+                }
         return stable_hash(payload)
 
     def _screening_cache_signature(

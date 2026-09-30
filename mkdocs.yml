@@ -38,6 +38,7 @@ nav:
       - Outputs: guides/outputs.md
       - Interpreting Outputs: guides/interpreting-outputs.md
       - Full-Text Sources: guides/full-text-sources.md
+      - Documents: guides/documents.md
       - Meta-Analysis: guides/meta-analysis.md
   - Reference:
       - CLI Reference: reference/cli.md
