@@ -1,0 +1,165 @@
+pmid,pmcid,source_file,x,y,z,region,group,statistic
+23418428,PMC3572100,pone.0054447.s003.pdf,-56,6,16,,Cortical structures / nC-F group,10.44
+23418428,PMC3572100,pone.0054447.s003.pdf,-56,6,18,,Cortical structures / nC-L group,7.37
+23418428,PMC3572100,pone.0054447.s003.pdf,-54,6,22,,Cortical structures / C group,6.74
+23418428,PMC3572100,pone.0054447.s003.pdf,52,4,12,,Cortical structures / nC-F group,7.30
+23418428,PMC3572100,pone.0054447.s003.pdf,48,2,14,,Cortical structures / nC-L group,5.40
+23418428,PMC3572100,pone.0054447.s003.pdf,48,6,24,,Cortical structures / C group,6.92
+23418428,PMC3572100,pone.0054447.s003.pdf,56,8,32,,Cortical structures / nC-F group,7.72
+23418428,PMC3572100,pone.0054447.s003.pdf,54,8,26,,Cortical structures / nC-L group,6.36
+23418428,PMC3572100,pone.0054447.s003.pdf,54,4,34,,Cortical structures / C group,8.59
+23418428,PMC3572100,pone.0054447.s003.pdf,-40,-2,10,,Cortical structures / nC-F group,9.40
+23418428,PMC3572100,pone.0054447.s003.pdf,-36,-4,12,,Cortical structures / nC-L group,6.78
+23418428,PMC3572100,pone.0054447.s003.pdf,-38,-12,-6,,Cortical structures / C group,9.81
+23418428,PMC3572100,pone.0054447.s003.pdf,42,8,-8,,Cortical structures / nC-F group,8.15
+23418428,PMC3572100,pone.0054447.s003.pdf,40,6,-10,,Cortical structures / nC-L group,7.00
+23418428,PMC3572100,pone.0054447.s003.pdf,38,-4,-12,,Cortical structures / C group,9.86
+23418428,PMC3572100,pone.0054447.s003.pdf,30,20,8,,Cortical structures / nC-F group,6.96
+23418428,PMC3572100,pone.0054447.s003.pdf,38,22,8,,Cortical structures / nC-L group,5.22
+23418428,PMC3572100,pone.0054447.s003.pdf,36,30,6,,Cortical structures / C group,6.97
+23418428,PMC3572100,pone.0054447.s003.pdf,-34,22,8,,Cortical structures / nC-F group,7.36
+23418428,PMC3572100,pone.0054447.s003.pdf,-30,16,12,,Cortical structures / nC-L group,5.75
+23418428,PMC3572100,pone.0054447.s003.pdf,-36,22,4,,Cortical structures / C group,6.88
+23418428,PMC3572100,pone.0054447.s003.pdf,2,14,28,,Cortical structures / nC-F group,7.01
+23418428,PMC3572100,pone.0054447.s003.pdf,-4,18,30,,Cortical structures / nC-L group,4.21
+23418428,PMC3572100,pone.0054447.s003.pdf,2,10,28,,Cortical structures / C group,7.42
+23418428,PMC3572100,pone.0054447.s003.pdf,6,-2,34,,Cortical structures / nC-F group,7.64
+23418428,PMC3572100,pone.0054447.s003.pdf,2,4,32,,Cortical structures / nC-L group,5.69
+23418428,PMC3572100,pone.0054447.s003.pdf,-4,-4,36,,Cortical structures / C group,7.00
+23418428,PMC3572100,pone.0054447.s003.pdf,-46,38,18,,Cortical structures / nC-F group,6.49
+23418428,PMC3572100,pone.0054447.s003.pdf,-36,40,28,,Cortical structures / nC-L group,4.18
+23418428,PMC3572100,pone.0054447.s003.pdf,-44,36,12,,Cortical structures / C group,7.07
+23418428,PMC3572100,pone.0054447.s003.pdf,50,38,14,,Cortical structures / nC-F group,6.22
+23418428,PMC3572100,pone.0054447.s003.pdf,42,44,18,,Cortical structures / nC-L group,3.38
+23418428,PMC3572100,pone.0054447.s003.pdf,50,42,6,,Cortical structures / C group,9.39
+23418428,PMC3572100,pone.0054447.s003.pdf,60,-32,20,,Cortical structures / nC-F group,11.57
+23418428,PMC3572100,pone.0054447.s003.pdf,62,-30,22,,Cortical structures / nC-L group,7.50
+23418428,PMC3572100,pone.0054447.s003.pdf,58,-32,20,,Cortical structures / C group,14.03
+23418428,PMC3572100,pone.0054447.s003.pdf,-60,-34,28,,Cortical structures / nC-F group,13.63
+23418428,PMC3572100,pone.0054447.s003.pdf,-60,-36,-28,,Cortical structures / nC-L group,10.91
+23418428,PMC3572100,pone.0054447.s003.pdf,-60,-34,28,,Cortical structures / C group,14.50
+23418428,PMC3572100,pone.0054447.s003.pdf,46,-58,-12,,Cortical structures / nC-F group,8.44
+23418428,PMC3572100,pone.0054447.s003.pdf,46,-58,-10,,Cortical structures / nC-L group,7.00
+23418428,PMC3572100,pone.0054447.s003.pdf,46,-58,-12,,Cortical structures / C group,9.31
+23418428,PMC3572100,pone.0054447.s003.pdf,-40,-68,-8,,Cortical structures / nC-F group,8.78
+23418428,PMC3572100,pone.0054447.s003.pdf,-44,-70,-8,,Cortical structures / nC-L group,7.19
+23418428,PMC3572100,pone.0054447.s003.pdf,-40,-68,-8,,Cortical structures / C group,8.76
+23418428,PMC3572100,pone.0054447.s003.pdf,-6,-12,2,,Subcortical structures / nC-F group,6.23
+23418428,PMC3572100,pone.0054447.s003.pdf,-4,-12,0,,Subcortical structures / C group,4.81
+23418428,PMC3572100,pone.0054447.s003.pdf,8,-18,8,,Subcortical structures / nC-F group,6.01
+23418428,PMC3572100,pone.0054447.s003.pdf,0,-14,8,,Subcortical structures / nC-L group,4.34
+23418428,PMC3572100,pone.0054447.s003.pdf,8,-18,8,,Subcortical structures / C group,5.46 7.81
+23418428,PMC3572100,pone.0054447.s003.pdf,14,4,-2,,Subcortical structures / nC-F group,4.92
+23418428,PMC3572100,pone.0054447.s003.pdf,-8,4,-4,,Subcortical structures / nC-F group,4.37
+23418428,PMC3572100,pone.0054447.s003.pdf,-6,-28,-14,,Subcortical structures / nC-F group,6.67
+23418428,PMC3572100,pone.0054447.s003.pdf,8,-22,-14,,Subcortical structures / nC-L group,5.73
+23418428,PMC3572100,pone.0054447.s003.pdf,-8,-20,-12,,Subcortical structures / C group,6.30
+23418428,PMC3572100,pone.0054447.s003.pdf,12,-4,-8,,Subcortical structures / nC-L group,5.49
+23418428,PMC3572100,pone.0054447.s003.pdf,-6,-4,-6,,Subcortical structures / C group,4.92
+23418428,PMC3572100,pone.0054447.s003.pdf,-14,-10,-8,,Subcortical structures / nC-F group,6.59
+23418428,PMC3572100,pone.0054447.s003.pdf,-16,-8,-8,,Subcortical structures / nC-L group,6.09
+23418428,PMC3572100,pone.0054447.s003.pdf,-14,-8,-8,,Subcortical structures / C group,4.28
+23418428,PMC3572100,pone.0054447.s003.pdf,14,-10,-8,,Subcortical structures / nC-F group,5.91
+23418428,PMC3572100,pone.0054447.s003.pdf,22,-2,-14,,Subcortical structures / C group,6.21
+23418428,PMC3572100,pone.0054447.s003.pdf,-22,-4,-16,,Subcortical structures / C group,6.23
+23418428,PMC3572100,pone.0054447.s003.pdf,-26,-70,-26,,Cerebellum / nC-F group,9.19
+23418428,PMC3572100,pone.0054447.s003.pdf,-28,-70,-26,,Cerebellum / nC-L group,5.81
+23418428,PMC3572100,pone.0054447.s003.pdf,-30,-60,-26,,Cerebellum / C group,7.45
+23418428,PMC3572100,pone.0054447.s003.pdf,-28,-62,-28,,Cerebellum / nC-F group,7.73
+23418428,PMC3572100,pone.0054447.s003.pdf,24,-66,-28,,Cerebellum / nC-F group,7.67
+23418428,PMC3572100,pone.0054447.s003.pdf,26,-66,-28,,Cerebellum / nC-L group,5.83
+23418428,PMC3572100,pone.0054447.s003.pdf,24,-66,-26,,Cerebellum / C group,4.87
+23418428,PMC3572100,pone.0054447.s004.pdf,-46,0,28,,Cortical structures / nC-F group,4.13
+23418428,PMC3572100,pone.0054447.s004.pdf,-54,6,26,,Cortical structures / nC-L group,3.56
+23418428,PMC3572100,pone.0054447.s004.pdf,-46,0,28,,Cortical structures / C group,3.47
+23418428,PMC3572100,pone.0054447.s004.pdf,42,8,22,,Cortical structures / nC-F group,4.09
+23418428,PMC3572100,pone.0054447.s004.pdf,50,12,28,,Cortical structures / nC-L group,4.17
+23418428,PMC3572100,pone.0054447.s004.pdf,44,6,28,,Cortical structures / C group,5.38
+23418428,PMC3572100,pone.0054447.s004.pdf,42,12,-8,,Cortical structures / nC-F group,3.44
+23418428,PMC3572100,pone.0054447.s004.pdf,48,16,24,,Cortical structures / C group,5.51
+23418428,PMC3572100,pone.0054447.s004.pdf,40,26,-16,,Cortical structures / nC-F group,5.38
+23418428,PMC3572100,pone.0054447.s004.pdf,38,30,8,,Cortical structures / nC-L group,4.53
+23418428,PMC3572100,pone.0054447.s004.pdf,34,18,-8,,Cortical structures / C group,4.54
+23418428,PMC3572100,pone.0054447.s004.pdf,36,32,4,,Cortical structures / nC-F group,3.20
+23418428,PMC3572100,pone.0054447.s004.pdf,-32,20,8,,Cortical structures / C group,4.77
+23418428,PMC3572100,pone.0054447.s004.pdf,-30,24,12,,Cortical structures / nC-F group,4.07
+23418428,PMC3572100,pone.0054447.s004.pdf,4,30,-12,,Cortical structures / nC-F group,5.95
+23418428,PMC3572100,pone.0054447.s004.pdf,4,34,-10,,Cortical structures / nC-L group,4.16
+23418428,PMC3572100,pone.0054447.s004.pdf,2,30,-10,,Cortical structures / C group,4.58
+23418428,PMC3572100,pone.0054447.s004.pdf,-6,36,4,,Cortical structures / nC-F group,4.92
+23418428,PMC3572100,pone.0054447.s004.pdf,-2,38,12,,Cortical structures / nC-L group,5.88
+23418428,PMC3572100,pone.0054447.s004.pdf,2,32,6,,Cortical structures / C group,3.94
+23418428,PMC3572100,pone.0054447.s004.pdf,-6,24,22,,Cortical structures / nC-F group,4.16
+23418428,PMC3572100,pone.0054447.s004.pdf,-4,26,24,,Cortical structures / nC-L group,4.07
+23418428,PMC3572100,pone.0054447.s004.pdf,0,28,16,,Cortical structures / C group,3.84
+23418428,PMC3572100,pone.0054447.s004.pdf,0,12,38,,Cortical structures / nC-F group,3.98
+23418428,PMC3572100,pone.0054447.s004.pdf,2,14,34,,Cortical structures / C group,4.64
+23418428,PMC3572100,pone.0054447.s004.pdf,-10,-46,18,,Cortical structures / nC-F group,4.58
+23418428,PMC3572100,pone.0054447.s004.pdf,2,-10,34,,Cortical structures / C group,4.10
+23418428,PMC3572100,pone.0054447.s004.pdf,4,-18,34,,Cortical structures / nC-F group,3.45 3.27
+23418428,PMC3572100,pone.0054447.s004.pdf,4,50,38,,Cortical structures / nC-F group,3.31
+23418428,PMC3572100,pone.0054447.s004.pdf,16,48,34,,Cortical structures / C group,3.96
+23418428,PMC3572100,pone.0054447.s004.pdf,-2,54,-2,,Cortical structures / nC-F group,3.90
+23418428,PMC3572100,pone.0054447.s004.pdf,0,56,0,,Cortical structures / nC-L group,4.52
+23418428,PMC3572100,pone.0054447.s004.pdf,6,50,12,,Cortical structures / C group,3.78
+23418428,PMC3572100,pone.0054447.s004.pdf,52,40,2,,Cortical structures / C group,5.33
+23418428,PMC3572100,pone.0054447.s004.pdf,-46,-70,18,,Cortical structures / nC-F group,5.60
+23418428,PMC3572100,pone.0054447.s004.pdf,-56,-22,34,,Cortical structures / nC-F group,4.86
+23418428,PMC3572100,pone.0054447.s004.pdf,-56,-24,34,,Cortical structures / nC-L group,9.51
+23418428,PMC3572100,pone.0054447.s004.pdf,-54,-24,34,,Cortical structures / C group,5.06
+23418428,PMC3572100,pone.0054447.s004.pdf,60,-20,34,,Cortical structures / nC-L group,4.88
+23418428,PMC3572100,pone.0054447.s004.pdf,58,-22,34,,Cortical structures / C group,4.44
+23418428,PMC3572100,pone.0054447.s004.pdf,48,-70,-12,,Cortical structures / nC-F group,6.64
+23418428,PMC3572100,pone.0054447.s004.pdf,44,-76,0,,Cortical structures / nC-L group,7.31
+23418428,PMC3572100,pone.0054447.s004.pdf,38,-66,-6,,Cortical structures / C group,6.93
+23418428,PMC3572100,pone.0054447.s004.pdf,-52,-68,-6,,Cortical structures / nC-L group,7.71
+23418428,PMC3572100,pone.0054447.s004.pdf,-50,-64,2,,Cortical structures / C group,6.44
+23418428,PMC3572100,pone.0054447.s004.pdf,-48,-64,2,,Cortical structures / nC-F group,6.40
+23418428,PMC3572100,pone.0054447.s004.pdf,-2,-6,8,,Subcortical structures / nC-F group,3.24
+23418428,PMC3572100,pone.0054447.s004.pdf,-2,-14,4,,Subcortical structures / nC-L group,3.50
+23418428,PMC3572100,pone.0054447.s004.pdf,4,-16,12,,Subcortical structures / nC-F group,3.42
+23418428,PMC3572100,pone.0054447.s004.pdf,4,-16,14,,Subcortical structures / C group,4.06
+23418428,PMC3572100,pone.0054447.s004.pdf,8,14,-6,,Subcortical structures / nC-F group,3.28
+23418428,PMC3572100,pone.0054447.s004.pdf,8,16,-4,,Subcortical structures / nC-L group,5.82
+23418428,PMC3572100,pone.0054447.s004.pdf,4,2,-2,,Subcortical structures / C group,4.51
+23418428,PMC3572100,pone.0054447.s004.pdf,-6,8,-6,,Subcortical structures / nC-F group,2.84 3.64
+23418428,PMC3572100,pone.0054447.s004.pdf,-8,16,-4,,Subcortical structures / nC-L group,5.11 6.61
+23418428,PMC3572100,pone.0054447.s004.pdf,-10,6,-6,,Subcortical structures / C group,3.76 3.84
+23418428,PMC3572100,pone.0054447.s004.pdf,6,-8,-6,,Subcortical structures / nC-F group,4.61
+23418428,PMC3572100,pone.0054447.s004.pdf,6,-6,-6,,Subcortical structures / nC-L group,6.19
+23418428,PMC3572100,pone.0054447.s004.pdf,8,-4,-4,,Subcortical structures / C group,4.28
+23418428,PMC3572100,pone.0054447.s004.pdf,-8,-8,-12,,Subcortical structures / nC-F group,4.50
+23418428,PMC3572100,pone.0054447.s004.pdf,-8,-8,-12,,Subcortical structures / nC-L group,6.11
+23418428,PMC3572100,pone.0054447.s004.pdf,-6,-6,-2,,Subcortical structures / C group,4.56
+23418428,PMC3572100,pone.0054447.s004.pdf,-8,-8,-12,,Subcortical structures / C group,4.34
+23418428,PMC3572100,pone.0054447.s004.pdf,16,-16,-12,,Subcortical structures / nC-F group,5.46
+23418428,PMC3572100,pone.0054447.s004.pdf,16,-18,-12,,Subcortical structures / nC-L group,3.78
+23418428,PMC3572100,pone.0054447.s004.pdf,14,-16,-12,,Subcortical structures / C group,3.82
+23418428,PMC3572100,pone.0054447.s004.pdf,22,-6,-14,,Subcortical structures / C group,3.12
+23418428,PMC3572100,pone.0054447.s004.pdf,-24,-4,-18,,Subcortical structures / nC-F group,3.73
+23418428,PMC3572100,pone.0054447.s004.pdf,-24,-6,-16,,Subcortical structures / C group,3.28
+23418428,PMC3572100,pone.0054447.s004.pdf,-42,-56,-22,,Cerebellum / nC-F group,6.81
+23418428,PMC3572100,pone.0054447.s004.pdf,-26,-62,-34,,Cerebellum / nC-L group,4.62
+23418428,PMC3572100,pone.0054447.s004.pdf,-12,-76,-36,,Cerebellum / C group,5.83
+23418428,PMC3572100,pone.0054447.s004.pdf,-34,-78,-38,,Cerebellum / nC-F group,4.22
+23418428,PMC3572100,pone.0054447.s004.pdf,46,-54,-34,,Cerebellum / nC-L group,4.74
+23418428,PMC3572100,pone.0054447.s004.pdf,-10,-76,-38,,Cerebellum / nC-F group,3.83
+23418428,PMC3572100,pone.0054447.s004.pdf,20,-70,-26,,Cerebellum / nC-L group,3.70
+23418428,PMC3572100,pone.0054447.s005.pdf,44,16,12,,Cortical structures / nC-F group,3.24
+23418428,PMC3572100,pone.0054447.s005.pdf,-46,-2,16,,Cortical structures / nC-F group,4.40
+23418428,PMC3572100,pone.0054447.s005.pdf,-28,26,-2,,Cortical structures / nC-F group,3.54
+23418428,PMC3572100,pone.0054447.s005.pdf,12,34,-6,,Cortical structures / nC-L group,3.35
+23418428,PMC3572100,pone.0054447.s005.pdf,-16,38,18,,Cortical structures / nC-L group,3.27
+23418428,PMC3572100,pone.0054447.s005.pdf,-16,18,28,,Cortical structures / nC-L group,3.27
+23418428,PMC3572100,pone.0054447.s005.pdf,4,-40,16,,Cortical structures / nC-L group,3.79
+23418428,PMC3572100,pone.0054447.s005.pdf,8,48,30,,Cortical structures / nC-F group,4.25
+23418428,PMC3572100,pone.0054447.s005.pdf,12,44,38,,Cortical structures / nC-L group,3.53
+23418428,PMC3572100,pone.0054447.s005.pdf,32,34,24,,Cortical structures / nC-L group,2.98
+23418428,PMC3572100,pone.0054447.s005.pdf,10,52,14,,Cortical structures / nC-L group,3.14
+23418428,PMC3572100,pone.0054447.s005.pdf,-22,42,-8,,Cortical structures / nC-L group,3.10
+23418428,PMC3572100,pone.0054447.s005.pdf,0,-10,0,,Subcortical structures / nC-F group,4.15
+23418428,PMC3572100,pone.0054447.s005.pdf,8,-26,-10,,Subcortical structures / nC-F group,3.27
+23418428,PMC3572100,pone.0054447.s005.pdf,14,-78,-3,,Cerebellum / nC-F group,4.12
+23418428,PMC3572100,pone.0054447.s005.pdf,-16,-82,-38,,Cerebellum / nC-L group,3.42
+23418428,PMC3572100,pone.0054447.s005.pdf,-18,-46,-30,,Cerebellum / nC-F group,4.12
+23418428,PMC3572100,pone.0054447.s005.pdf,-38,-64,-36,,Cerebellum / nC-L group,3.27

@@ -1,0 +1,21 @@
+pmid,pmcid,source_file,x,y,z,region,group,size,statistic
+21612768,PMC3165202,mmc1.pdf,-16,-42,-48,Cerebellum,,81,7.28
+21612768,PMC3165202,mmc1.pdf,-6,-52,10,Posterior Cingulate Gyrus,,490,5.99
+21612768,PMC3165202,mmc1.pdf,-22,-14,-18,Hippocampus,,17,5.24
+21612768,PMC3165202,mmc1.pdf,-4,52,-12,Medial Orbitofrontal Cortex,,38,5.18
+21612768,PMC3165202,mmc1.pdf,-16,32,52,Superior Frontal Gyrus,,13,4.9
+21612768,PMC3165202,mmc1.pdf,14,-6,44,Cingulate Gyrus,,19,4.78
+21612768,PMC3165202,mmc1.pdf,-8,-10,48,,,,(4.29)
+21612768,PMC3165202,mmc1.pdf,-48,-14,54,Precentral Gyrus,,19,4.75
+21612768,PMC3165202,mmc1.pdf,32,-14,16,Insula,,24,4.53
+21612768,PMC3165202,mmc1.pdf,32,14,-40,Middle Temporal Pole,,10,4.41
+21612768,PMC3165202,mmc1.pdf,-48,-64,22,Middle Temporal Gyrus,,14,4.35
+21612768,PMC3165202,mmc1.pdf,-34,-8,0,Putamen,,27,4.97
+21612768,PMC3165202,mmc1.pdf,-16,52,-4,Ventromedial Prefrontal Cortex,,11,4.76
+21612768,PMC3165202,mmc1.pdf,-6,38,-24,Gyrus Rectus,,25,4.59
+21612768,PMC3165202,mmc1.pdf,8,10,68,Supplementary Motor Area,,23,4.25
+21612768,PMC3165202,mmc1.pdf,42,-16,-26,Inferior Temporal Gyrus,,11,4.15
+21612768,PMC3165202,mmc1.pdf,-12,48,36,Superior Frontal Gyrus,,30,4.00
+21612768,PMC3165202,mmc1.pdf,-26,56,-2,Lateral Orbitofrontal Cortex /,(A-) - (A+),12,4.19
+21612768,PMC3165202,mmc1.pdf,-6,66,18,Medial/Superior Frontal,Lateral Frontal Pole,10,4.08
+21612768,PMC3165202,mmc1.pdf,-22,-66,28,Superior Occipital,(A+) - (A-),22,4.54

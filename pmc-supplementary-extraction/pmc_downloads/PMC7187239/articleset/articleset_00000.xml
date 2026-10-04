@@ -1,0 +1,837 @@
+<?xml version="1.0"  ?><!DOCTYPE pmc-articleset PUBLIC "-//NLM//DTD ARTICLE SET 2.0//EN" "https://dtd.nlm.nih.gov/ncbi/pmc/articleset/nlm-articleset-2.0.dtd"><pmc-articleset><article article-type="research-article" xml:lang="en" dtd-version="1.4"><front><journal-meta><journal-id journal-id-type="nlm-ta">Addict Biol</journal-id><journal-id journal-id-type="iso-abbrev">Addict Biol</journal-id><journal-id journal-id-type="pmc-domain-id">379</journal-id><journal-id journal-id-type="pmc-domain">blackwellopen</journal-id><journal-id journal-id-type="nlm-id">9604935</journal-id><journal-id journal-id-type="publisher-id">ADB</journal-id><journal-title-group><journal-title>Addiction Biology</journal-title></journal-title-group><issn pub-type="ppub">1355-6215</issn><issn pub-type="epub">1369-1600</issn><custom-meta-group><custom-meta><meta-name>pmc-is-collection-domain</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-collection-title</meta-name><meta-value>Wiley Open Access Collection</meta-value></custom-meta></custom-meta-group></journal-meta><article-meta><article-id pub-id-type="pmcid">PMC7187239</article-id><article-id pub-id-type="pmcid-ver">PMC7187239.1</article-id><article-id pub-id-type="pmcaid">7187239</article-id><article-id pub-id-type="pmcaiid">7187239</article-id><article-id pub-id-type="pmid">31066137</article-id><article-id pub-id-type="doi">10.1111/adb.12766</article-id><article-id pub-id-type="publisher-id">ADB12766</article-id><article-id pub-id-type="other">AB-11-2018-0294.R1</article-id><article-version article-version-type="pmc-version">1</article-version><article-categories><subj-group subj-group-type="overline"><subject>Original Article</subject></subj-group><subj-group subj-group-type="heading"><subject>Human Neuroimaging Studies</subject></subj-group></article-categories><title-group><article-title>Brain responses to anticipating and receiving beer: Comparing light, at‐risk, and dependent alcohol users</article-title><alt-title alt-title-type="left-running-head">Groefsema et al.</alt-title></title-group><contrib-group><contrib id="adb12766-cr-0001" contrib-type="author" corresp="yes"><name name-style="western"><surname>Groefsema</surname><given-names initials="MM">Martine M.</given-names></name><contrib-id contrib-id-type="orcid" authenticated="false">https://orcid.org/0000-0001-6399-4880</contrib-id><xref ref-type="aff" rid="adb12766-aff-0001">
+<sup>1</sup>
+</xref><address><email>m.groefsema@bsi.ru.nl</email></address></contrib><contrib id="adb12766-cr-0002" contrib-type="author"><name name-style="western"><surname>Engels</surname><given-names initials="RCME">Rutger C.M.E.</given-names></name><xref ref-type="aff" rid="adb12766-aff-0002">
+<sup>2</sup>
+</xref></contrib><contrib id="adb12766-cr-0003" contrib-type="author"><name name-style="western"><surname>Voon</surname><given-names initials="V">Valerie</given-names></name><xref ref-type="aff" rid="adb12766-aff-0003">
+<sup>3</sup>
+</xref></contrib><contrib id="adb12766-cr-0004" contrib-type="author"><name name-style="western"><surname>Schellekens</surname><given-names initials="AFA">Arnt F.A.</given-names></name><xref ref-type="aff" rid="adb12766-aff-0004">
+<sup>4</sup>
+</xref></contrib><contrib id="adb12766-cr-0005" contrib-type="author"><name name-style="western"><surname>Luijten</surname><given-names initials="M">Maartje</given-names></name><xref ref-type="aff" rid="adb12766-aff-0001">
+<sup>1</sup>
+</xref></contrib><contrib id="adb12766-cr-0006" contrib-type="author"><name name-style="western"><surname>Sescousse</surname><given-names initials="G">Guillaume</given-names></name><xref ref-type="aff" rid="adb12766-aff-0005">
+<sup>5</sup>
+</xref><xref ref-type="aff" rid="adb12766-aff-0006">
+<sup>6</sup>
+</xref><xref ref-type="aff" rid="adb12766-aff-0007">
+<sup>7</sup>
+</xref></contrib></contrib-group><aff id="adb12766-aff-0001" content-type="private-address">
+<label><sup>1</sup></label>
+<named-content content-type="organisation-division">Executive Board</named-content>
+<institution>Radboud University, Behavioural Science Institute</institution>
+<city>Nijmegen</city>
+<country country="NL">The Netherlands</country>
+</aff><aff id="adb12766-aff-0002" content-type="private-address">
+<label><sup>2</sup></label>
+<named-content content-type="organisation-division">Executive Board</named-content>
+<institution>Erasmus University</institution>
+<city>Rotterdam</city>
+<country country="NL">The Netherlands</country>
+</aff><aff id="adb12766-aff-0003" content-type="private-address">
+<label><sup>3</sup></label>
+<institution>Cambridge University, Behavioural and Clinical Neuroscience Institute</institution>
+<city>Cambridge</city>
+<country country="GB">United Kingdom</country>
+</aff><aff id="adb12766-aff-0004" content-type="private-address">
+<label><sup>4</sup></label>
+<institution>Radboud University, RadboudUMC</institution>
+<city>Nijmegen</city>
+<country country="NL">The Netherlands</country>
+</aff><aff id="adb12766-aff-0005" content-type="private-address">
+<label><sup>5</sup></label>
+<institution>Radboud University, Donders Institute for Brain, Cognition and Behaviour</institution>
+<city>Nijmegen</city>
+<country country="NL">The Netherlands</country>
+</aff><aff id="adb12766-aff-0006" content-type="private-address">
+<label><sup>6</sup></label>
+<institution>Centre de Recherche en Neurosciences de Lyon, INSERM U1028, CNRS UMR5292, PSYR2 Team</institution>
+<city>Lyon</city>
+<country country="FR">France</country>
+</aff><aff id="adb12766-aff-0007" content-type="private-address">
+<label><sup>7</sup></label>
+<institution>CH Le Vinatier, Service Universitaire d'Addictologie</institution>
+<city>Bron</city>
+<country country="FR">France</country>
+</aff><author-notes><corresp id="correspondenceTo"><label>*</label><bold>Correspondence</bold><break/>
+Martine M. Groefsema, Behavioural Science Institute, Radboud University, PO Box 9104, Nijmegen HE 5550, The Netherlands.<break/>
+Email: <email>m.groefsema@bsi.ru.nl</email><break/></corresp></author-notes><pub-date pub-type="epub"><day>07</day><month>5</month><year>2019</year></pub-date><pub-date pub-type="ppub"><month>5</month><year>2020</year></pub-date><volume>25</volume><issue>3</issue><issue-id pub-id-type="pmc-issue-id">356668</issue-id><issue-id pub-id-type="doi">10.1111/adb.v25.3</issue-id><elocation-id>e12766</elocation-id><history><date date-type="received"><day>12</day><month>11</month><year>2018</year></date><date date-type="rev-recd"><day>26</day><month>2</month><year>2019</year></date><date date-type="accepted"><day>30</day><month>3</month><year>2019</year></date></history><pub-history><event event-type="pmc-release"><date><day>28</day><month>04</month><year>2020</year></date></event><event event-type="pmc-live"><date><day>28</day><month>04</month><year>2020</year></date></event><event event-type="pmc-last-change"><date iso-8601-date="2026-03-21 23:25:14.110"><day>21</day><month>03</month><year>2026</year></date></event></pub-history><permissions><copyright-statement content-type="article-copyright">© 2019 The Authors Addiction Biology published by John Wiley &amp; Sons Ltd on behalf of Society for the Study of Addiction</copyright-statement><license license-type="creativeCommonsBy"><ali:license_ref xmlns:ali="http://www.niso.org/schemas/ali/1.0/" specific-use="textmining" content-type="ccbylicense">https://creativecommons.org/licenses/by/4.0/</ali:license_ref><license-p>This is an open access article under the terms of the <ext-link xmlns:xlink="http://www.w3.org/1999/xlink" ext-link-type="uri" xlink:href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</ext-link> License, which permits use, distribution and reproduction in any medium, provided the original work is properly cited.</license-p></license></permissions><self-uri xmlns:xlink="http://www.w3.org/1999/xlink" content-type="pmc-pdf" xlink:href="ADB-25-e12766.pdf"/><self-uri xmlns:xlink="http://www.w3.org/1999/xlink" content-type="pdf" xlink:href="file:ADB-25-e12766.pdf"/><abstract><title>Abstract</title><p>Impaired brain processing of alcohol‐related rewards has been suggested to play a central role in alcohol use disorder. Yet, evidence remains inconsistent and mainly originates from studies in which participants passively observe alcohol cues or taste alcohol. Here, we designed a protocol in which beer consumption was predicted by incentive cues and contingent on instrumental action closer to real life situations. We predicted that anticipating and receiving beer (compared with water) would elicit activity in the brain reward network and that this activity would correlate with drinking level across participants.</p><p>The sample consisted of 150 beer‐drinking males, aged 18 to 25 years. Three groups were defined based on alcohol use disorders identification test (AUDIT) scores: light drinkers (n = 39), at‐risk drinkers (n = 64), and dependent drinkers (n = 47). fMRI measures were obtained while participants engaged in the beer incentive delay task involving beer‐ and water‐predicting cues followed by real sips of beer or water.</p><p>During anticipation, outcome notification and delivery of beer compared with water, higher activity was found in a reward‐related brain network including the dorsal medial prefrontal cortex, orbitofrontal cortex, and amygdala. Yet, no activity was observed in the striatum, and no differences were found between the groups.</p><p>Our results reveal that anticipating, obtaining, and tasting beer activates parts of the brain reward network, but that these brain responses do not differentiate between different drinking levels.</p></abstract><abstract abstract-type="graphical"><p>In this study, we designed a protocol in which beer consumption was predicted by incentive cues and contingent on instrumental action, closer to real life situations. During anticipation, outcome notification and delivery of beer compared with water, higher activity was found in a reward‐related brain network including the dorsal medial prefrontal cortex, orbitofrontal cortex, and amygdala. Yet no differences were found between light, at risk, or dependent drinkers, suggesting that these brain responses do not differentiate between different drinking levels.</p><p>
+<boxed-text position="anchor" content-type="graphic" id="adb12766-blkfxd-0001" orientation="portrait"><graphic xmlns:xlink="http://www.w3.org/1999/xlink" position="anchor" id="nlm-graphic-1" orientation="portrait" xlink:href="ADB-25-e12766-g005.jpg"/></boxed-text>
+</p></abstract><kwd-group kwd-group-type="author-generated"><kwd id="adb12766-kwd-0001">alcohol</kwd><kwd id="adb12766-kwd-0002">brain</kwd><kwd id="adb12766-kwd-0003">reward</kwd></kwd-group><counts><fig-count count="4"/><table-count count="2"/><page-count count="10"/><word-count count="5209"/></counts><custom-meta-group><custom-meta><meta-name>pmc-status-qastatus</meta-name><meta-value>0</meta-value></custom-meta><custom-meta><meta-name>pmc-status-live</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-status-embargo</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-status-released</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-open-access</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-olf</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-manuscript</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-legally-suppressed</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-has-pdf</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-has-supplement</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-pdf-only</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-suppress-copyright</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-is-real-version</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-is-scanned-article</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-preprint</meta-name><meta-value>no</meta-value></custom-meta><custom-meta><meta-name>pmc-prop-in-epmc</meta-name><meta-value>yes</meta-value></custom-meta><custom-meta><meta-name>pmc-license-ref</meta-name><meta-value>CC BY</meta-value></custom-meta><custom-meta><meta-name>source-schema-version-number</meta-name><meta-value>2.0</meta-value></custom-meta><custom-meta><meta-name>cover-date</meta-name><meta-value>May 2020</meta-value></custom-meta><custom-meta><meta-name>details-of-publishers-convertor</meta-name><meta-value>Converter:WILEY_ML3GV2_TO_JATSPMC version:5.8.1 mode:remove_FC converted:28.04.2020</meta-value></custom-meta></custom-meta-group></article-meta><notes><p content-type="self-citation">
+<mixed-citation publication-type="journal" id="adb12766-cit-0001">
+<string-name name-style="western">
+<surname>Groefsema</surname>
+<given-names>MM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Engels</surname>
+<given-names>RCME</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Voon</surname>
+<given-names>V</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schellekens</surname>
+<given-names>AFA</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Luijten</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Sescousse</surname>
+<given-names>G</given-names>
+</string-name>. <article-title>Brain responses to anticipating and receiving beer: Comparing light, at‐risk, and dependent alcohol users</article-title>. <source xml:lang="en">Addiction Biology</source>. <year>2020</year>;<volume>25</volume>:<elocation-id>e12766</elocation-id>
+<pub-id pub-id-type="doi">10.1111/adb.12766</pub-id>
+<pub-id pub-id-type="pmid">31066137</pub-id><pub-id pub-id-type="pmcid">PMC7187239</pub-id></mixed-citation>
+</p><fn-group id="adb12766-ntgp-0001"><fn id="adb12766-note-0001"><p>Maartje Luijten and Guillaume Sescousse shared last authorship.</p></fn></fn-group></notes></front><body id="adb12766-body-0001"><sec id="adb12766-sec-0005"><label>1</label><title>INTRODUCTION</title><p>Excessive alcohol use has been associated with risky behavior and increased mortality,<xref rid="adb12766-bib-0001" ref-type="ref">1</xref> resulting in a high economic and disease burden worldwide.<xref rid="adb12766-bib-0002" ref-type="ref">2</xref> Improving prevention and treatment of alcohol use disorders (AUD) requires a better understanding of the underlying mechanisms. At the brain level, disrupted reward processing has been considered as one of the key mechanisms contributing to AUD and more generally to addictive behaviours.<xref rid="adb12766-bib-0003" ref-type="ref">3</xref>, <xref rid="adb12766-bib-0004" ref-type="ref">4</xref>, <xref rid="adb12766-bib-0005" ref-type="ref">5</xref>, <xref rid="adb12766-bib-0006" ref-type="ref">6</xref>, <xref rid="adb12766-bib-0007" ref-type="ref">7</xref> Most studies that have probed the reactivity of the brain reward network in AUD have used monetary rewards, showing altered response patterns in the striatum and medial prefrontal cortex (mPFC) (although the direction of these effects remains inconsistent, see Galandra et al and Huys et al<xref rid="adb12766-bib-0005" ref-type="ref">5</xref>, <xref rid="adb12766-bib-0008" ref-type="ref">8</xref> for recent reviews). In contrast, fewer studies have investigated the processing of alcohol‐related rewards in AUD. This is important in the light of recent literature arguing that the brain reward network responds differently to addiction versus nonaddiction‐related rewards.<xref rid="adb12766-bib-0009" ref-type="ref">9</xref>, <xref rid="adb12766-bib-0010" ref-type="ref">10</xref>
+</p><p>Previous studies investigating alcohol‐related reward processing have mostly focused on visual alcohol cue reactivity. Cues that have been repeatedly paired with alcohol use elicit wanting responses resulting from the activation of the brain reward network, including the ventral striatum (VS), amygdala, mPFC, and orbitofrontal cortex (OFC).<xref rid="adb12766-bib-0007" ref-type="ref">7</xref>, <xref rid="adb12766-bib-0011" ref-type="ref">11</xref>, <xref rid="adb12766-bib-0012" ref-type="ref">12</xref> However, as revealed by a recent meta‐analysis, reward‐related brain responses to alcohol cues do not seem to distinguish nondependent from dependent alcohol users,<xref rid="adb12766-bib-0011" ref-type="ref">11</xref> challenging the importance of the wanting component in explaining AUD. Yet, the studies included in this meta‐analysis have a few limitations. First, most of them have examined brain responses to alcohol pictures that are not followed by actual alcohol consumption and thus presumably do not carry the same incentive value as in real life. In order to investigate whether conditioned alcohol cues elicit exaggerated brain responses in AUD, it is important to ensure that these cues are predictive of real alcohol consumption. Second, it is noteworthy that many cue reactivity studies in dependent alcohol users did not include a control group or had relatively low sample sizes (see Table <xref rid="adb12766-tbl-0001" ref-type="table">1</xref> in Schacht et al<xref rid="adb12766-bib-0011" ref-type="ref">11</xref>), thereby limiting the ability to detect group differences.</p><table-wrap id="adb12766-tbl-0001" xml:lang="en" orientation="portrait" position="float"><label>Table 1</label><caption><p>Sample characteristics</p></caption><table frame="hsides" rules="groups"><col align="left" span="1"/><col align="char" char="±" span="1"/><col align="char" char="±" span="1"/><col align="char" char="±" span="1"/><col align="char" char="." span="1"/><thead valign="bottom"><tr style="border-bottom:solid 1px #000000"><th align="left" valign="bottom" rowspan="1" colspan="1"/><th align="left" valign="bottom" rowspan="1" colspan="1">Light Drinkers (n = 39)</th><th align="left" valign="bottom" rowspan="1" colspan="1">At‐risk Drinkers (n = 64)</th><th align="left" valign="bottom" rowspan="1" colspan="1">Dependent Drinkers (n = 47)</th><th align="left" valign="bottom" rowspan="1" colspan="1">Statistics</th></tr></thead><tbody valign="top"><tr><td align="left" valign="top" rowspan="1" colspan="1">Age (years)<xref ref-type="fn" rid="adb12766-note-0004">a</xref>
+</td><td align="char" valign="top" rowspan="1" colspan="1">22.19 ± 1.77</td><td align="char" valign="top" rowspan="1" colspan="1">22.10 ± 1.92</td><td align="char" valign="top" rowspan="1" colspan="1">22.62 ± 1.73</td><td align="char" valign="top" rowspan="1" colspan="1">
+<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = 1.337, <italic toggle="yes">P =</italic> .266</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Education level<xref ref-type="fn" rid="adb12766-note-0005">b</xref>
+</td><td align="center" valign="top" rowspan="1" colspan="1">70% high, 20% middle, 10% low</td><td align="center" valign="top" rowspan="1" colspan="1">76% high, 22% middle, 2% low</td><td align="center" valign="top" rowspan="1" colspan="1">79% high, 21% middle, 0% low</td><td align="char" valign="top" rowspan="1" colspan="1">
+<italic toggle="yes">X</italic>
+<sup>2</sup>
+<sub>(4)</sub> = 7.762, <italic toggle="yes">P</italic> = .101</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">AUDIT<xref ref-type="fn" rid="adb12766-note-0006">c</xref>
+</td><td align="char" valign="top" rowspan="1" colspan="1">5.51 ± 1.46</td><td align="char" valign="top" rowspan="1" colspan="1">10.95 ± 1.77</td><td align="char" valign="top" rowspan="1" colspan="1">21.04 ± 3.44</td><td align="char" valign="top" rowspan="1" colspan="1">
+<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = 488.591, <italic toggle="yes">P</italic> &lt; .001</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Weekly drinking<xref ref-type="fn" rid="adb12766-note-0007">d</xref>
+</td><td align="char" valign="top" rowspan="1" colspan="1">5.88 ± 4.40</td><td align="char" valign="top" rowspan="1" colspan="1">13.60 ± 5.11</td><td align="char" valign="top" rowspan="1" colspan="1">34.35 ± 9.81</td><td align="char" valign="top" rowspan="1" colspan="1">
+<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = 210.622, <italic toggle="yes">P</italic> &lt; .001</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Smoking currently<xref ref-type="fn" rid="adb12766-note-0008">e</xref>
+</td><td align="char" valign="top" rowspan="1" colspan="1">7.7%</td><td align="char" valign="top" rowspan="1" colspan="1">14.1%</td><td align="char" valign="top" rowspan="1" colspan="1">27.7%</td><td align="char" valign="top" rowspan="1" colspan="1">
+<italic toggle="yes">X</italic>
+<sup>2</sup>
+<sub>(1)</sub> = 6.767, <italic toggle="yes">P</italic> = .034</td></tr></tbody></table><table-wrap-foot id="adb12766-ntgp-0002"><fn id="adb12766-note-0002"><p>
+<italic toggle="yes">Note</italic>. Mean ± SD.</p></fn><fn id="adb12766-note-0003"><p>Abbreviation: AUDIT, alcohol use disorders identification test.</p></fn><fn id="adb12766-note-0004"><label>a</label><p>Age range 18 to 26 years at first test session.</p></fn><fn id="adb12766-note-0005"><label>b</label><p>Charaterized as low, middle, or high according to the Dutch education system.</p></fn><fn id="adb12766-note-0006"><label>c</label><p>Alcohol use disorder identification test,<xref rid="adb12766-bib-0013" ref-type="ref">13</xref> range 1 to 29.</p></fn><fn id="adb12766-note-0007"><label>d</label><p>Number of alcoholic drinks based on a 7‐day timeline follow‐back,<xref rid="adb12766-bib-0014" ref-type="ref">14</xref> range 0 to 71.</p></fn><fn id="adb12766-note-0008"><label>e</label><p>One‐item yes/no question.</p></fn></table-wrap-foot></table-wrap><p>More recently, a few studies have examined brain responses to tasting alcohol, investigating the hedonic or “liking” properties of alcohol.<xref rid="adb12766-bib-0015" ref-type="ref">15</xref>, <xref rid="adb12766-bib-0016" ref-type="ref">16</xref>, <xref rid="adb12766-bib-0017" ref-type="ref">17</xref>, <xref rid="adb12766-bib-0018" ref-type="ref">18</xref>, <xref rid="adb12766-bib-0019" ref-type="ref">19</xref>, <xref rid="adb12766-bib-0020" ref-type="ref">20</xref> These studies have revealed that compared with soft drinks, alcohol elicits activity in the reward‐related brain network, in particular in the VS and mPFC among heavy drinking (young) adults (but see Cservenka et al<xref rid="adb12766-bib-0021" ref-type="ref">21</xref>). Importantly, moderate to strong correlations were found between activation in these regions and the severity of alcohol use problems,<xref rid="adb12766-bib-0016" ref-type="ref">16</xref>, <xref rid="adb12766-bib-0017" ref-type="ref">17</xref> suggesting that reward‐related brain responses to the taste of alcohol may represent a neurobiological marker of AUD. Yet, these studies have employed passive tasting paradigms in which alcohol was administered in a fully predictable manner and independently of any instrumental action (but see Oberlin et al<xref rid="adb12766-bib-0022" ref-type="ref">22</xref>). This may provide an incomplete picture of alcohol reward processing in AUD, given that reward‐related brain activity is heavily dependent on both the unpredictability of the reward<xref rid="adb12766-bib-0023" ref-type="ref">23</xref> and the requirement for instrumental action.<xref rid="adb12766-bib-0024" ref-type="ref">24</xref>, <xref rid="adb12766-bib-0025" ref-type="ref">25</xref> This is all the more important as brain activity in response to drugs of abuse is thought to depend on whether these drugs are received passively or following contingent action.<xref rid="adb12766-bib-0026" ref-type="ref">26</xref>
+</p><p>In this study, we aimed to investigate whether problematic alcohol use is associated with abnormal reward‐related brain responses to anticipating, obtaining, and tasting beer, while addressing the limitations of previous studies. To this aim, we used functional Magnetic Resonance Imaging (fMRI) combined with a novel task design inspired by the monetary incentive delay task.<xref rid="adb12766-bib-0027" ref-type="ref">27</xref> This task that we refer to as the beer incentive delay (BID) task used alcohol instead of monetary rewards. Specifically, participants were exposed to abstract cues predicting the delivery of either beer or water (latter being used as a control condition) and had to react fast enough to a visual target in order to receive the predicted reward in the mouth via a tube. Brain responses reflecting motivation or “wanting” were measured during the period preceding the motor action (cue + delay), while brain responses reflecting pleasure or “liking” were measured at the time of reward outcome notification and reward delivery, separately. Importantly, we recruited a large cohort of 150 participants spanning the whole spectrum from light to dependent drinkers. In order to validate our novel task design, we first tested whether beer anticipation, outcome notification, and delivery would elicit higher brain responses in the reward‐related network compared with water. Then, we hypothesized that these brain responses, in particular in the VS, would differentiate light, at‐risk, and dependent alcohol drinkers.</p></sec><sec id="adb12766-sec-0006"><label>2</label><title>MATERIAL AND METHODS</title><sec id="adb12766-sec-0007"><label>2.1</label><title>Participants</title><p>Participants were recruited via flyers and online advertisements. Potential participants initially completed an online screening to assess their eligibility to participate (see detailed flow‐chart in Figure <xref rid="adb12766-supitem-0001" ref-type="supplementary-material">S1</xref>). Inclusion criteria at this stage were (a) age 18 to 25 years, (b) being male, and (c) drinking beer. Exclusion criteria were Magnetic Resonance Imaging (MRI) contraindications and a history of brain injury. Participants were further categorized into three groups—light, at‐risk, and dependent drinkers—based on two self‐report measures collected during the initial online screening, as well as the Diagnostic and Statistical Manual (DSM‐IV) criteria for alcohol dependence assessed later during an onsite clinical interview. The self‐report measures assessed the level of alcohol‐related problems (AUD identification test [AUDIT]<xref rid="adb12766-bib-0013" ref-type="ref">13</xref> and the heaviness of drinking (number of alcoholic drinks per week). We used the recommended cut‐offs for AUDIT scores,<xref rid="adb12766-bib-0028" ref-type="ref">28</xref> ie, score less than 8 for light drinkers, score between 8 and 15 for at‐risk drinkers, and score greater than 15 for likely dependent drinkers. To further delineate the likely dependent drinkers from the two other groups, we required them to drink more than 22 alcoholic drinks per week (ie, to show a pattern of heavy and excessive drinking behavior as defined by Ihssen et al and Monshouwer et al<xref rid="adb12766-bib-0029" ref-type="ref">29</xref>, <xref rid="adb12766-bib-0030" ref-type="ref">30</xref> while the light and at‐risk drinkers had to consume less than or equal to 22 alcoholic drinks per week. Finally, to confirm the suspicion of alcohol dependence diagnosis in the most severe group, we conducted a later onsite screening for these participants and verified that they met the DSM‐IV criteria for alcohol dependence as assessed with the semi‐structured MINI interview (MINI,<xref rid="adb12766-bib-0031" ref-type="ref">31</xref> administered by a psychologist in training). All participants participated voluntary, gave written consent, and received a financial compensation of 50 euros (with an additional 10 euros for the MINI interview for the dependent drinkers). The study was approved by the regional ethical committee CMO‐Arnhem‐Nijmegen (# 2014/043).</p><p>The initial sample consisted of 166 individuals. Seven individuals were incorrectly included, as they did not meet the combined requirement of drinking less than 22 drinks per week with an AUDIT score between 0 and 15, or drinking more than 22 drinks per week with an AUDIT score greater than 15. The data from these seven participants were discarded before performing any data analysis. Six participants further dropped out during data collection. Finally, the data from one participant were missing because of technical problems with the pumps delivering the drinks, and data from two participants were excluded because of excessive head motion in the scanner (greater than 3 mm). Characteristics of the final sample (n = 150) are presented in Table <xref rid="adb12766-tbl-0001" ref-type="table">1</xref>. The light drinkers (n = 39), at‐risk drinkers (n = 64), and dependent drinkers (n = 47) were matched for age and education, and none of them was seeking treatment for their alcohol use. The groups differed in alcohol consumption levels and smoking status.</p></sec><sec id="adb12766-sec-0008"><label>2.2</label><title>Procedure</title><p>Following the screening, participants completed three data collection sessions about 1 week apart: two behavioural sessions in a bar lab and one fMRI session (data from the bar lab will be reported elsewhere, see Table <xref rid="adb12766-supitem-0001" ref-type="supplementary-material">S1</xref> for a complete overview of the data collected in each session). FMRI data acquisition took place between 4:00 <sc>pm</sc> and 10:00 <sc>pm</sc>, coinciding with typical drinking hours. Participants were asked to abstain from drinking alcohol in the 24 hours preceding testing, as verified using a breath analyzer. Participants performed two tasks in the scanner, including the BID task in which participants could earn sips of beer and water (see below). Participants consumed a glass of water before scanning to homogenize the level of thirst across participants. After scanning, a breath analyzer was again used to check whether the blood‐alcohol‐levels (BACs) were below the legal .05 limit before participants were allowed to leave.</p></sec><sec id="adb12766-sec-0009"><label>2.3</label><title>BID task</title><p>We used a modified version of the monetary incentive delay task,<xref rid="adb12766-bib-0027" ref-type="ref">27</xref>, <xref rid="adb12766-bib-0032" ref-type="ref">32</xref> in which the rewards were 3‐mL sips of either chilled beer or water (Figure <xref rid="adb12766-fig-0001" ref-type="fig">1</xref>). The sips were delivered using two StepDos 03RC fluid pumps with tubes that were placed in the participants' mouth. In the anticipation phase, participants first saw a cue informing them about the opportunity to earn beer (yellow triangle) or water (blue square) followed by a variable delay materialized by a fixation cross. Then, a visual target appeared, and participants were instructed to respond to it as fast as possible using a button press, both in the beer and water conditions. If the response was fast enough, positive feedback was provided in the form of a green tick (outcome notification phase), followed by the drink delivery in the mouth, and then swallowing (delivery phase). When the response was too slow, a red cross was presented, ending that trial. Both the beer and water conditions consisted of 30 pseudo‐randomized trials. Ten practice trials preceded the task. Reaction times during the practice trials were used to tailor task difficulty to each individual (by adjusting the time limit for responding to the target), which was further continuously adjusted online to ensure an overall success rate of approximately 66% in each condition.<xref rid="adb12766-bib-0032" ref-type="ref">32</xref> The task duration was approximately 20 minutes.</p><fig fig-type="Figure" xml:lang="en" id="adb12766-fig-0001" orientation="portrait" position="float"><label>Figure 1</label><caption><p>Beer incentive delay task. A, a correct beer trial; B, an incorrect water trial</p></caption><graphic xmlns:xlink="http://www.w3.org/1999/xlink" id="nlm-graphic-3" position="float" orientation="portrait" xlink:href="ADB-25-e12766-g001.jpg"/></fig></sec><sec id="adb12766-sec-0010"><label>2.4</label><title>Behavioral analyses</title><p>Reaction times on successful trials were analyzed using a mixed‐ANOVA design, with drink (beer/water) as a within‐subject factor and group (light/at‐risk/dependent drinkers) as a between‐subject factor. Liking of the beer and water was assessed at the end of the fMRI session using Likert‐scales ranging from 1 to 10 with the questions “How much did you like the beer/water?” Liking ratings were analyzed using the same ANOVA design as for reaction times.</p></sec><sec id="adb12766-sec-0011"><label>2.5</label><title>fMRI data acquisition</title><p>Imaging was conducted on a PRISMA (Fit) 3T Siemens scanner, using a 32‐channel head coil. Blood oxygen level‐dependent (BOLD) sensitive functional images were acquired with a whole brain T2*‐weighted sequence using multi‐echo echoplanar imaging (EPI) (35 axial slices, matrix 64 × 64, voxel size = 3.5 × 3.5 × 3.0 mm, repetition time = 2250 ms, echo times = [9.4, 18.8, 28.2, 37.6 ms], flip angle = 90°). The BOLD data acquisition sequence was updated during the course of the study, because of the discovery of MRI noise artefacts. The sequence parameters remained identical, except for the slice order, which changed from ascending to interleaved. We took some measures in our analyses to (a) remove the artefacts and (b) model the change in scanning sequence halfway through the study (see below). In addition, we matched across the three groups the proportion of participants scanned with the initial versus updated sequence (60% versus 40%, respectively). A high‐resolution T1 scan was acquired in each participant (192 sagittal slices, field of view 256 mm, voxel size = 1.0 × 1.0 × 1.0 mm, repetition time = 300 ms, echo time 3.03 ms).</p></sec><sec id="adb12766-sec-0012"><label>2.6</label><title>fMRI data analyses</title><p>Preprocessing steps were conducted in SPM8 (<ext-link xmlns:xlink="http://www.w3.org/1999/xlink" ext-link-type="uri" xlink:href="http://www.fil.ion.ucl.ac.uk/spm">http://www.fil.ion.ucl.ac.uk/spm</ext-link>). For each volume, the four echo images were combined into a single one, weighing all echoes equally. Standard preprocessing steps were performed on the functional data: realignment to the first image of the time series, coregistration to the structural image, normalization to MNI space based on the segmentation and normalization of the structural image, and spatial smoothing with an 8‐mm Gaussian kernel. In addition, two cleaning methods were incorporated into the pipeline to ensure optimal removal of artefacts and thorough denoising of the data: (a) a principal component analyses (PCA) to filter out slice‐specific noise components<xref rid="adb12766-bib-0033" ref-type="ref">33</xref> before preprocessing and (b) an independent component analysis (ICA)‐based automatic removal of motion artifacts using FMRIB Software Library (FSL) (<ext-link xmlns:xlink="http://www.w3.org/1999/xlink" ext-link-type="uri" xlink:href="http://www.fmrib.ox.ac.uk/fsl">http://www.fmrib.ox.ac.uk/fsl</ext-link>) after preprocessing (ICA‐AROMA).<xref rid="adb12766-bib-0034" ref-type="ref">34</xref> This pipeline has previously been found to be efficient to take care of the MRI noise artefacts identified in the first half of our data.<xref rid="adb12766-bib-0035" ref-type="ref">35</xref>
+</p><p>After preprocessing, the data were modelled using a general linear model. The anticipation phase was modelled with a boxcar function as the combination of the cue and delay periods (duration 3.5‐9.5 seconds). The outcome notification phase was modelled with separate regressors for correct and incorrect responses using stick‐functions. The delivery phase was modelled with a boxcar function as the combination of the drink and swallow periods for correct trials (duration 7 seconds). The beer and water conditions were modelled separately. Six motion parameters were included, and a temporal high‐pass filter with a cutoff of 128 seconds was applied to remove low‐frequency noise. For each task phase (anticipation, outcome notification, and delivery), contrast images were calculated for beer&gt;water and then entered in second‐level analyses.</p><p>In order to validate the task, we first examined the brain activity elicited by the beer&gt;water contrast across all participants using whole‐brain one‐sample <italic toggle="yes">t</italic> tests, separately for each task phase. We used the same procedure to further examine the brain activity elicited by each drink separately, using first‐level beta images for the beer or water condition.</p><p>To examine group differences, we performed separate whole‐brain one‐way ANOVAs for each task phase, with group as a between‐subject factor (light/at‐risk/dependent drinkers). Additionally, we performed a whole‐brain regression analysis across all participants to identify brain regions in which activity elicited by the beer&gt;water contrast would scale with a continuous measure of drinking level. For this, we computed a continuous measure reflecting the common variance across the AUDIT and weekly drinking scores. Specifically, we used a PCA (using “PCA” in MATLAB) that reduced the correlation between these scores while retaining most of their information. We selected the first principal component as a composite measure of drinking level that explained 96.0% of the common variance across the AUDIT and weekly drinking scores. The scanning sequence (before/after discovery of artefacts) was added as a binary covariate of no interest in all fMRI analyses. All T‐maps were thresholded with a voxel‐level uncorrected <italic toggle="yes">P</italic> &lt; .001, combined with a cluster‐level family‐wise error (FWE) corrected <italic toggle="yes">P</italic> &lt; .05, accounting for multiple comparisons across the whole brain. The F‐maps assessing group differences were thresholded with a voxel‐level FWE corrected <italic toggle="yes">P</italic> &lt; .05 across the whole brain (since cluster‐level correction is not available for F‐maps in SPM8).</p><p>Given our a priori hypothesis about the VS, region‐of‐interest (ROI) analyses were performed using an anatomical mask of the VS.<xref rid="adb12766-bib-0036" ref-type="ref">36</xref> Percent signal change for the beer and water conditions was extracted in this ROI using the rfxplot toolbox<xref rid="adb12766-bib-0037" ref-type="ref">37</xref> and analyzed using frequentist ANOVAs in SPSS, as well as by Bayesian statistics using JASP.<xref rid="adb12766-bib-0038" ref-type="ref">38</xref>
+</p></sec></sec><sec id="adb12766-sec-0013"><label>3</label><title>RESULTS</title><sec id="adb12766-sec-0014"><label>3.1</label><title>Behavioral results</title><p>The average success rate of 65% (SD: ± 6) approached the intended 66%. Average reaction times are shown in Table <xref rid="adb12766-tbl-0002" ref-type="table">2</xref>. Results showed neither a significant main effect of group (<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = .345, <italic toggle="yes">P =</italic> .709) or drink (<italic toggle="yes">F</italic>
+<sub>(1,147)</sub> = .300, <italic toggle="yes">P =</italic> .585), nor a group*drink interaction (<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = 1.213, <italic toggle="yes">P =</italic> .300). These results suggest that reaction times, a proxy for motivation in this task, were comparable across drinks and groups. Liking ratings are shown in Table <xref rid="adb12766-tbl-0002" ref-type="table">2</xref> (ratings were available for 136 participants because we only included these ratings after the 14th participant). Results revealed a main effect of drink (<italic toggle="yes">F</italic>
+<sub>(1,133)</sub> = 35.302, <italic toggle="yes">P</italic> &lt; .001), with higher liking ratings for water, compared with beer. No main effect of Group (<italic toggle="yes">F</italic>
+<sub>(2,133)</sub> = .322, <italic toggle="yes">P =</italic> .726) or group*drink interaction (<italic toggle="yes">F</italic>
+<sub>(2,133)</sub> = .335, <italic toggle="yes">P =</italic> .716) was observed. These results suggest that participants across the three groups liked the water more than the beer in the BID task.</p><table-wrap id="adb12766-tbl-0002" xml:lang="en" orientation="portrait" position="float"><label>Table 2</label><caption><p>Behavioral results for the beer incentive delay task</p></caption><table frame="hsides" rules="groups"><col align="left" span="1"/><col align="char" char="±" span="1"/><col align="char" char="±" span="1"/><col align="char" char="±" span="1"/><col align="center" span="1"/><thead valign="bottom"><tr style="border-bottom:solid 1px #000000"><th align="left" valign="bottom" rowspan="1" colspan="1"/><th align="left" valign="bottom" rowspan="1" colspan="1">Light Drinkers (n = 39)</th><th align="left" valign="bottom" rowspan="1" colspan="1">At‐risk Drinkers (n = 64)</th><th align="left" valign="bottom" rowspan="1" colspan="1">Dependent Drinkers (n = 47)</th><th align="left" valign="bottom" rowspan="1" colspan="1">Statistics</th></tr></thead><tbody valign="top"><tr><td align="left" valign="top" rowspan="1" colspan="1">Reaction time beer (ms)</td><td align="char" valign="top" rowspan="1" colspan="1">338 ± 55</td><td align="char" valign="top" rowspan="1" colspan="1">332 ± 54</td><td align="char" valign="top" rowspan="1" colspan="1">325 ± 45</td><td rowspan="2" align="center" valign="top" colspan="1">
+<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = 1.858, <italic toggle="yes">P =</italic> .300</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Reaction time water (ms)</td><td align="char" valign="top" rowspan="1" colspan="1">333 ± 43</td><td align="char" valign="top" rowspan="1" colspan="1">335 ± 39</td><td align="char" valign="top" rowspan="1" colspan="1">333 ± 45</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Liking beer (1‐10)</td><td align="char" valign="top" rowspan="1" colspan="1">5.73 ± 1.7</td><td align="char" valign="top" rowspan="1" colspan="1">5.80 ± 1.7</td><td align="char" valign="top" rowspan="1" colspan="1">5.91 ± 1.8</td><td rowspan="2" align="center" valign="top" colspan="1">
+<italic toggle="yes">F</italic>
+<sub>(2,133)</sub> = .335, <italic toggle="yes">P =</italic> .716</td></tr><tr><td align="left" valign="top" rowspan="1" colspan="1">Liking water (1‐10)</td><td align="char" valign="top" rowspan="1" colspan="1">6.82 ± 1.4</td><td align="char" valign="top" rowspan="1" colspan="1">7.13 ± 1.3</td><td align="char" valign="top" rowspan="1" colspan="1">6.89 ± 1.1</td></tr></tbody></table><table-wrap-foot id="adb12766-ntgp-0003"><fn id="adb12766-note-0009"><p>
+<italic toggle="yes">Note</italic>. Mean ± SD. Statistics reported for the group*drink interaction effects.</p></fn><fn id="adb12766-note-1009"><p>[Correction added on 22 May after first online publication: Data for average reaction times in Table 2 have been updated in this version]</p></fn></table-wrap-foot></table-wrap></sec><sec id="adb12766-sec-0015"><label>3.2</label><title>Imaging results</title><p>All analyses referred to in this section can be accessed at <ext-link xmlns:xlink="http://www.w3.org/1999/xlink" ext-link-type="uri" xlink:href="https://neurovault.org/collections/TOHDTVIQ">https://neurovault.org/collections/TOHDTVIQ</ext-link>. First, we examined brain responses to beer compared with water, in the three different phases of the task and across all participants (Figure <xref rid="adb12766-fig-0002" ref-type="fig">2</xref>). These analyses revealed that during the anticipation phase, the right dorsal medial PFC (dmPFC) [x, y, z = 7, 40, 40, <italic toggle="yes">T</italic> = 4.41], the left orbital frontal cortex (OFC) [x, y, z = –36, 23, –18, <italic toggle="yes">T</italic> = 4.94] and the anterior cingulate cortex (ACC) [x, y, z = 0, 43, 18, <italic toggle="yes">T</italic> = 4.21] responded more strongly to the anticipation of beer compared with water. During the outcome notification phase, the right anterior insula [x, y, z = 37, 23, 2, <italic toggle="yes">T</italic> = 7.83] and bilateral amygdala [x, y, z = –18, –4, –18, <italic toggle="yes">T</italic> = 6.56; 20, –4, 15, <italic toggle="yes">T</italic> = 6.73] showed increased activity upon the notification of a beer compared with water. Finally, during the delivery phase, when individuals tasted the beer compared with water, stronger activations were found in the bilateral somatosensory cortex [x, y, z = 60, –4, 25, <italic toggle="yes">T</italic> = 11.43; –53, –7, 25, <italic toggle="yes">T</italic> = 11.41], bilateral amygdala [x, y, z = –23, –4, –12, <italic toggle="yes">T</italic> = 8.07; 24, –4, –12, <italic toggle="yes">T</italic> = 8.07], bilateral insula [x, y, z = 34, –7, 12, <italic toggle="yes">T</italic> = 10.78; –33, –10, 12, <italic toggle="yes">T</italic> = 8.10], dmPFC [x, y, z = –10, 23, 60, <italic toggle="yes">T</italic> = 5.43] and left OFC [x, y, z = ‐20, 33, –10, <italic toggle="yes">T</italic> = 5.00]. Please see Table <xref rid="adb12766-supitem-0001" ref-type="supplementary-material">S2</xref> for a complete list of activation foci for all task phases.</p><fig fig-type="Figure" xml:lang="en" id="adb12766-fig-0002" orientation="portrait" position="float"><label>Figure 2</label><caption><p>Whole brain responses for the contrasts beer&gt;water for the anticipation, outcome notification, and delivery phases of the task, across all participants (n = 150). T‐maps are overlaid on an average anatomical scan of all participants (display threshold: voxel‐level uncorrected <italic toggle="yes">P</italic> &lt; .001, combined with cluster‐level family‐wise error (FWE) corrected <italic toggle="yes">P</italic> &lt; .05)</p></caption><graphic xmlns:xlink="http://www.w3.org/1999/xlink" id="nlm-graphic-5" position="float" orientation="portrait" xlink:href="ADB-25-e12766-g002.jpg"/></fig><p>The beer versus water contrast did not elicit the expected reward‐related activations in the striatum. In addition, liking ratings revealed that water was rated as more pleasurable than beer. We thus reasoned that the lack of striatal activity in the beer&gt;water contrast might reflect the fact that the water condition elicits comparable or even higher striatal activity compared with the beer condition. To test this hypothesis, we examined brain activation patterns for the beer and water conditions separately. We found that across the three phases of the task, the beer and water conditions indeed recruit very similar brain regions including the VS and putamen, insula, dorso lateral PFC, ACC, and somatosensory cortex (Figure <xref rid="adb12766-fig-0003" ref-type="fig">3</xref>, for other foci, see Table <xref rid="adb12766-supitem-0001" ref-type="supplementary-material">S3</xref>). This observation confirms that the reward‐related brain network is activated in this task, but to a similar extent in the beer and water conditions, thereby explaining why their direct contrast does not produce the expected activation in the striatum.</p><fig fig-type="Figure" xml:lang="en" id="adb12766-fig-0003" orientation="portrait" position="float"><label>Figure 3</label><caption><p>Whole brain responses to beer (blue) and water (red) for the anticipation, outcome notification, and delivery phases of the task, across all participants (n = 150). Purple areas are active in both conditions. Binarized T‐maps are overlaid on an average anatomical scan of all participants (display threshold: voxel‐level uncorrected <italic toggle="yes">P</italic> &lt; .001, combined with cluster‐level family‐wise error (FWE) corrected <italic toggle="yes">P</italic> &lt; .05)</p></caption><graphic xmlns:xlink="http://www.w3.org/1999/xlink" id="nlm-graphic-7" position="float" orientation="portrait" xlink:href="ADB-25-e12766-g003.jpg"/></fig><p>Then, we examined whether the groups differed in their brain responses to the beer versus water conditions in any of the three phases of the task. In contrast to our hypothesis, we did not observe any significant differences surviving multiple comparisons across the whole brain between light drinkers, at‐risk drinkers, and dependent drinkers.</p><p>In order to further examine individual differences, we performed a regression analysis using our composite measure of drinking level (see Methods) as a regressor, across all participants. In line with the results of the above group analysis, this regression analysis did not reveal any brain activity in the beer&gt;water contrast scaling with drinking level, in any of the three phases of the task.</p><p>Finally, we performed an ROI analysis restricted to an anatomical mask of the VS. Specifically, we extracted the percent signal change for the beer and water conditions for the various phases of the task and examined potential group differences for the beer&gt;water contrast using a one‐way ANOVA (Figure <xref rid="adb12766-fig-0004" ref-type="fig">4</xref>). Again, the results showed no group differences during the anticipation (<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = .955, <italic toggle="yes">P =</italic> .387), outcome notification (<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = .511, <italic toggle="yes">P =</italic> .601), and delivery phases (<italic toggle="yes">F</italic>
+<sub>(2,147)</sub> = .097, <italic toggle="yes">P =</italic> .908). In order to assess whether this lack of significant group differences can be interpreted as evidence for the null hypothesis (H0, no group difference), we performed Bayesian analyses in Jeffreys's Amazing Statistics Program (JASP), using a default Cauchy prior with a scale parameter of 0.5.<xref rid="adb12766-bib-0038" ref-type="ref">38</xref> The Bayes factor quantifying the relative evidence in favor of H0 over H1 (significant difference between groups) for the anticipation phase was BF01 = 6.557, thus providing moderate evidence for the null hypothesis of no group difference. Similarly, the Bayes factors for the outcome notification and delivery phases were BF01 = 9.710 and BF01 = 13.679, respectively, indicating strong evidence for the null hypothesis of no group difference in terms of VS activation. Sensitivity analyses controlling for smoking status did not qualitatively affect the results of the whole brain or ROI analyses.</p><fig fig-type="Figure" xml:lang="en" id="adb12766-fig-0004" orientation="portrait" position="float"><label>Figure 4</label><caption><p>Percent signal change in the ventral striatal region‐of‐interest (ROI) for the contrast beer&gt;water. Box height represents the interquartile range (IQR), black lines represent the median, crosses represent the mean, and whiskers represent the largest and smallest values no further than 1.5*IQR. Single data points are values located outside the whiskers. Frequentists statistics show no significant differences between groups, while Bayesian statistics provide moderate to strong evidence in favor of no group differences. Note: The scales are different between the figures because of differences in the amplitude of the blood oxygen level‐dependent (BOLD) response for the various phases of the task</p></caption><graphic xmlns:xlink="http://www.w3.org/1999/xlink" id="nlm-graphic-9" position="float" orientation="portrait" xlink:href="ADB-25-e12766-g004.jpg"/></fig></sec></sec><sec id="adb12766-sec-0016"><label>4</label><title>DISCUSSION</title><p>Across groups, our results revealed increased brain activity in reward‐related brain areas during the anticipation, outcome notification, and delivery of beer compared with water, suggesting that our novel task design is well‐suited to examine the processing of alcohol‐related rewards. Yet, in contrast to our hypotheses, no brain activity was found in the VS in the beer vs water comparison, and no group differences were observed between light, at‐risk, and dependent drinkers in any of the phases of the task. While disrupted reward processing has been implicated as a core component of substance use disorders, brain responses to anticipating and receiving beer did not differentiate drinkers with different levels of alcohol use in our study. If replicated, our findings would suggest that individual differences in alcohol use may not be associated with critical differences in the processing of alcohol‐related rewards in the brain.</p><p>For validation purposes, we first examined whether the contrast of beer vs water elicited the expected activations in reward‐related brain areas. Across the various phases of the task, we found such activations in the dmPFC, ACC, OFC, and amygdala, which are commonly activated by reward or salient stimuli, in the particular in the context of gustatory stimulation.<xref rid="adb12766-bib-0010" ref-type="ref">10</xref>, <xref rid="adb12766-bib-0039" ref-type="ref">39</xref>, <xref rid="adb12766-bib-0040" ref-type="ref">40</xref> More specifically, during the anticipation phase, we found higher activity for the beer vs water condition in the mPFC, ACC, and OFC, areas known to be involved in the perception of craving‐related stimuli<xref rid="adb12766-bib-0041" ref-type="ref">41</xref> and the computation of anticipated reward value.<xref rid="adb12766-bib-0042" ref-type="ref">42</xref> During the outcome notification phase, we found higher activity in the insula and amygdala, both associated with the evaluation of the affective properties of stimuli.<xref rid="adb12766-bib-0017" ref-type="ref">17</xref>, <xref rid="adb12766-bib-0020" ref-type="ref">20</xref>, <xref rid="adb12766-bib-0043" ref-type="ref">43</xref>, <xref rid="adb12766-bib-0044" ref-type="ref">44</xref> Finally, during the beer delivery phase, we found higher activity in the somatosensory cortex, amygdala and insula, areas that are known to play a role in the evaluation of experienced reward and feedback, in particular in the context of food rewards.<xref rid="adb12766-bib-0010" ref-type="ref">10</xref>, <xref rid="adb12766-bib-0045" ref-type="ref">45</xref>
+</p><p>In contrast to our hypothesis, we did not find activation differences between the beer and water conditions in the VS. Further analyses revealed that this was at least partly driven by the beer and water conditions activating the VS to a similar extent. Unexpectedly, we also found that reaction times (ie, motivation) following beer‐ and water‐predicting cues were similar, and that liking ratings for the beer condition were a bit lower than for the water condition. Presumably, drinking small sips of beer of water through a tube feels very different and less pleasurable than drinking from a glass, and water might also become rewarding under these circumstances. Interestingly, our results are in line with previous reports showing that water is similar to other caloric beverages in terms of subjective liking and wanting,<xref rid="adb12766-bib-0046" ref-type="ref">46</xref> and activates a large brain network including reward‐related regions.<xref rid="adb12766-bib-0047" ref-type="ref">47</xref> These observations call for the use of artificial saliva as a more neutral control condition,<xref rid="adb12766-bib-0048" ref-type="ref">48</xref> as well as a better evaluation of the hedonic properties of beer delivered through a tube in future fMRI studies. Importantly though, the lack of VS activity when comparing the beer and water conditions across all participants does not prevent us from examining group differences in this area, as it could be that VS activity is only present in individuals with relatively high drinking levels.</p><p>However, in contrast with this hypothesis, we found no differences between light, at‐risk, and dependent drinkers when examining whole brain responses to beer vs water, in any of the phases of the BID task. In the VS, Bayesian statistics further provided moderate to strong evidence in favor of the null hypothesis of no group difference. While these findings appear to be at odds with major reward‐related addiction theories,<xref rid="adb12766-bib-0049" ref-type="ref">49</xref>, <xref rid="adb12766-bib-0050" ref-type="ref">50</xref> our results are in line with a previous meta‐analysis showing no differences in brain responses to visual alcohol cues between dependent and nondependent drinkers.<xref rid="adb12766-bib-0011" ref-type="ref">11</xref> Our results also concur with those of a recent study that used an alcohol‐delivery protocol in the scanner and showed no reward‐related brain activity following the unpredictable delivery of alcohol vs water, as well as no reward‐related differences between alcohol‐dependent individuals and social drinkers.<xref rid="adb12766-bib-0021" ref-type="ref">21</xref> Below, we propose several explanations for the lack of group differences in our study.</p><p>First, our participants were relatively young (M<sub>age</sub> = 21.98), and none of them was seeking treatment for their alcohol use, which means that our dependent group might represent a mild form of AUD. Moreover, at this age, the cumulative exposure to alcohol is still limited both in time and quantity, compared with older AUD populations. These specificities might play a role in the absence of reward‐related brain abnormalities in our study, which might only arise in older, treatment‐seeking AUD populations. If so, that would suggest that such abnormalities are a consequence of alcohol use rather than a predisposing factor. In support of this interpretation, a review of the literature indicates that most studies reporting positive correlations between level of use and reward‐related brain activation included dependent individuals who were in treatment.<xref rid="adb12766-bib-0004" ref-type="ref">4</xref> Another feature of our study that could explain the lack of group differences is the use of abstract cues in the task. Indeed, it has been suggested that sensitized brain responses to incentive cues in addiction would only be observed when using explicit addiction‐related cues, such as alcohol pictures.<xref rid="adb12766-bib-0009" ref-type="ref">9</xref> In contrast, abstract and nonfamiliar cues like geometric shapes might lead to blunted reward‐related brain responses. Future studies should directly test this prediction.</p><p>Alternatively, it may be that these “bottom‐up” brain responses to alcohol‐related rewards simply do not differentiate different types of drinkers and that other “top‐down” factors such as impaired prefrontal‐based self‐control,<xref rid="adb12766-bib-0051" ref-type="ref">51</xref>, <xref rid="adb12766-bib-0052" ref-type="ref">52</xref> diminished goal‐directed behavior,<xref rid="adb12766-bib-0053" ref-type="ref">53</xref>, <xref rid="adb12766-bib-0054" ref-type="ref">54</xref> and impaired decision making and learning<xref rid="adb12766-bib-0008" ref-type="ref">8</xref>, <xref rid="adb12766-bib-0055" ref-type="ref">55</xref> are more relevant in explaining individual differences in drinking behavior. In addition, a less often studied factor is the social aspect of alcohol use; it is known that alcohol is most often consumed in social settings and for social reasons,<xref rid="adb12766-bib-0056" ref-type="ref">56</xref>, <xref rid="adb12766-bib-0057" ref-type="ref">57</xref> with peer influences and imitation of drinking behavior acting as powerful predictors of use.<xref rid="adb12766-bib-0058" ref-type="ref">58</xref> For young adults such as those included in the present study, drinking alcohol may only be rewarding when it is accompanied by social interaction. Therefore, future research may further examine this social aspect of alcohol use in relation to reward processing.</p><p>While the relatively large sample size is a major strength of the current study, some limitations should be acknowledged. First, the ecological validity of our task can be questioned, as individuals were receiving sips of beer through a tube, while lying down in the MRI scanner. This is obviously a different experience than having a full drink from a glass in a more relaxing setting. Yet, to date, this is the closest way to examine brain responses to the taste of beer. Second, while all participants liked beer, it did not have to be their preferred drink, which may have reduced the magnitude of their brain responses to the taste of beer. Third, this study is cross‐sectional, and longitudinal data are needed to examine whether brain responses to beer can predict future alcohol use. Eventually, such data will provide insight into the risk and resilience factors regarding the transition from alcohol use to AUD. Finally, it is important to note that the focus of our study on male participants precludes any generalization of our findings to the female population.</p><p>To conclude, in this group of young adults, brain responses to the anticipation and consumption of beer were not related to individual differences in the level of alcohol use, thereby challenging the role of alcohol‐related reward processing in explaining AUD.</p></sec><sec sec-type="supplementary-material"><title>Supporting information</title><supplementary-material content-type="local-data" id="adb12766-supitem-0001" position="float" orientation="portrait"><caption><p>
+<bold>Figure S1</bold>: Flow chart of the entire data collection</p><p>
+<bold>Table S1</bold>: Overview of all collected data in the study</p><p>
+<bold>Table S2</bold>: Whole brain activations for the comparison between beer and water in the three phases of the BID task</p><p>
+<bold>Table S3</bold>: Whole brain activations for the beer and water conditions compared with the implicit baseline in the three phases of the BID task</p></caption><media xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="ADB-25-e12766-s001.docx" position="float" orientation="portrait"><caption><p>Click here for additional data file.</p></caption></media></supplementary-material></sec></body><back><ack id="adb12766-sec-0017"><title>ACKNOWLEDGEMENTS</title><p>Funding for this study was provided by the Behavioural Science Institute. The Behavioural Science Institute had no role in the study design, collection, analysis, or interpretation of the data, writing the manuscript, or the decision to submit the paper for publication.</p></ack><ref-list id="adb12766-bibl-0001" content-type="cited-references"><title>REFERENCES</title><ref id="adb12766-bib-0001"><label>1</label><mixed-citation publication-type="journal" id="adb12766-cit-0002">
+<string-name name-style="western">
+<surname>Hingson</surname>
+<given-names>RW</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Zha</surname>
+<given-names>W</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Weitzman</surname>
+<given-names>ER</given-names>
+</string-name>. <article-title>Magnitude of and trends in alcohol‐related mortality and morbidity among US college students ages 18‐24, 1998‐2005</article-title>. <source xml:lang="en">J Stud Alcohol Drugs</source>. <year>2009</year>;<volume>16</volume>:<fpage>12</fpage>‐<lpage>20</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.15288/jsads.2009.s16.12</pub-id><pub-id pub-id-type="pmcid">PMC2701090</pub-id><pub-id pub-id-type="pmid">19538908</pub-id></mixed-citation></ref><ref id="adb12766-bib-0002"><label>2</label><mixed-citation publication-type="journal" id="adb12766-cit-0003">
+<string-name name-style="western">
+<surname>Rehm</surname>
+<given-names>J</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Mathers</surname>
+<given-names>C</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Popova</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Thavorncharoensap</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Teerawattananon</surname>
+<given-names>Y</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Patra</surname>
+<given-names>J</given-names>
+</string-name>. <article-title>Global burden of disease and injury and economic cost attributable to alcohol use and alcohol‐use disorders</article-title>. <source xml:lang="en">The Lancet</source>. <year>2009</year>;<volume>373</volume>(<issue>9682</issue>):<fpage>2223</fpage>‐<lpage>2233</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/S0140-6736(09)60746-7</pub-id><pub-id pub-id-type="pmid">19560604</pub-id></mixed-citation></ref><ref id="adb12766-bib-0003"><label>3</label><mixed-citation publication-type="journal" id="adb12766-cit-0004">
+<string-name name-style="western">
+<surname>Luijten</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schellekens</surname>
+<given-names>AF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kühn</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Machielse</surname>
+<given-names>MWJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Sescousse</surname>
+<given-names>G</given-names>
+</string-name>. <article-title>Disruption of reward processing in addiction: an image‐based meta‐analysis of functional magnetic resonance imaging studies</article-title>. <source xml:lang="en">JAMA Psychiat</source>. <year>2017</year>;<volume>74</volume>(<issue>4</issue>):<fpage>387</fpage>‐<lpage>398</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.1001/jamapsychiatry.2016.3084</pub-id><pub-id pub-id-type="pmid">28146248</pub-id></mixed-citation></ref><ref id="adb12766-bib-0004"><label>4</label><mixed-citation publication-type="journal" id="adb12766-cit-0005">
+<string-name name-style="western">
+<surname>Hommer</surname>
+<given-names>DW</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Bjork</surname>
+<given-names>JM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gilman</surname>
+<given-names>JM</given-names>
+</string-name>. <article-title>Imaging brain response to reward in addictive disorders</article-title>. <source xml:lang="en">Ann N Y Acad Sci</source>. <year>2011</year>;<volume>1216</volume>(<issue>1</issue>):<fpage>50</fpage>‐<lpage>61</lpage>.<pub-id pub-id-type="pmid">21272010</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1749-6632.2010.05898.x</pub-id></mixed-citation></ref><ref id="adb12766-bib-0005"><label>5</label><mixed-citation publication-type="journal" id="adb12766-cit-0006">
+<string-name name-style="western">
+<surname>Galandra</surname>
+<given-names>C</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Basso</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Cappa</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Canessa</surname>
+<given-names>N</given-names>
+</string-name>. <article-title>The alcoholic brain: neural bases of impaired reward‐based decision‐making in alcohol use disorders</article-title>. <source xml:lang="en">Neurol Sci</source>. <year>2017</year>;<volume>39</volume>:<fpage>423</fpage>‐<lpage>435</lpage>.<pub-id pub-id-type="pmid">29188399</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1007/s10072-017-3205-1</pub-id></mixed-citation></ref><ref id="adb12766-bib-0006"><label>6</label><mixed-citation publication-type="journal" id="adb12766-cit-0007">
+<string-name name-style="western">
+<surname>Volkow</surname>
+<given-names>ND</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Morales</surname>
+<given-names>M</given-names>
+</string-name>. <article-title>The brain on drugs: from reward to addiction</article-title>. <source xml:lang="en">Cell</source>. <year>2015</year>;<volume>162</volume>(<issue>4</issue>):<fpage>712</fpage>‐<lpage>725</lpage>.<pub-id pub-id-type="pmid">26276628</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.cell.2015.07.046</pub-id></mixed-citation></ref><ref id="adb12766-bib-0007"><label>7</label><mixed-citation publication-type="journal" id="adb12766-cit-0008">
+<string-name name-style="western">
+<surname>Kuhn</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gallinat</surname>
+<given-names>J</given-names>
+</string-name>. <article-title>Common biology of craving across legal and illegal drugs ‐ a quantitative meta‐analysis of cue‐reactivity brain response</article-title>. <source xml:lang="en">Eur J Neurosci</source>. <year>2011</year>;<volume>33</volume>(<issue>7</issue>):<fpage>1318</fpage>‐<lpage>1326</lpage>.<pub-id pub-id-type="pmid">21261758</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1460-9568.2010.07590.x</pub-id></mixed-citation></ref><ref id="adb12766-bib-0008"><label>8</label><mixed-citation publication-type="journal" id="adb12766-cit-0009">
+<string-name name-style="western">
+<surname>Huys</surname>
+<given-names>QJM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Deserno</surname>
+<given-names>L</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Obermayer</surname>
+<given-names>K</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schlagenhauf</surname>
+<given-names>F</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Heinz</surname>
+<given-names>A</given-names>
+</string-name>. <article-title>Model‐free temporal‐difference learning and dopamine in alcohol dependence: examining concepts from theory and animals in human imaging</article-title>. <source xml:lang="en">Biol Psychiatry: Cognitive Neuroscience Neuroimaging</source>. <year>2016</year>;<volume>1</volume>(<issue>5</issue>):<fpage>401</fpage>‐<lpage>410</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.bpsc.2016.06.005</pub-id><pub-id pub-id-type="pmid">29560869</pub-id></mixed-citation></ref><ref id="adb12766-bib-0009"><label>9</label><mixed-citation publication-type="journal" id="adb12766-cit-0010">
+<string-name name-style="western">
+<surname>Leyton</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Vezina</surname>
+<given-names>P</given-names>
+</string-name>. <article-title>Striatal ups and downs: Their roles in vulnerability to addictions in humans</article-title>. <source xml:lang="en">Neurosci Biobehav Rev</source>. <year>2013</year>;<volume>37</volume>(<issue>9</issue>):<fpage>1999</fpage>‐<lpage>2014</lpage>.<pub-id pub-id-type="pmid">23333263</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neubiorev.2013.01.018</pub-id><pub-id pub-id-type="pmcid">PMC3743927</pub-id></mixed-citation></ref><ref id="adb12766-bib-0010"><label>10</label><mixed-citation publication-type="journal" id="adb12766-cit-0011">
+<string-name name-style="western">
+<surname>Sescousse</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Caldú</surname>
+<given-names>X</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Segura</surname>
+<given-names>B</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Dreher</surname>
+<given-names>JC</given-names>
+</string-name>. <article-title>Processing of primary and secondary rewards: a quantitative meta‐analysis and review of human functional neuroimaging studies</article-title>. <source xml:lang="en">Neurosci Biobehav Rev</source>. <year>2013</year>;<volume>37</volume>(<issue>4</issue>):<fpage>681</fpage>‐<lpage>696</lpage>.<pub-id pub-id-type="pmid">23415703</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neubiorev.2013.02.002</pub-id></mixed-citation></ref><ref id="adb12766-bib-0011"><label>11</label><mixed-citation publication-type="journal" id="adb12766-cit-0012">
+<string-name name-style="western">
+<surname>Schacht</surname>
+<given-names>JP</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Anton</surname>
+<given-names>RF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Myrick</surname>
+<given-names>H</given-names>
+</string-name>. <article-title>Functional neuroimaging studies of alcohol cue reactivity: a quantitative meta‐analysis and systematic review</article-title>. <source xml:lang="en">Addict Biol</source>. <year>2013</year>;<volume>18</volume>(<issue>1</issue>):<fpage>121</fpage>‐<lpage>133</lpage>.<pub-id pub-id-type="pmid">22574861</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1369-1600.2012.00464.x</pub-id><pub-id pub-id-type="pmcid">PMC3419322</pub-id></mixed-citation></ref><ref id="adb12766-bib-0012"><label>12</label><mixed-citation publication-type="journal" id="adb12766-cit-0013">
+<string-name name-style="western">
+<surname>Chase</surname>
+<given-names>HW</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Eickhoff</surname>
+<given-names>SB</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Laird</surname>
+<given-names>AR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hogarth</surname>
+<given-names>L</given-names>
+</string-name>. <article-title>The neural basis of drug stimulus processing and craving: an activation likelihood estimation meta‐analysis</article-title>. <source xml:lang="en">Biol Psychiatry</source>. <year>2011</year>;<volume>70</volume>(<issue>8</issue>):<fpage>785</fpage>‐<lpage>793</lpage>.<pub-id pub-id-type="pmid">21757184</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.biopsych.2011.05.025</pub-id><pub-id pub-id-type="pmcid">PMC4827617</pub-id></mixed-citation></ref><ref id="adb12766-bib-0013"><label>13</label><mixed-citation publication-type="journal" id="adb12766-cit-0014">
+<string-name name-style="western">
+<surname>Saunders</surname>
+<given-names>JB</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Aasland</surname>
+<given-names>OG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Babor</surname>
+<given-names>TF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>De La Fuente</surname>
+<given-names>JR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Grant</surname>
+<given-names>M</given-names>
+</string-name>. <article-title>Development of the alcohol use disorders identification test (AUDIT): WHO collaborative project on early detection of persons with harmful alcohol consumption II</article-title>. <source xml:lang="en">Addiction</source>. <year>1993</year>;<volume>88</volume>(<issue>6</issue>):<fpage>791</fpage>‐<lpage>804</lpage>.<pub-id pub-id-type="pmid">8329970</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1360-0443.1993.tb02093.x</pub-id></mixed-citation></ref><ref id="adb12766-bib-0014"><label>14</label><mixed-citation publication-type="journal" id="adb12766-cit-0015">
+<string-name name-style="western">
+<surname>Hoeppner</surname>
+<given-names>BB</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Stout</surname>
+<given-names>RL</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Jackson</surname>
+<given-names>KM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Barnett</surname>
+<given-names>NP</given-names>
+</string-name>. <article-title>How good is fine‐grained Timeline Follow‐back data? Comparing 30‐day TLFB and repeated 7‐day TLFB alcohol consumption reports on the person and daily level</article-title>. <source xml:lang="en">Addict Behav</source>. <year>2010</year>;<volume>35</volume>(<issue>12</issue>):<fpage>1138</fpage>‐<lpage>1143</lpage>.<pub-id pub-id-type="pmid">20822852</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.addbeh.2010.08.013</pub-id><pub-id pub-id-type="pmcid">PMC2942970</pub-id></mixed-citation></ref><ref id="adb12766-bib-0015"><label>15</label><mixed-citation publication-type="journal" id="adb12766-cit-0016">
+<string-name name-style="western">
+<surname>Korucuoglu</surname>
+<given-names>O</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gladwin</surname>
+<given-names>TE</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Baas</surname>
+<given-names>F</given-names>
+</string-name>, et al. <article-title>Neural response to alcohol taste cues in youth: effects of the OPRM1 gene</article-title>. <source xml:lang="en">Addict Biol</source>. <year>2016</year>;<volume>22</volume>:<fpage>1562</fpage>‐<lpage>1575</lpage>.<pub-id pub-id-type="pmid">27594419</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/adb.12440</pub-id></mixed-citation></ref><ref id="adb12766-bib-0016"><label>16</label><mixed-citation publication-type="journal" id="adb12766-cit-0017">
+<string-name name-style="western">
+<surname>Claus</surname>
+<given-names>ED</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Ewing</surname>
+<given-names>SWF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Filbey</surname>
+<given-names>FM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Sabbineni</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hutchison</surname>
+<given-names>KE</given-names>
+</string-name>. <article-title>Identifying neurobiological phenotypes associated with alcohol use disorder severity</article-title>. <source xml:lang="en">Neuropsychopharmacology</source>. <year>2011</year>;<volume>36</volume>(<issue>10</issue>):<fpage>2086</fpage>‐<lpage>2096</lpage>.<pub-id pub-id-type="pmid">21677649</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/npp.2011.99</pub-id><pub-id pub-id-type="pmcid">PMC3158325</pub-id></mixed-citation></ref><ref id="adb12766-bib-0017"><label>17</label><mixed-citation publication-type="journal" id="adb12766-cit-0018">
+<string-name name-style="western">
+<surname>Filbey</surname>
+<given-names>FM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Claus</surname>
+<given-names>E</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Audette</surname>
+<given-names>AR</given-names>
+</string-name>, et al. <article-title>Exposure to the taste of alcohol elicits activation of the mesocorticolimbic neurocircuitry</article-title>. <source xml:lang="en">Neuropsychopharmacology</source>. <year>2008</year>;<volume>33</volume>(<issue>6</issue>):<fpage>1391</fpage>‐<lpage>1401</lpage>.<pub-id pub-id-type="pmid">17653109</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/sj.npp.1301513</pub-id><pub-id pub-id-type="pmcid">PMC2856647</pub-id></mixed-citation></ref><ref id="adb12766-bib-0018"><label>18</label><mixed-citation publication-type="journal" id="adb12766-cit-0019">
+<string-name name-style="western">
+<surname>Oberlin</surname>
+<given-names>BG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Dzemidzic</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Tran</surname>
+<given-names>SM</given-names>
+</string-name>, et al. <article-title>Beer flavor provokes striatal dopamine release in male drinkers: mediation by family history of alcoholism</article-title>. <source xml:lang="en">Neuropsychopharmacology</source>. <year>2013</year>;<volume>38</volume>(<issue>9</issue>):<fpage>1617</fpage>‐<lpage>1624</lpage>.<pub-id pub-id-type="pmid">23588036</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/npp.2013.91</pub-id><pub-id pub-id-type="pmcid">PMC3717546</pub-id></mixed-citation></ref><ref id="adb12766-bib-0019"><label>19</label><mixed-citation publication-type="journal" id="adb12766-cit-0020">
+<string-name name-style="western">
+<surname>Oberlin</surname>
+<given-names>BG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Dzemidzic</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Harezlak</surname>
+<given-names>J</given-names>
+</string-name>, et al. <article-title>Corticostriatal and dopaminergic response to beer flavor with both fMRI and [(11) c]raclopride positron emission tomography</article-title>. <source xml:lang="en">Alcohol Clin Exp Res</source>. <year>2016</year>;<volume>40</volume>(<issue>9</issue>):<fpage>1865</fpage>‐<lpage>1873</lpage>.<pub-id pub-id-type="pmid">27459715</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/acer.13158</pub-id><pub-id pub-id-type="pmcid">PMC5008996</pub-id></mixed-citation></ref><ref id="adb12766-bib-0020"><label>20</label><mixed-citation publication-type="journal" id="adb12766-cit-0021">
+<string-name name-style="western">
+<surname>Filbey</surname>
+<given-names>FM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Ray</surname>
+<given-names>L</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Smolen</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Claus</surname>
+<given-names>ED</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Audette</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hutchison</surname>
+<given-names>KE</given-names>
+</string-name>. <article-title>Differential neural response to alcohol priming and alcohol taste cues is associated with DRD4 VNTR and OPRM1 genotypes</article-title>. <source xml:lang="en">Alcohol Clin Exp Res</source>. <year>2008</year>;<volume>32</volume>(<issue>7</issue>):<fpage>1113</fpage>‐<lpage>1123</lpage>.<pub-id pub-id-type="pmid">18540916</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1530-0277.2008.00692.x</pub-id><pub-id pub-id-type="pmcid">PMC2856650</pub-id></mixed-citation></ref><ref id="adb12766-bib-0021"><label>21</label><mixed-citation publication-type="journal" id="adb12766-cit-0022">
+<string-name name-style="western">
+<surname>Cservenka</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Courtney</surname>
+<given-names>KE</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Ghahremani</surname>
+<given-names>DG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hutchison</surname>
+<given-names>KE</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Ray</surname>
+<given-names>LA</given-names>
+</string-name>. <article-title>Development, initial testing and challenges of an ecologically valid reward prediction error FMRI task for alcoholism</article-title>. <source xml:lang="en">Alcohol Alcohol</source>. <year>2017</year>;<volume>52</volume>:<fpage>617</fpage>‐<lpage>624</lpage>.<pub-id pub-id-type="pmid">28633363</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1093/alcalc/agx037</pub-id><pub-id pub-id-type="pmcid">PMC5860006</pub-id></mixed-citation></ref><ref id="adb12766-bib-0022"><label>22</label><mixed-citation publication-type="journal" id="adb12766-cit-0023">
+<string-name name-style="western">
+<surname>Oberlin</surname>
+<given-names>BG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Albrecht</surname>
+<given-names>DS</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Herring</surname>
+<given-names>CM</given-names>
+</string-name>, et al. <article-title>Monetary discounting and ventral striatal dopamine receptor availability in nontreatment‐seeking alcoholics and social drinkers</article-title>. <source xml:lang="en">Psychopharmacology (Berl)</source>. <year>2015</year>;<volume>232</volume>(<issue>12</issue>):<fpage>2207</fpage>‐<lpage>2216</lpage>.<pub-id pub-id-type="pmid">25563235</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1007/s00213-014-3850-5</pub-id><pub-id pub-id-type="pmcid">PMC4545519</pub-id></mixed-citation></ref><ref id="adb12766-bib-0023"><label>23</label><mixed-citation publication-type="journal" id="adb12766-cit-0024">
+<string-name name-style="western">
+<surname>Delgado</surname>
+<given-names>MR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Miller</surname>
+<given-names>MM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Inati</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Phelps</surname>
+<given-names>EA</given-names>
+</string-name>. <article-title>An fMRI study of reward‐related probability learning</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2005</year>;<volume>24</volume>(<issue>3</issue>):<fpage>862</fpage>‐<lpage>873</lpage>.<pub-id pub-id-type="pmid">15652321</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neuroimage.2004.10.002</pub-id></mixed-citation></ref><ref id="adb12766-bib-0024"><label>24</label><mixed-citation publication-type="journal" id="adb12766-cit-0025">
+<string-name name-style="western">
+<surname>Zink</surname>
+<given-names>CF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Pagnoni</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Martin‐Skurski</surname>
+<given-names>ME</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Chappelow</surname>
+<given-names>JC</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Berns</surname>
+<given-names>GS</given-names>
+</string-name>. <article-title>Human striatal responses to monetary reward depend on saliency</article-title>. <source xml:lang="en">Neuron</source>. <year>2004</year>;<volume>42</volume>(<issue>3</issue>):<fpage>509</fpage>‐<lpage>517</lpage>.<pub-id pub-id-type="pmid">15134646</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/s0896-6273(04)00183-7</pub-id></mixed-citation></ref><ref id="adb12766-bib-0025"><label>25</label><mixed-citation publication-type="journal" id="adb12766-cit-0026">
+<string-name name-style="western">
+<surname>Elliott</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Newman</surname>
+<given-names>JL</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Longe</surname>
+<given-names>OA</given-names>
+</string-name>, <string-name name-style="western">
+<surname>William Deakin</surname>
+<given-names>JF</given-names>
+</string-name>. <article-title>Instrumental responding for rewards is associated with enhanced neuronal response in subcortical reward systems</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2004</year>;<volume>21</volume>(<issue>3</issue>):<fpage>984</fpage>‐<lpage>990</lpage>.<pub-id pub-id-type="pmid">15006665</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neuroimage.2003.10.010</pub-id></mixed-citation></ref><ref id="adb12766-bib-0026"><label>26</label><mixed-citation publication-type="journal" id="adb12766-cit-0027">
+<string-name name-style="western">
+<surname>Jacobs</surname>
+<given-names>EH</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Smit</surname>
+<given-names>AB</given-names>
+</string-name>, <string-name name-style="western">
+<surname>de Vries</surname>
+<given-names>TJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schoffelmeer</surname>
+<given-names>ANM</given-names>
+</string-name>. <article-title>Neuroadaptive effects of active versus passive drug administration in addiction research</article-title>. <source xml:lang="en">Trends Pharmacol Sci</source>. <year>2003</year>;<volume>24</volume>(<issue>11</issue>):<fpage>566</fpage>‐<lpage>573</lpage>.<pub-id pub-id-type="pmid">14607079</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.tips.2003.09.006</pub-id></mixed-citation></ref><ref id="adb12766-bib-0027"><label>27</label><mixed-citation publication-type="journal" id="adb12766-cit-0028">
+<string-name name-style="western">
+<surname>Knutson</surname>
+<given-names>B</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Greer</surname>
+<given-names>SM</given-names>
+</string-name>. <article-title>Anticipatory affect: neural correlates and consequences for choice</article-title>. <source xml:lang="en">Philos Trans R Soc Lond B Biol Sci</source>. <year>2008</year>;<volume>363</volume>(<issue>1511</issue>):<fpage>3771</fpage>‐<lpage>3786</lpage>.<pub-id pub-id-type="pmid">18829428</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1098/rstb.2008.0155</pub-id><pub-id pub-id-type="pmcid">PMC2607363</pub-id></mixed-citation></ref><ref id="adb12766-bib-0028"><label>28</label><mixed-citation publication-type="book" id="adb12766-cit-0029">
+<string-name name-style="western">
+<surname>Babor</surname>
+<given-names>TF</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Higgins‐Biddle</surname>
+<given-names>JC</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Saunders</surname>
+<given-names>JB</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Monteiro</surname>
+<given-names>MG</given-names>
+</string-name>. <source xml:lang="en">AUDIT: the alcohol use disorders identification test: guidelines for use in primary health care</source>. <publisher-loc>Geneva</publisher-loc>: <publisher-name>World Health Organization</publisher-name>; <year>2001</year>.</mixed-citation></ref><ref id="adb12766-bib-0029"><label>29</label><mixed-citation publication-type="journal" id="adb12766-cit-0030">
+<string-name name-style="western">
+<surname>Ihssen</surname>
+<given-names>N</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Cox</surname>
+<given-names>WM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Wiggett</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Fadardi</surname>
+<given-names>JS</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Linden</surname>
+<given-names>DEJ</given-names>
+</string-name>. <article-title>Differentiating heavy from light drinkers by neural responses to visual alcohol cues and other motivational stimuli</article-title>. <source xml:lang="en">Cereb Cortex</source>. <year>2011</year>;<volume>21</volume>(<issue>6</issue>):<fpage>1408</fpage>‐<lpage>1415</lpage>.<pub-id pub-id-type="pmid">21045002</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1093/cercor/bhq220</pub-id></mixed-citation></ref><ref id="adb12766-bib-0030"><label>30</label><mixed-citation publication-type="miscellaneous" id="adb12766-cit-0031">
+<string-name name-style="western">
+<surname>Monshouwer</surname>
+<given-names>K</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Tuithof</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>van Dorsselaer</surname>
+<given-names>S</given-names>
+</string-name>. <article-title>Factsheet riskant alcoholgebruik in Nederland [Factsheet risky alcohol use in the Netherlands]</article-title>. <ext-link xmlns:xlink="http://www.w3.org/1999/xlink" ext-link-type="uri" xlink:href="https://www.trimbos.nl/docs/bd1d5260-16d8-4d3f-a151-09f983d61d4c.pdf">https://www.trimbos.nl/docs/bd1d5260-16d8-4d3f-a151-09f983d61d4c.pdf</ext-link>, <year>2018</year>.</mixed-citation></ref><ref id="adb12766-bib-0031"><label>31</label><mixed-citation publication-type="journal" id="adb12766-cit-0032">
+<string-name name-style="western">
+<surname>Sheehan</surname>
+<given-names>DV</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Lecrubier</surname>
+<given-names>Y</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Sheehan</surname>
+<given-names>KH</given-names>
+</string-name>, et al. <article-title>The validity of the Mini International Neuropsychiatric Interview (MINI) according to the SCID‐P and its reliability</article-title>. <source xml:lang="en">Eur Psychiatry</source>. <year>1997</year>;<volume>12</volume>(<issue>5</issue>):<fpage>224</fpage>‐<lpage>231</lpage>.</mixed-citation></ref><ref id="adb12766-bib-0032"><label>32</label><mixed-citation publication-type="journal" id="adb12766-cit-0033">
+<string-name name-style="western">
+<surname>Knutson</surname>
+<given-names>B</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Westdorp</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kaiser</surname>
+<given-names>E</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hommer</surname>
+<given-names>D</given-names>
+</string-name>. <article-title>FMRI visualization of brain activity during a monetary incentive delay task</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2000</year>;<volume>12</volume>(<issue>1</issue>):<fpage>20</fpage>‐<lpage>27</lpage>.<pub-id pub-id-type="pmid">10875899</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1006/nimg.2000.0593</pub-id></mixed-citation></ref><ref id="adb12766-bib-0033"><label>33</label><mixed-citation publication-type="journal" id="adb12766-cit-0034">
+<string-name name-style="western">
+<surname>Viviani</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gron</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Spitzer</surname>
+<given-names>M</given-names>
+</string-name>. <article-title>Functional principal component analysis of fMRI data</article-title>. <source xml:lang="en">Hum Brain Mapp</source>. <year>2005</year>;<volume>24</volume>(<issue>2</issue>):<fpage>109</fpage>‐<lpage>129</lpage>.<pub-id pub-id-type="pmid">15468155</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1002/hbm.20074</pub-id><pub-id pub-id-type="pmcid">PMC6871761</pub-id></mixed-citation></ref><ref id="adb12766-bib-0034"><label>34</label><mixed-citation publication-type="journal" id="adb12766-cit-0035">
+<string-name name-style="western">
+<surname>Pruim</surname>
+<given-names>RH</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Mennes</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>van Rooij</surname>
+<given-names>D</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Llera</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Buitelaar</surname>
+<given-names>JK</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Beckmann</surname>
+<given-names>CF</given-names>
+</string-name>. <article-title>ICA‐AROMA: A robust ICA‐based strategy for removing motion artifacts from fMRI data</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2015</year>;<volume>112</volume>:<fpage>267</fpage>‐<lpage>277</lpage>.<pub-id pub-id-type="pmid">25770991</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neuroimage.2015.02.064</pub-id></mixed-citation></ref><ref id="adb12766-bib-0035"><label>35</label><mixed-citation publication-type="journal" id="adb12766-cit-0036">
+<string-name name-style="western">
+<surname>Nieuwhof</surname>
+<given-names>F</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Bloem</surname>
+<given-names>BR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Reelick</surname>
+<given-names>MF</given-names>
+</string-name>, et al. <article-title>Impaired dual tasking in Parkinson's disease is associated with reduced focusing of cortico‐striatal activity</article-title>. <source xml:lang="en">Brain</source>. <year>2017</year>;<volume>140</volume>(<issue>5</issue>):<fpage>1384</fpage>‐<lpage>1398</lpage>.<pub-id pub-id-type="pmid">28335024</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1093/brain/awx042</pub-id></mixed-citation></ref><ref id="adb12766-bib-0036"><label>36</label><mixed-citation publication-type="journal" id="adb12766-cit-0037">
+<string-name name-style="western">
+<surname>Murray</surname>
+<given-names>GK</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Corlett</surname>
+<given-names>PR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Clark</surname>
+<given-names>L</given-names>
+</string-name>, et al. <article-title>Substantia nigra/ventral tegmental reward prediction error disruption in psychosis</article-title>. <source xml:lang="en">Mol Psychiatry</source>. <year>2008</year>;<volume>13</volume>(<issue>3</issue>):<fpage>267</fpage>‐<lpage>276</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/sj.mp.4002058</pub-id><pub-id pub-id-type="pmcid">PMC2564111</pub-id><pub-id pub-id-type="pmid">17684497</pub-id></mixed-citation></ref><ref id="adb12766-bib-0037"><label>37</label><mixed-citation publication-type="journal" id="adb12766-cit-0038">
+<string-name name-style="western">
+<surname>Glascher</surname>
+<given-names>J</given-names>
+</string-name>. <article-title>Visualization of group inference data in functional neuroimaging</article-title>. <source xml:lang="en">Neuroinformatics</source>. <year>2009</year>;<volume>7</volume>(<issue>1</issue>):<fpage>73</fpage>‐<lpage>82</lpage>.<pub-id pub-id-type="pmid">19140033</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1007/s12021-008-9042-x</pub-id></mixed-citation></ref><ref id="adb12766-bib-0038"><label>38</label><mixed-citation publication-type="journal" id="adb12766-cit-0039">
+<string-name name-style="western">
+<surname>Wagenmakers</surname>
+<given-names>EJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Love</surname>
+<given-names>J</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Marsman</surname>
+<given-names>M</given-names>
+</string-name>, et al. <article-title>Bayesian inference for psychology. Part II: Example applications with JASP</article-title>. <source xml:lang="en">Psychon Bull Rev</source>. <year>2017</year>;<volume>25</volume>:<fpage>58</fpage>‐<lpage>76</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.3758/s13423-017-1323-7</pub-id><pub-id pub-id-type="pmcid">PMC5862926</pub-id><pub-id pub-id-type="pmid">28685272</pub-id></mixed-citation></ref><ref id="adb12766-bib-0039"><label>39</label><mixed-citation publication-type="journal" id="adb12766-cit-0040">
+<string-name name-style="western">
+<surname>Bartra</surname>
+<given-names>O</given-names>
+</string-name>, <string-name name-style="western">
+<surname>McGuire</surname>
+<given-names>JT</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kable</surname>
+<given-names>JW</given-names>
+</string-name>. <article-title>The valuation system: a coordinate‐based meta‐analysis of BOLD fMRI experiments examining neural correlates of subjective value</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2013</year>;<volume>76</volume>:<fpage>412</fpage>‐<lpage>427</lpage>.<pub-id pub-id-type="pmid">23507394</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neuroimage.2013.02.063</pub-id><pub-id pub-id-type="pmcid">PMC3756836</pub-id></mixed-citation></ref><ref id="adb12766-bib-0040"><label>40</label><mixed-citation publication-type="journal" id="adb12766-cit-0041">
+<string-name name-style="western">
+<surname>Veldhuizen</surname>
+<given-names>MG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Albrecht</surname>
+<given-names>J</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Zelano</surname>
+<given-names>C</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Boesveldt</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Breslin</surname>
+<given-names>P</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Lundström</surname>
+<given-names>JN</given-names>
+</string-name>. <article-title>Identification of human gustatory cortex by activation likelihood estimation</article-title>. <source xml:lang="en">Hum Brain Mapp</source>. <year>2011</year>;<volume>32</volume>(<issue>12</issue>):<fpage>2256</fpage>‐<lpage>2266</lpage>.<pub-id pub-id-type="pmid">21305668</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1002/hbm.21188</pub-id><pub-id pub-id-type="pmcid">PMC3123671</pub-id></mixed-citation></ref><ref id="adb12766-bib-0041"><label>41</label><mixed-citation publication-type="journal" id="adb12766-cit-0042">
+<string-name name-style="western">
+<surname>Diekhof</surname>
+<given-names>EK</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Falkai</surname>
+<given-names>P</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gruber</surname>
+<given-names>O</given-names>
+</string-name>. <article-title>Functional neuroimaging of reward processing and decision‐making: a review of aberrant motivational and affective processing in addiction and mood disorders</article-title>. <source xml:lang="en">Brain Res Rev</source>. <year>2008</year>;<volume>59</volume>(<issue>1</issue>):<fpage>164</fpage>‐<lpage>184</lpage>.<pub-id pub-id-type="pmid">18675846</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.brainresrev.2008.07.004</pub-id></mixed-citation></ref><ref id="adb12766-bib-0042"><label>42</label><mixed-citation publication-type="journal" id="adb12766-cit-0043">
+<string-name name-style="western">
+<surname>Haber</surname>
+<given-names>SN</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Knutson</surname>
+<given-names>B</given-names>
+</string-name>. <article-title>The reward circuit: linking primate anatomy and human imaging</article-title>. <source xml:lang="en">Neuropsychopharmacology</source>. <year>2010</year>;<volume>35</volume>(<issue>1</issue>):<fpage>4</fpage>‐<lpage>26</lpage>.<pub-id pub-id-type="pmid">19812543</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/npp.2009.129</pub-id><pub-id pub-id-type="pmcid">PMC3055449</pub-id></mixed-citation></ref><ref id="adb12766-bib-0043"><label>43</label><mixed-citation publication-type="journal" id="adb12766-cit-0044">
+<string-name name-style="western">
+<surname>Etkin</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Buchel</surname>
+<given-names>C</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Gross</surname>
+<given-names>JJ</given-names>
+</string-name>. <article-title>The neural bases of emotion regulation</article-title>. <source xml:lang="en">Nat Rev Neurosci</source>. <year>2015</year>;<volume>16</volume>:<fpage>603</fpage>‐<lpage>700</lpage>.<pub-id pub-id-type="doi" assigning-authority="pmc">10.1038/nrn4044</pub-id><pub-id pub-id-type="pmid">26481098</pub-id></mixed-citation></ref><ref id="adb12766-bib-0044"><label>44</label><mixed-citation publication-type="journal" id="adb12766-cit-0045">
+<string-name name-style="western">
+<surname>Ochsner</surname>
+<given-names>KN</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Silvers</surname>
+<given-names>JA</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Buhle</surname>
+<given-names>JT</given-names>
+</string-name>. <article-title>Functional imaging studies of emotion regulation: a synthetic review and evolving model of the cognitive control of emotion</article-title>. <source xml:lang="en">Ann N Y Acad Sci</source>. <year>2012</year>;<volume>1251</volume>(<issue>1</issue>):<fpage>E1</fpage>‐<lpage>E24</lpage>.<pub-id pub-id-type="pmid">23025352</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/j.1749-6632.2012.06751.x</pub-id><pub-id pub-id-type="pmcid">PMC4133790</pub-id></mixed-citation></ref><ref id="adb12766-bib-0045"><label>45</label><mixed-citation publication-type="journal" id="adb12766-cit-0046">
+<string-name name-style="western">
+<surname>Schultz</surname>
+<given-names>W</given-names>
+</string-name>. <article-title>Dopamine reward prediction error coding</article-title>. <source xml:lang="en">Dialogues Clin Neurosci</source>. <year>2016</year>;<volume>18</volume>(<issue>1</issue>):<fpage>23</fpage>‐<lpage>32</lpage>.<pub-id pub-id-type="pmid">27069377</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.31887/DCNS.2016.18.1/wschultz</pub-id><pub-id pub-id-type="pmcid">PMC4826767</pub-id></mixed-citation></ref><ref id="adb12766-bib-0046"><label>46</label><mixed-citation publication-type="journal" id="adb12766-cit-0047">
+<string-name name-style="western">
+<surname>Wegman</surname>
+<given-names>J</given-names>
+</string-name>, <string-name name-style="western">
+<surname>van Loon</surname>
+<given-names>I</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Smeets</surname>
+<given-names>PAM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Cools</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Aarts</surname>
+<given-names>E</given-names>
+</string-name>. <article-title>Top‐down expectation effects of food labels on motivation</article-title>. <source xml:lang="en">Neuroimage</source>. <year>2018</year>;<volume>173</volume>:<fpage>13</fpage>‐<lpage>24</lpage>.<pub-id pub-id-type="pmid">29438844</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.neuroimage.2018.02.011</pub-id></mixed-citation></ref><ref id="adb12766-bib-0047"><label>47</label><mixed-citation publication-type="journal" id="adb12766-cit-0048">
+<string-name name-style="western">
+<surname>de Araujo</surname>
+<given-names>IET</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kringelbach</surname>
+<given-names>ML</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Rolls</surname>
+<given-names>ET</given-names>
+</string-name>, <string-name name-style="western">
+<surname>McGlone</surname>
+<given-names>F</given-names>
+</string-name>. <article-title>Human cortical responses to water in the mouth, and the effects of thirst</article-title>. <source xml:lang="en">J Neurophysiol</source>. <year>2003</year>;<volume>90</volume>(<issue>3</issue>):<fpage>1865</fpage>‐<lpage>1876</lpage>.<pub-id pub-id-type="pmid">12773496</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1152/jn.00297.2003</pub-id></mixed-citation></ref><ref id="adb12766-bib-0048"><label>48</label><mixed-citation publication-type="journal" id="adb12766-cit-0049">
+<string-name name-style="western">
+<surname>Veldhuizen</surname>
+<given-names>MG</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Bender</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Constable</surname>
+<given-names>RT</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Small</surname>
+<given-names>DM</given-names>
+</string-name>. <article-title>Trying to detect taste in a tasteless solution: modulation of early gustatory cortex by attention to taste</article-title>. <source xml:lang="en">Chem Senses</source>. <year>2007</year>;<volume>32</volume>(<issue>6</issue>):<fpage>569</fpage>‐<lpage>581</lpage>.<pub-id pub-id-type="pmid">17495173</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1093/chemse/bjm025</pub-id></mixed-citation></ref><ref id="adb12766-bib-0049"><label>49</label><mixed-citation publication-type="journal" id="adb12766-cit-0050">
+<string-name name-style="western">
+<surname>Robinson</surname>
+<given-names>TE</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Berridge</surname>
+<given-names>KC</given-names>
+</string-name>. <article-title>Incentive‐sensitization and addiction</article-title>. <source xml:lang="en">Addiction</source>. <year>2001</year>;<volume>96</volume>(<issue>1</issue>):<fpage>103</fpage>‐<lpage>114</lpage>.<pub-id pub-id-type="pmid">11177523</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1046/j.1360-0443.2001.9611038.x</pub-id></mixed-citation></ref><ref id="adb12766-bib-0050"><label>50</label><mixed-citation publication-type="journal" id="adb12766-cit-0051">
+<string-name name-style="western">
+<surname>Bjork</surname>
+<given-names>JM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Smith</surname>
+<given-names>AR</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Chen</surname>
+<given-names>G</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hommer</surname>
+<given-names>DW</given-names>
+</string-name>. <article-title>Mesolimbic recruitment by nondrug rewards in detoxified alcoholics: effort anticipation, reward anticipation, and reward delivery</article-title>. <source xml:lang="en">Hum Brain Mapp</source>. <year>2012</year>;<volume>33</volume>(<issue>9</issue>):<fpage>2174</fpage>‐<lpage>2188</lpage>.<pub-id pub-id-type="pmid">22281932</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1002/hbm.21351</pub-id><pub-id pub-id-type="pmcid">PMC3342463</pub-id></mixed-citation></ref><ref id="adb12766-bib-0051"><label>51</label><mixed-citation publication-type="journal" id="adb12766-cit-0052">
+<string-name name-style="western">
+<surname>Luijten</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Machielsen</surname>
+<given-names>MW</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Veltman</surname>
+<given-names>DJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Hester</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>de Haan</surname>
+<given-names>L</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Franken</surname>
+<given-names>IH</given-names>
+</string-name>. <article-title>Systematic review of ERP and fMRI studies investigating inhibitory control and error processing in people with substance dependence and behavioural addictions</article-title>. <source xml:lang="en">J Psychiatry Neurosci</source>. <year>2014</year>;<volume>39</volume>(<issue>3</issue>):<fpage>149</fpage>‐<lpage>169</lpage>.<pub-id pub-id-type="pmid">24359877</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1503/jpn.130052</pub-id><pub-id pub-id-type="pmcid">PMC3997601</pub-id></mixed-citation></ref><ref id="adb12766-bib-0052"><label>52</label><mixed-citation publication-type="journal" id="adb12766-cit-0053">
+<string-name name-style="western">
+<surname>Tang</surname>
+<given-names>YY</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Posner</surname>
+<given-names>MI</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Rothbart</surname>
+<given-names>MK</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Volkow</surname>
+<given-names>ND</given-names>
+</string-name>. <article-title>Circuitry of self‐control and its role in reducing addiction</article-title>. <source xml:lang="en">Trends Cogn Sci</source>. <year>2015</year>;<volume>19</volume>(<issue>8</issue>):<fpage>439</fpage>‐<lpage>444</lpage>.<pub-id pub-id-type="pmid">26235449</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.tics.2015.06.007</pub-id></mixed-citation></ref><ref id="adb12766-bib-0053"><label>53</label><mixed-citation publication-type="journal" id="adb12766-cit-0054">
+<string-name name-style="western">
+<surname>Reiter</surname>
+<given-names>AM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Deserno</surname>
+<given-names>L</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Wilbertz</surname>
+<given-names>T</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Heinze</surname>
+<given-names>HJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schlagenhauf</surname>
+<given-names>F</given-names>
+</string-name>. <article-title>Risk factors for addiction and their association with model‐based behavioral control</article-title>. <source xml:lang="en">Front Behav Neurosci</source>. <year>2016</year>;<volume>10</volume>:<fpage>26</fpage>.<pub-id pub-id-type="pmid">27013998</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.3389/fnbeh.2016.00026</pub-id><pub-id pub-id-type="pmcid">PMC4794491</pub-id></mixed-citation></ref><ref id="adb12766-bib-0054"><label>54</label><mixed-citation publication-type="journal" id="adb12766-cit-0055">
+<string-name name-style="western">
+<surname>Sebold</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Nebe</surname>
+<given-names>S</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Garbusow</surname>
+<given-names>M</given-names>
+</string-name>, et al. <article-title>When habits are dangerous: alcohol expectancies and habitual decision making predict relapse in alcohol dependence</article-title>. <source xml:lang="en">Biol Psychiatry</source>. <year>2017</year>;<volume>82</volume>(<issue>11</issue>):<fpage>847</fpage>‐<lpage>856</lpage>.<pub-id pub-id-type="pmid">28673442</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1016/j.biopsych.2017.04.019</pub-id></mixed-citation></ref><ref id="adb12766-bib-0055"><label>55</label><mixed-citation publication-type="journal" id="adb12766-cit-0056">
+<string-name name-style="western">
+<surname>Reiter</surname>
+<given-names>AM</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Deserno</surname>
+<given-names>L</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kallert</surname>
+<given-names>T</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Heinze</surname>
+<given-names>HJ</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Heinz</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Schlagenhauf</surname>
+<given-names>F</given-names>
+</string-name>. <article-title>Behavioral and neural signatures of reduced updating of alternative options in alcohol‐dependent patients during flexible decision‐making</article-title>. <source xml:lang="en">J Neurosci</source>. <year>2016</year>;<volume>36</volume>(<issue>43</issue>):<fpage>10935</fpage>‐<lpage>10948</lpage>.<pub-id pub-id-type="pmid">27798176</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1523/JNEUROSCI.4322-15.2016</pub-id><pub-id pub-id-type="pmcid">PMC6705653</pub-id></mixed-citation></ref><ref id="adb12766-bib-0056"><label>56</label><mixed-citation publication-type="journal" id="adb12766-cit-0057">
+<string-name name-style="western">
+<surname>Dallas</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Field</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Jones</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Christiansen</surname>
+<given-names>P</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Rose</surname>
+<given-names>A</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Robinson</surname>
+<given-names>E</given-names>
+</string-name>. <article-title>Influenced but unaware: social influence on alcohol drinking among social acquaintances</article-title>. <source xml:lang="en">Alcohol Clin Exp Res</source>. <year>2014</year>;<volume>38</volume>(<issue>5</issue>):<fpage>1448</fpage>‐<lpage>1453</lpage>.<pub-id pub-id-type="pmid">24588229</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1111/acer.12375</pub-id></mixed-citation></ref><ref id="adb12766-bib-0057"><label>57</label><mixed-citation publication-type="journal" id="adb12766-cit-0058">
+<string-name name-style="western">
+<surname>Smit</surname>
+<given-names>K</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Groefsema</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Luijten</surname>
+<given-names>M</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Engels</surname>
+<given-names>R</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Kuntsche</surname>
+<given-names>E</given-names>
+</string-name>. <article-title>Drinking motives moderate the effect of the social environment on alcohol use: an event‐level study among young adults</article-title>. <source xml:lang="en">J Stud Alcohol Drugs</source>. <year>2015</year>;<volume>76</volume>(<issue>6</issue>):<fpage>971</fpage>‐<lpage>980</lpage>.<pub-id pub-id-type="pmid">26562607</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.15288/jsad.2015.76.971</pub-id></mixed-citation></ref><ref id="adb12766-bib-0058"><label>58</label><mixed-citation publication-type="journal" id="adb12766-cit-0059">
+<string-name name-style="western">
+<surname>Larsen</surname>
+<given-names>H</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Engels</surname>
+<given-names>RCME</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Granic</surname>
+<given-names>I</given-names>
+</string-name>, <string-name name-style="western">
+<surname>Overbeek</surname>
+<given-names>G</given-names>
+</string-name>. <article-title>An experimental study on imitation of alcohol consumption in same‐sex dyads</article-title>. <source xml:lang="en">Alcohol Alcohol</source>. <year>2009</year>;<volume>44</volume>(<issue>3</issue>):<fpage>250</fpage>‐<lpage>255</lpage>.<pub-id pub-id-type="pmid">19240054</pub-id><pub-id pub-id-type="doi" assigning-authority="pmc">10.1093/alcalc/agp002</pub-id></mixed-citation></ref></ref-list></back></article></pmc-articleset>

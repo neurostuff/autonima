@@ -1,0 +1,49 @@
+pmid,pmcid,source_file,x,y,z,region,group,hemisphere,size,statistic,p_value
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-38.0,20.0,-18.0,Posterior Orbital Gyrus,Beer>Water,L,207,5.27,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-30.0,23.0,-15.0,Posterior Orbital Gyrus,Beer>Water,L,,4.67,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-46.0,26.0,-8.0,Inferior Frontal Gyrus ,Beer>Water,L,,4.08,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,7.0,40.0,55.0,Superior Frontal Gyrus,Beer>Water,R,155,4.51,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,4.0,43.0,42.0,Superior Frontal Gyrus,Beer>Water,R,,4.13,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-3.0,38.0,50.0,Superior Frontal Gyrus,Beer>Water,L,,4.03,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-3.0,43.0,15.0,Anterior Cingulate Gyrus,Beer>Water,L,460,4.47,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-16.0,46.0,10.0,Anterior Cingulate Gyrus,Beer>Water,L,,4.22,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-8.0,48.0,25.0,Anterior Cingulate Gyrus,Beer>Water,L,,4.13,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,34.0,-7.0,10.0,Insula,Water>Beer,R,3986,8.55,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,37.0,-10.0,18.0,Postcentral Gyrus,Water>Beer,R,,8.30,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,50.0,-10.0,25.0,Postcentral Gyrus,Water>Beer,R,,7.36,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-36.0,-10.0,18.0,Insula,Water>Beer,L,4976,8.06,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-46.0,-14.0,20.0,Postcentral Gyrus,Water>Beer,L,,7.83,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-38.0,-4.0,2.0,Insula,Water>Beer,L,,7.68,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-20.0,-92.0,-12.0,Occipital Lobe,Water>Beer,L,550,5.36,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-26.0,-87.0,-20.0,Occipital Lobe,Water>Beer,L,,5.14,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-28.0,-82.0,-12.0,Occipital Lobe,Water>Beer,L,,5.06,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-20.0,-40.0,-28.0,Cerebellum,Water>Beer,L,72,4.78,0.046
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-28.0,-42.0,-30.0,Cerebellum,Water>Beer,L,,4.15,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-23.0,-50.0,-30.0,Cerebellum,Water>Beer,L,,4.00,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,37.0,-87.0,2.0,Occipital Lobe,Beer,R,5848,20.22,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,32.0,-80.0,-12.0,Occipital Lobe,Beer,R,,19.26,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,30.0,-90.0,8.0,Occipital Lobe,Beer,R,,18.90,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,24.0,-82.0,-10.0,Occipital Lobe,Beer,R,,17.99,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,20.0,-84.0,-8.0,Occipital Lobe,Beer,R,,17.85,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,22.0,-97.0,2.0,Occipital Lobe,Beer,R,,15.57,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,34.0,-62.0,-12.0,Occipital Lobe,Beer,R,,13.61,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,64.0,-34.0,25.0,Parietal Lobe,Beer,R,,12.06,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,30.0,-47.0,45.0,Superior Parietal Gyrus,Beer,R,,9.25,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,42.0,-54.0,-30.0,Cerebellum,Beer,R,,8.63,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,60.0,-20.0,25.0,Parietal Lobe,Beer,R,,7.54,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,17.0,-72.0,35.0,Parietal Lobe,Beer,R,,7.44,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,20.0,-70.0,32.0,Parietal Lobe,Beer,R,,7.04,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,27.0,-62.0,8.0,Superior Parietal Gyrus,Beer,R,,6.28,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,22.0,-42.0,20.0,Occipital Lobe,Beer,R,,6.15,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,20.0,-60.0,35.0,Superior Parietal Gyrus,Beer,R,,5.74,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,4.0,13.0,52.0,Superior Frontal Gyrus,Beer,R,16798,17.97,0.000
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-26.0,-82.0,-12.0,Occipital Lobe,Beer,L,,17.57,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,2.0,16.0,42.0,Superior Frontal Gyrus,Beer,R,,17.36,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-30.0,-74.0,-12.0,Occipital Lobe,Beer,L,,17.04,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,34.0,28.0,2.0,Inferior Frontal Gyrus,Beer,R,,17.03,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,32.0,26.0,5.0,Inferior Frontal Gyrus,Beer,R,,16.93,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,40.0,18.0,-2.0,Insula,Beer,R,,16.79,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,32.0,23.0,-10.0,Posterior Orbital Gyrus,Beer,R,,16.73,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-28.0,-92.0,5.0,,Beer,,,16.42,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,2.0,0.0,60.0,Superior Frontal Gyrus,Beer,R,,16.38,
+31066137,PMC7187239,ADB-25-e12766-s001.docx,-33.0,20.0,-10.0,Insula,Beer,L,,16.22,

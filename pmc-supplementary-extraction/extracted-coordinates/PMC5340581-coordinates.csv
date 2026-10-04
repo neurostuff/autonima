@@ -1,0 +1,7 @@
+pmid,pmcid,source_file,x,y,z,region,group,size,statistic,hemisphere
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,-18.0,-20.0,-4.0,putamen,Fasting state,150,3.04,L
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,-38.0,26.0,2.0,insula,Fed state,225,3.31,L
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,-42.0,-14.0,22.0,insula,Fed state,206,3.19,L
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,26.0,-22.0,-6.0,putamen,Fasting state,188,3.29,R
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,-22.0,4.0,-26.0,amygdala,Fed state,19,3.16,L
+28017966,PMC5340581,NIHMS830046-supplement-1.docx,-14.0,14.0,12.0,caudate,Fed state,94,4.05,L

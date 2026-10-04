@@ -1,0 +1,40 @@
+pmid,pmcid,source_file,x,y,z,region,group,size,p_value,statistic
+29525416,PMC6969092,mmc1.docx,45.0,17.0,-2.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,3.0,35.0,22.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,6.0,41.0,4.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,12.0,2.0,-5.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,-30.0,17.0,-14.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,-39.0,17.0,-5.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,3.0,-16.0,34.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,-36.0,-94.0,1.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,-27.0,-97.0,-8.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,24.0,-100.0,1.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,36.0,-88.0,-8.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,42.0,5.0,31.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,21.0,56.0,-8.0,,*T1 Decision Phase: Parametric regressor of CV for chosen options*,,,
+29525416,PMC6969092,mmc1.docx,-42.0,-37.0,49.0,,Cluster,759,< .001,49
+29525416,PMC6969092,mmc1.docx,-24.0,-64.0,49.0,,Cluster,,,49
+29525416,PMC6969092,mmc1.docx,-30.0,-55.0,52.0,,Cluster,,,52
+29525416,PMC6969092,mmc1.docx,-3.0,14.0,49.0,,Cluster,265,&lt; .001,49
+29525416,PMC6969092,mmc1.docx,-39.0,-85.0,-2.0,,Cluster,506,< .001,-2
+29525416,PMC6969092,mmc1.docx,-30.0,-91.0,-2.0,,Cluster,,,-2
+29525416,PMC6969092,mmc1.docx,-39.0,-73.0,-8.0,,Cluster,,,-8
+29525416,PMC6969092,mmc1.docx,42.0,-64.0,-8.0,,Cluster,654,< .001,-8
+29525416,PMC6969092,mmc1.docx,42.0,-82.0,-2.0,,Cluster,,,-2
+29525416,PMC6969092,mmc1.docx,33.0,-91.0,1.0,,Cluster,,,1
+29525416,PMC6969092,mmc1.docx,39.0,-67.0,-23.0,,Cluster,,,-23
+29525416,PMC6969092,mmc1.docx,33.0,-49.0,-26.0,,Cluster,,,-26
+29525416,PMC6969092,mmc1.docx,-24.0,-4.0,55.0,,Cluster,245,&lt; .001,55
+29525416,PMC6969092,mmc1.docx,30.0,-58.0,52.0,,Cluster,431,&lt; .001,52
+29525416,PMC6969092,mmc1.docx,45.0,-31.0,49.0,,Cluster,,,49
+29525416,PMC6969092,mmc1.docx,30.0,-64.0,40.0,,Cluster,,,40
+29525416,PMC6969092,mmc1.docx,27.0,-4.0,55.0,,Cluster,140,&lt; .001,55
+29525416,PMC6969092,mmc1.docx,-45.0,2.0,34.0,,Cluster,94,&lt; .001,34
+29525416,PMC6969092,mmc1.docx,-9.0,-19.0,10.0,,Cluster,46,< .001,10
+29525416,PMC6969092,mmc1.docx,33.0,20.0,7.0,,Cluster,24,&lt; .001,7
+29525416,PMC6969092,mmc1.docx,6.0,-73.0,-20.0,,Cluster,7,< .001,-20
+29525416,PMC6969092,mmc1.docx,48.0,8.0,31.0,,Cluster,13,&lt; .001,31
+29525416,PMC6969092,mmc1.docx,-30.0,17.0,10.0,,Cluster,12,< .001,10
+29525416,PMC6969092,mmc1.docx,9.0,-19.0,10.0,,Cluster,5,< .001,10
+29525416,PMC6969092,mmc1.docx,-27.0,-55.0,-23.0,,Cluster,9,< .001,-23
+29525416,PMC6969092,mmc1.docx,-27.0,-64.0,-23.0,,Cluster,,,-23

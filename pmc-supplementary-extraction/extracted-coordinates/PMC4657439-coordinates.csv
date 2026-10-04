@@ -1,0 +1,95 @@
+pmid,pmcid,source_file,x,y,z,region,group,ba,statistic
+26070843,PMC4657439,mmc1.docx,31.0,23.0,4.0,R Insula,Loss>Neutral,"13,45,47",13.45
+26070843,PMC4657439,mmc1.docx,-27.0,23.0,4.0,L Insula,Loss>Neutral,"13,45",13.32
+26070843,PMC4657439,mmc1.docx,10.0,9.0,3.0,R Caudate,Loss>Neutral,n/a,12.78
+26070843,PMC4657439,mmc1.docx,-8.0,7.0,3.0,L Caudate,Loss>Neutral,n/a,12.47
+26070843,PMC4657439,mmc1.docx,9.0,-6.0,9.0,R Thalamus,Loss>Neutral,n/a,10.88
+26070843,PMC4657439,mmc1.docx,8.0,-21.0,-5.0,R Midbrain,Loss>Neutral,n/a,10.17
+26070843,PMC4657439,mmc1.docx,8.0,31.0,40.0,R MFG,Loss>Neutral,8,9.75
+26070843,PMC4657439,mmc1.docx,-6.0,-10.0,10.0,L Thalamus,Loss>Neutral,n/a,9.73
+26070843,PMC4657439,mmc1.docx,6.0,22.0,48.0,R SFG,Loss>Neutral,8,9.22
+26070843,PMC4657439,mmc1.docx,-7.0,-22.0,-2.0,L Thalamus,Loss>Neutral,n/a,9.13
+26070843,PMC4657439,mmc1.docx,-50.0,-40.0,47.0,L IPL,Loss>Neutral,40,8.76
+26070843,PMC4657439,mmc1.docx,-3.0,12.0,24.0,L Anterior Cingulate,Loss>Neutral,"33,24",8.47
+26070843,PMC4657439,mmc1.docx,-41.0,3.0,27.0,L IFG,Loss>Neutral,"9,6",8.20
+26070843,PMC4657439,mmc1.docx,10.0,34.0,23.0,R Anterior Cingulate,Loss>Neutral,"32,9",8.04
+26070843,PMC4657439,mmc1.docx,43.0,5.0,29.0,R IFG,Loss>Neutral,"9,6",7.95
+26070843,PMC4657439,mmc1.docx,-31.0,-56.0,44.0,L IPL,Loss>Neutral,7,7.94
+26070843,PMC4657439,mmc1.docx,27.0,-82.0,4.0,R MOG,Loss>Neutral,18,7.86
+26070843,PMC4657439,mmc1.docx,-35.0,36.0,18.0,L MFG,Loss>Neutral,10,7.53
+26070843,PMC4657439,mmc1.docx,-14.0,-86.0,-9.0,L Lingual,Loss>Neutral,18,7.49
+26070843,PMC4657439,mmc1.docx,-9.0,-69.0,-24.0,L Cerebellum (posterior lobe),Loss>Neutral,n/a,7.31
+26070843,PMC4657439,mmc1.docx,-49.0,14.0,17.0,L IFG,Loss>Neutral,"44,45",7.29
+26070843,PMC4657439,mmc1.docx,-2.0,5.0,59.0,L SFG,Loss>Neutral,6,7.20
+26070843,PMC4657439,mmc1.docx,28.0,-58.0,41.0,R Precuneus,Loss>Neutral,7,7.16
+26070843,PMC4657439,mmc1.docx,47.0,-36.0,45.0,R IPL,Loss>Neutral,40,7.11
+26070843,PMC4657439,mmc1.docx,12.0,-68.0,-22.0,R Cerebellum (posterior lobe),Loss>Neutral,n/a,7.11
+26070843,PMC4657439,mmc1.docx,38.0,32.0,9.0,R IFG,Loss>Neutral,46,7.09
+26070843,PMC4657439,mmc2.docx,11.0,8.0,3.0,R Caudate,Reward vs. Neutral Anticipation,n/a,13.97
+26070843,PMC4657439,mmc2.docx,-8.0,7.0,2.0,L Caudate,Reward vs. Neutral Anticipation,n/a,13.86
+26070843,PMC4657439,mmc2.docx,-6.0,-25.0,-2.0,L Thalamus,Reward vs. Neutral Anticipation,n/a,13.48
+26070843,PMC4657439,mmc2.docx,8.0,-21.0,-4.0,R Thalamus,Reward vs. Neutral Anticipation,n/a,13.43
+26070843,PMC4657439,mmc2.docx,32.0,24.0,3.0,R IFG,Reward vs. Neutral Anticipation,"45,47,13",13.25
+26070843,PMC4657439,mmc2.docx,-28.0,24.0,3.0,L Insula,Reward vs. Neutral Anticipation,"13,45",13.04
+26070843,PMC4657439,mmc2.docx,7.0,-10.0,11.0,R Thalamus,Reward vs. Neutral Anticipation,n/a,12.79
+26070843,PMC4657439,mmc2.docx,-6.0,-13.0,7.0,L Thalamus,Reward vs. Neutral Anticipation,n/a,12.58
+26070843,PMC4657439,mmc2.docx,12.0,31.0,24.0,R Anterior Cingulate,Reward vs. Neutral Anticipation,32,11.82
+26070843,PMC4657439,mmc2.docx,-6.0,32.0,23.0,L Anterior Cingulate,Reward vs. Neutral Anticipation,"32,24",11.73
+26070843,PMC4657439,mmc2.docx,7.0,15.0,24.0,R Anterior Cingulate,Reward vs. Neutral Anticipation,"24,33",11.19
+26070843,PMC4657439,mmc2.docx,-29.0,-48.0,-24.0,L Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,11.06
+26070843,PMC4657439,mmc2.docx,7.0,20.0,37.0,R Cingulate,Reward vs. Neutral Anticipation,32,11.04
+26070843,PMC4657439,mmc2.docx,29.0,-57.0,-24.0,R Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,10.75
+26070843,PMC4657439,mmc2.docx,-20.0,-25.0,0.0,L Thalamus,Reward vs. Neutral Anticipation,n/a,10.48
+26070843,PMC4657439,mmc2.docx,-45.0,-3.0,43.0,L Precentral,Reward vs. Neutral Anticipation,6,10.36
+26070843,PMC4657439,mmc2.docx,2.0,-54.0,-11.0,R Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,10.23
+26070843,PMC4657439,mmc2.docx,-16.0,-56.0,-20.0,L Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,10.19
+26070843,PMC4657439,mmc2.docx,-1.0,-30.0,27.0,L Cingulate,Reward vs. Neutral Anticipation,"23,31",10.16
+26070843,PMC4657439,mmc2.docx,0.0,-59.0,29.0,L Nodule,Reward vs. Neutral Anticipation,n/a,10.08
+26070843,PMC4657439,mmc2.docx,11.0,-62.0,-19.0,R Precuneus,Reward vs. Neutral Anticipation,n/a,10.06
+26070843,PMC4657439,mmc2.docx,-45.0,7.0,22.0,L IFG,Reward vs. Neutral Anticipation,n/a,10.03
+26070843,PMC4657439,mmc2.docx,-10.0,-81.0,0.0,L Lingual,Reward vs. Neutral Anticipation,18,10.01
+26070843,PMC4657439,mmc2.docx,-2.0,1.0,58.0,L MFG,Reward vs. Neutral Anticipation,6,9.97
+26070843,PMC4657439,mmc2.docx,22.0,17.0,-1.0,R Lentiform,Reward vs. Neutral Anticipation,n/a,9.82
+26070843,PMC4657439,mmc2.docx,-19.0,-80.0,-9.0,L Lingual,Reward vs. Neutral Anticipation,"19,18",9.79
+26070843,PMC4657439,mmc2.docx,-32.0,33.0,13.0,L IFG,Reward vs. Neutral Anticipation,n/a,9.75
+26070843,PMC4657439,mmc2.docx,12.0,-83.0,2.0,R Lingual,Reward vs. Neutral Anticipation,n/a,9.23
+26070843,PMC4657439,mmc2.docx,18.0,-38.0,-18.0,R Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,9.14
+26070843,PMC4657439,mmc2.docx,-49.0,-38.0,48.0,L IPL,Reward vs. Neutral Anticipation,40,9.01
+26070843,PMC4657439,mmc2.docx,40.0,-8.0,53.0,R Precentral,Reward vs. Neutral Anticipation,6,9.00
+26070843,PMC4657439,mmc2.docx,47.0,5.0,20.0,R IFG,Reward vs. Neutral Anticipation,n/a,8.99
+26070843,PMC4657439,mmc2.docx,-35.0,-46.0,39.0,L IPL,Reward vs. Neutral Anticipation,40,8.97
+26070843,PMC4657439,mmc2.docx,32.0,-34.0,-38.0,R Cerebellar Tonsil,Reward vs. Neutral Anticipation,n/a,8.68
+26070843,PMC4657439,mmc2.docx,21.0,-70.0,-13.0,R Cerebellum (posterior lobe),Reward vs. Neutral Anticipation,18,8.66
+26070843,PMC4657439,mmc2.docx,-31.0,-52.0,-41.0,L Cerebellum (posterior lobe),Reward vs. Neutral Anticipation,n/a,8.63
+26070843,PMC4657439,mmc2.docx,25.0,-80.0,13.0,R Cuneus,Reward vs. Neutral Anticipation,n/a,8.61
+26070843,PMC4657439,mmc2.docx,-22.0,-85.0,12.0,L Cuneus,Reward vs. Neutral Anticipation,n/a,8.56
+26070843,PMC4657439,mmc2.docx,-23.0,14.0,-2.0,L Lentiform,Reward vs. Neutral Anticipation,n/a,8.44
+26070843,PMC4657439,mmc2.docx,-12.0,-94.0,8.0,L Cuneus,Reward vs. Neutral Anticipation,17,8.39
+26070843,PMC4657439,mmc2.docx,36.0,35.0,8.0,R IFG,Reward vs. Neutral Anticipation,"46,10",8.38
+26070843,PMC4657439,mmc2.docx,24.0,-63.0,-40.0,R Cerebellum (posterior lobe),Reward vs. Neutral Anticipation,n/a,8.38
+26070843,PMC4657439,mmc2.docx,-32.0,-69.0,-10.0,L Fusiform,Reward vs. Neutral Anticipation,"18,19",8.36
+26070843,PMC4657439,mmc2.docx,5.0,-75.0,13.0,R Cuneus,Reward vs. Neutral Anticipation,"23,18,17",8.33
+26070843,PMC4657439,mmc2.docx,50.0,-34.0,47.0,R IPL,Reward vs. Neutral Anticipation,40,8.20
+26070843,PMC4657439,mmc2.docx,-16.0,-66.0,6.0,L Cuneus,Reward vs. Neutral Anticipation,"30,19",8.17
+26070843,PMC4657439,mmc2.docx,-12.0,-37.0,-15.0,L Cerebellum (anterior lobe),Reward vs. Neutral Anticipation,n/a,8.12
+26070843,PMC4657439,mmc2.docx,41.0,48.0,15.0,R MFG,Reward vs. Neutral Anticipation,"46,10",8.09
+26070843,PMC4657439,mmc2.docx,-38.0,-26.0,58.0,L Postcentral,Reward vs. Neutral Anticipation,"4,3",8.07
+26070843,PMC4657439,mmc2.docx,35.0,-43.0,38.0,R IPL,Reward vs. Neutral Anticipation,40,8.04
+26070843,PMC4657439,mmc2.docx,25.0,38.0,-18.0,R MFG,Reward vs. Neutral Anticipation,11,7.96
+26070843,PMC4657439,mmc2.docx,-8.0,-75.0,37.0,L Cuneus,Reward vs. Neutral Anticipation,"7,19",7.91
+26070843,PMC4657439,mmc2.docx,-17.0,-1.0,11.0,L Lentiform,Reward vs. Neutral Anticipation,n/a,7.81
+26070843,PMC4657439,mmc2.docx,31.0,-49.0,-45.0,R Cerebellar Tonsil,Reward vs. Neutral Anticipation,n/a,7.70
+26070843,PMC4657439,mmc2.docx,-17.0,-19.0,25.0,L Caudate,Reward vs. Neutral Anticipation,n/a,7.65
+26070843,PMC4657439,mmc2.docx,-11.0,-53.0,-38.0,L Cerebellum (posterior lobe),Reward vs. Neutral Anticipation,n/a,7.64
+26070843,PMC4657439,mmc2.docx,26.0,-59.0,45.0,R Superior Parietal Lobule,Reward vs. Neutral Anticipation,7,7.49
+26070843,PMC4657439,mmc2.docx,44.0,-22.0,-5.0,R STG,Reward vs. Neutral Anticipation,"22,13",7.40
+26070843,PMC4657439,mmc2.docx,-41.0,46.0,20.0,L MFG,Reward vs. Neutral Anticipation,"10,46",7.40
+26070843,PMC4657439,mmc2.docx,-42.0,-47.0,5.0,L MTG,Reward vs. Neutral Anticipation,n/a,7.32
+26070843,PMC4657439,mmc2.docx,32.0,6.0,-1.0,R Claustrum,Reward vs. Neutral Anticipation,n/a,7.27
+26070843,PMC4657439,mmc2.docx,-27.0,-27.0,13.0,L Insula,Reward vs. Neutral Anticipation,13,7.26
+26070843,PMC4657439,mmc2.docx,-32.0,-6.0,-2.0,L Claustrum,Reward vs. Neutral Anticipation,n/a,7.17
+26070843,PMC4657439,mmc2.docx,27.0,31.0,23.0,R MFG,Reward vs. Neutral Anticipation,n/a,7.15
+26070843,PMC4657439,mmc2.docx,47.0,43.0,26.0,R MFG,Reward vs. Neutral Anticipation,46,7.12
+26070843,PMC4657439,mmc2.docx,-19.0,-67.0,-38.0,L Cerebellum (posterior lobe),Reward vs. Neutral Anticipation,n/a,7.09
+26070843,PMC4657439,mmc2.docx,-25.0,-72.0,23.0,L Precuneus,Reward vs. Neutral Anticipation,31,7.09
+26070843,PMC4657439,mmc2.docx,-27.0,48.0,6.0,L MFG,Reward vs. Neutral Anticipation,10,7.08

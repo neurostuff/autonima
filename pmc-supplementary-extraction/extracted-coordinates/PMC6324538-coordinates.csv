@@ -1,0 +1,43 @@
+pmid,pmcid,source_file,x,y,z,region,group,size
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-42.0,-72.0,0.0,Left Inferior Temporal Gyrus,Patients,653
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,42.0,-46.0,-18.0,Right Fusiform Gyrus,Patients,325
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-48.0,30.0,-3.0,Left Inferior Frontal Gyrus,Patients,297
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-28.0,1.0,52.0,Left Middle Frontal Gyrus,Patients,249
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,25.0,-69.0,-15.0,Right Lingual Gyrus,Patients,147
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-4.0,27.0,46.0,Left Medial Frontal Gyrus,Patients,106
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-16.0,-89.0,0.0,Left Lingual Gyrus,Patients,64
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-36.0,-34.0,-18.0,Left Fusiform Gyrus,Patients,61
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-7.0,-2.0,67.0,Left Superior Frontal Gyrus,Patients,33
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-16.0,-86.0,-6.0,Left Lingual Gyrus,Controls,590
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,25.0,-69.0,-9.0,Right Lingual Gyrus,Controls,565
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,36.0,7.0,-6.0,Right Insula,Controls,320
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-45.0,-63.0,17.0,Left Middle Temporal Gyrus,Controls,222
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-4.0,36.0,14.0,Left Anterior Cingulate,Controls,214
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-36.0,4.0,-6.0,Left Insula,Controls,155
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,45.0,-66.0,6.0,Right Middle Temporal Gyrus,Controls,153
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,19.0,65.0,14.0,Right Superior Frontal Gyrus,Controls,74
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-10.0,-54.0,29.0,Left Cingulate Gyrus,,96
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,42.0,-60.0,26.0,Right Middle Temporal Gyrus,,78
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-48.0,30.0,29.0,Left Middle Frontal Gyrus,,58
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-30.0,-16.0,-29.0,Left Uncus,,48
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-19.0,-57.0,32.0,Left Precuneus,,41
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-2.0,-25.0,38.0,Left Cingulate Gyrus,,37
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,36.0,-8.0,-29.0,Right Uncus,,30
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,19.0,50.0,-9.0,Right Superior Frontal Gyrus,,27
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,16.0,-11.0,55.0,Right Medial Frontal Gyrus,,27
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-42.0,-74.0,29.0,Left Middle Temporal Gyrus,,26
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-19.0,-74.0,-18.0,Left Cerebellum,,25
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-45.0,-54.0,43.0,Left Inferior Parietal Lobule,,25
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,48.0,30.0,26.0,Right Middle Frontal Gyrus,,24
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-25.0,50.0,26.0,Left Superior Frontal Gyrus,,23
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,59.0,-54.0,-6.0,Right Inferior Temporal Gyrus,,20
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,7.0,30.0,26.0,Right Cingulate Gyrus,,19
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-54.0,-37.0,43.0,Left Inferior Parietal Lobule,,19
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-7.0,10.0,-3.0,Left Nucleus Accumbens,,18
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,7.0,-63.0,35.0,Right Precuneus,,16
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-30.0,12.0,-6.0,Left Insula,,15
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,16.0,18.0,-3.0,Right Nucleus Accumbens,,15
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-45.0,10.0,14.0,Left Insula,,15
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,7.0,-40.0,35.0,Right Cingulate Gyrus,,15
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,28.0,-69.0,49.0,Right Precuneus,,13
+30646331,PMC6324538,jamanetwopen-1-e186466-s001.pdf,-10.0,39.0,0.0,Left Anterior Cingulate,,12

@@ -1,0 +1,15 @@
+pmid,pmcid,source_file,x,y,z,region,group,ba
+32490056,PMC7256056,mmc1.docx,-3.00,45,-7.5,**Medial frontal gyrus**,**Diagnosis×social support**,"**10,11**"
+32490056,PMC7256056,mmc1.docx,-6,52.5,0,**Medial frontal gyrus**,**Diagnosis effect**,"**32,10**"
+32490056,PMC7256056,mmc1.docx,33.0,49.5,19.5,**Middle frontal cortex\_R**,**Diagnosis effect**,**10**
+32490056,PMC7256056,mmc1.docx,-40.5,-16.5,13.5,**Insula and rolandic operculum\_L**,**Sex effect (male)**,"**14, 41,43**"
+32490056,PMC7256056,mmc1.docx,49.5,-21,13.5,**Insula and rolandic operculum\_R**,**Sex effect (male)**,"**13,41,43**"
+32490056,PMC7256056,mmc1.docx,-49.5,-25.5,61.5,**Postcentral gyrus\_L**,**Sex effect (male)**,"**3,2**"
+32490056,PMC7256056,mmc1.docx,37.5,-37.5,61.5,**Postcentral gyrus \_R**,**Sex effect (male)**,"**3,2**"
+32490056,PMC7256056,mmc1.docx,-4.5,51,9,**Medial frontal gyrus**,**Sex effect (male)**,**10**
+32490056,PMC7256056,mmc1.docx,0,-12,12,**Thalamus\_B**,**Sex effect (male)**,
+32490056,PMC7256056,mmc1.docx,-18.00,-9,-30,**Parahippocampal\_L**,**Sex effect (male)**,**35**
+32490056,PMC7256056,mmc1.docx,18.00,-10.5,-28.5,**Parahippocampal\_R**,**Sex effect (male)**,**35**
+32490056,PMC7256056,mmc1.docx,-25.5,-102,4.5,**Middle occipital gyrus\_L**,**BMI effect**,**18**
+32490056,PMC7256056,mmc1.docx,-15,-76.5,39,**Precuneus\_L**,**BMI effect**,**7**
+32490056,PMC7256056,mmc1.docx,37.5,-90,9,**Middle occipital gyrus\_R**,**BMI effect**,**18**

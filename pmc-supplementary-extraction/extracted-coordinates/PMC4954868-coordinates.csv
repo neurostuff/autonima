@@ -1,0 +1,19 @@
+pmid,pmcid,source_file,x,y,z,region,group,size,statistic
+27266443,PMC4954868,mmc1.pdf,-32,14,14,L anterior insula*,,341,4.86
+27266443,PMC4954868,mmc1.pdf,34,10,8,R anterior insula,,19,3.50
+27266443,PMC4954868,mmc1.pdf,8,60,16,R medial frontal gyrus,,22,5.44
+27266443,PMC4954868,mmc1.pdf,-8,60,20,L medial frontal gyrus,,11,5.16
+27266443,PMC4954868,mmc1.pdf,-8,14,44,L dorsal ACC (BA 32),,39,3.76
+27266443,PMC4954868,mmc1.pdf,10,14,44,R dorsal ACC (BA 32),,69,3.85
+27266443,PMC4954868,mmc1.pdf,-8,24,22,L ventral ACC (BA 24),,46,3.82
+27266443,PMC4954868,mmc1.pdf,6,24,24,R ventral ACC (BA 24),,53,3.81
+27266443,PMC4954868,mmc1.pdf,24,54,0,R superior frontal gyrus,,59,4.02
+27266443,PMC4954868,mmc1.pdf,-44,-38,14,L superior temporal sulcus 51,,L superior temporal sulcus 51,3.36
+27266443,PMC4954868,mmc1.pdf,20,-54,24,R precuneus,,14,3.28
+27266443,PMC4954868,mmc1.pdf,44,-56,26,R posterior parietal cortex,,62,3.37
+27266443,PMC4954868,mmc1.pdf,-40,-56,46,L posterior parietal cortex,,33,3.67
+27266443,PMC4954868,mmc1.pdf,-4,-16,-6,L midbrain,,16,3.11
+27266443,PMC4954868,mmc1.pdf,28,62,16,R medial frontal gyrus,,95,3.08
+27266443,PMC4954868,mmc1.pdf,-6,30,50,L superior frontal gyrus,,23,3.04
+27266443,PMC4954868,mmc1.pdf,-48,32,22,L dlPFC,,95,2.99
+27266443,PMC4954868,mmc1.pdf,38,34,30,R dlPFC,,125,2.95

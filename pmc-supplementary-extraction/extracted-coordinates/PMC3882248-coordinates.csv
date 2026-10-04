@@ -1,0 +1,173 @@
+pmid,pmcid,source_file,x,y,z,region,group,ba,hemisphere,size,statistic
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,-87.0,-10.0,Inferior Occipital Gyrus,Whole sample, ,L,2343,>8
+24400099,PMC3882248,pone.0084560.s002.docx,39.0,-87.0,-10.0,,Whole sample, ,R,1573,7.69
+24400099,PMC3882248,pone.0084560.s002.docx,-34.0,-61.0,50.0,Superior Parietal Gyrus,Whole sample, ,L,1003,5.56
+24400099,PMC3882248,pone.0084560.s002.docx,-32.0,-71.0,50.0,,Whole sample,7,L, ,4.8
+24400099,PMC3882248,pone.0084560.s002.docx,28.0,-59.0,48.0,,Whole sample, ,R,496,5.33
+24400099,PMC3882248,pone.0084560.s002.docx,3.0,-45.0,25.0,Posterior Cingulate Cortex,Whole sample,31,R,1207,5.06
+24400099,PMC3882248,pone.0084560.s002.docx,0.0,-61.0,30.0,Precuneus,Whole sample, ,L/R, ,4.87
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,65.0,23.0,Medial Frontal Gyrus,Whole sample, ,L,491,4.96
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,49.0,45.0,,Whole sample,8,L, ,4.23
+24400099,PMC3882248,pone.0084560.s002.docx,5.0,56.0,30.0,,Whole sample, ,R, ,4.04
+24400099,PMC3882248,pone.0084560.s002.docx,-37.0,5.0,28.0,Inferior Frontal Gyrus,Whole sample, ,L,1001,4.81
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,17.0,55.0,Superior Frontal Gyrus,Whole sample,8,L, ,4.01
+24400099,PMC3882248,pone.0084560.s002.docx,14.0,37.0,55.0,,Whole sample, ,R,102,4.64
+24400099,PMC3882248,pone.0084560.s002.docx,14.0,3.0,0.0,Globus Pallidus,Whole sample, ,R,46,4.34
+24400099,PMC3882248,pone.0084560.s002.docx,-64.0,-27.0,-10.0,Middle Temporal Gyrus,Whole sample, ,L,136,4.08
+24400099,PMC3882248,pone.0084560.s002.docx,55.0,-61.0,23.0,Superior Temporal Gyrus,Whole sample, ,R,97,3.94
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,10.0,50.0,Anterior Cingulate Cortex,Whole sample,32,L,68,3.8
+24400099,PMC3882248,pone.0084560.s002.docx,-30.0,21.0,-15.0,Insula,Whole sample, ,L,45,3.56
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,-84.0,-13.0,Inferior Occipital Gyrus,Alcohol Dependents,19,L,3040,>8
+24400099,PMC3882248,pone.0084560.s002.docx,35.0,-87.0,-10.0,,Alcohol Dependents,18,R,1651,6.74
+24400099,PMC3882248,pone.0084560.s002.docx,5.0,-45.0,25.0,Posterior Cingulate Gyrus,Alcohol Dependents, ,R,662,4.58
+24400099,PMC3882248,pone.0084560.s002.docx,-9.0,-50.0,28.0,,Alcohol Dependents, ,L, ,4.45
+24400099,PMC3882248,pone.0084560.s002.docx,-14.0,-59.0,38.0,Precuneus,Alcohol Dependents, ,L, ,2.6
+24400099,PMC3882248,pone.0084560.s002.docx,-37.0,21.0,-15.0,Insula,Alcohol Dependents, ,L,709,4.28
+24400099,PMC3882248,pone.0084560.s002.docx,-34.0,10.0,28.0,Inferior Frontal Gyrus,Alcohol Dependents, ,L, ,4.49
+24400099,PMC3882248,pone.0084560.s002.docx,44.0,26.0,23.0,,Alcohol Dependents, ,R,61,3.68
+24400099,PMC3882248,pone.0084560.s002.docx,30.0,-55.0,45.0,Inferior Parietal Lobule,Alcohol Dependents, ,R,372,4.2
+24400099,PMC3882248,pone.0084560.s002.docx,35.0,-55.0,58.0,,Alcohol Dependents,40,R, ,3.41
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,65.0,23.0,Medial Frontal Gyrus,Alcohol Dependents, ,L,124,3.78
+24400099,PMC3882248,pone.0084560.s002.docx,0.0,54.0,43.0,,Alcohol Dependents, ,L/R, ,3.2
+24400099,PMC3882248,pone.0084560.s002.docx,3.0,58.0,28.0,,Alcohol Dependents,9,R, ,3.03
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,51.0,18.0,Medial Frontal Gyrus,Alcohol Dependents, ,L,251,3.39
+24400099,PMC3882248,pone.0084560.s002.docx,-4.0,60.0,-3.0,,Alcohol Dependents,10,L, ,3.38
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,47.0,30.0,,Alcohol Dependents,9,L, ,3.37
+24400099,PMC3882248,pone.0084560.s002.docx,-18.0,47.0,43.0,Superior Frontal Gyrus,Alcohol Dependents,8,L,33,3.41
+24400099,PMC3882248,pone.0084560.s002.docx,9.0,-11.0,18.0,Thalamus,Alcohol Dependents, ,R,31,3.35
+24400099,PMC3882248,pone.0084560.s002.docx,-7.0,14.0,58.0,Supplementary Motor Area,Alcohol Dependents, ,L,90,3.29
+24400099,PMC3882248,pone.0084560.s002.docx,3.0,12.0,60.0,,Alcohol Dependents,6,R, ,3.14
+24400099,PMC3882248,pone.0084560.s002.docx,-7.0,5.0,58.0,,Alcohol Dependents,6,L, ,2.81
+24400099,PMC3882248,pone.0084560.s002.docx,28.0,-20.0,53.0,Precentral Gyrus,Alcohol Dependents, ,R,27,3.12
+24400099,PMC3882248,pone.0084560.s002.docx,48.0,-57.0,18.0,Middle Temporal Gyrus,Alcohol Dependents, ,R,22,3.08
+24400099,PMC3882248,pone.0084560.s002.docx,-62.0,-13.0,-15.0,,Alcohol Dependents, ,L,15,3.06
+24400099,PMC3882248,pone.0084560.s002.docx,16.0,44.0,20.0,Anterior Cingulate Gyrus,Alcohol Dependents, ,R,15,2.92
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,-87.0,-10.0,Inferior Occipital Gyrus,Depression/Anxiety patients, ,L,991,6.63
+24400099,PMC3882248,pone.0084560.s002.docx,42.0,-87.0,-8.0,,Depression/Anxiety patients, ,R,310,4.86
+24400099,PMC3882248,pone.0084560.s002.docx,-23.0,65.0,15.0,Superior Frontal Gyrus,Depression/Anxiety patients,10,L,81,4.23
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,58.0,5.0,Middle Frontal Gyrus,Depression/Anxiety patients, ,L, ,3.44
+24400099,PMC3882248,pone.0084560.s002.docx,-32.0,63.0,3.0,,Depression/Anxiety patients,10,L, ,3.42
+24400099,PMC3882248,pone.0084560.s002.docx,-25.0,21.0,-8.0,Insula,Depression/Anxiety patients, ,L,21,3.79
+24400099,PMC3882248,pone.0084560.s002.docx,14.0,5.0,0.0,Pallidum,Depression/Anxiety patients, ,R,38,3.67
+24400099,PMC3882248,pone.0084560.s002.docx,-37.0,-57.0,53.0,Inferior Parietal Lobule,Depression/Anxiety patients,40,L,42,3.5
+24400099,PMC3882248,pone.0084560.s002.docx,-2.0,-34.0,30.0,Posterior Cingulate Gyrus,Depression/Anxiety patients,23,L,38,3.22
+24400099,PMC3882248,pone.0084560.s002.docx,0.0,-61.0,30.0,Precuneus,Depression/Anxiety patients, ,L/R,59,3.13
+24400099,PMC3882248,pone.0084560.s002.docx,-39.0,-87.0,-10.0,Inferior Occipital Gyrus,Healthy Controls, ,L,1248,5.93
+24400099,PMC3882248,pone.0084560.s002.docx,35.0,-89.0,-3.0,,Healthy Controls, ,R,743,5.39
+24400099,PMC3882248,pone.0084560.s002.docx,21.0,-98.0,8.0,,Healthy Controls,18,R, ,3.94
+24400099,PMC3882248,pone.0084560.s002.docx,-34.0,-61.0,48.0,Inferior Parietal Lobule,Healthy Controls, ,L,219,4.46
+24400099,PMC3882248,pone.0084560.s002.docx,14.0,37.0,53.0,Superior Frontal Gyrus,Healthy Controls,8,R,105,4.24
+24400099,PMC3882248,pone.0084560.s002.docx,-11.0,49.0,45.0,,Healthy Controls,8,L,104,3.84
+24400099,PMC3882248,pone.0084560.s002.docx,-9.0,8.0,53.0,Supplementary Motor Area,Healthy Controls,6,L,44,4.03
+24400099,PMC3882248,pone.0084560.s002.docx,28.0,-59.0,50.0,Precuneus,Healthy Controls,7,R,190,4.01
+24400099,PMC3882248,pone.0084560.s002.docx,32.0,-68.0,45.0,Superior Parietal Gyrus,Healthy Controls, ,R, ,3.68
+24400099,PMC3882248,pone.0084560.s002.docx,-43.0,21.0,30.0,Middle Frontal Gyrus,Healthy Controls, ,L,506,3.75
+24400099,PMC3882248,pone.0084560.s002.docx,-37.0,5.0,28.0,Inferior Frontal Gyrus,Healthy Controls, ,L, ,3.64
+24400099,PMC3882248,pone.0084560.s002.docx,53.0,-61.0,23.0,Superior Temporal Gyrus,Healthy Controls,39,R,55,3.65
+24400099,PMC3882248,pone.0084560.s002.docx,-53.0,-9.0,45.0,Precentral Gyrus,Healthy Controls,4,L,47,3.62
+24400099,PMC3882248,pone.0084560.s002.docx,5.0,-25.0,28.0,Posterior Cingulate Gyrus,Healthy Controls, ,R,281,3.5
+24400099,PMC3882248,pone.0084560.s002.docx,0.0,-41.0,30.0,,Healthy Controls, ,L, ,3.43
+24400099,PMC3882248,pone.0084560.s002.docx,3.0,-59.0,23.0,,Healthy Controls,31,R, ,3.25
+24400099,PMC3882248,pone.0084560.s002.docx,19.0,-18.0,43.0,,Healthy Controls,24,R,16,3.37
+24400099,PMC3882248,pone.0084560.s002.docx,9.0,60.0,33.0,Medial Frontal Gyrus,Healthy Controls,9,R,18,3.37
+24400099,PMC3882248,pone.0084560.s002.docx,-46.0,-64.0,28.0,Middle Temporal Gyrus,Healthy Controls, ,L,40,3.25
+24400099,PMC3882248,pone.0084560.s002.docx,-50.0,-41.0,-3.0,,Healthy Controls, ,L,35,3.24
+24400099,PMC3882248,pone.0084560.s002.docx,67.0,-43.0,-8.0,,Healthy Controls, ,R,15,3.04
+24400099,PMC3882248,pone.0084560.s003.docx,-27.0,-48.0,-5.0,Lingual Gyrus,*Alcohol Dependents > Healthy Controls*, ,L,44,3.68
+24400099,PMC3882248,pone.0084560.s003.docx,16.0,10.0,33.0,Anterior Cingulate Cortex,*Alcohol Dependents > Healthy Controls*, ,R,68,3.43
+24400099,PMC3882248,pone.0084560.s003.docx,7.0,35.0,15.0,,*Alcohol Dependents > Healthy Controls*,32,R,70,3.51
+24400099,PMC3882248,pone.0084560.s003.docx,19.0,42.0,20.0,Medial Prefrontal Cortex  ,*Alcohol Dependents > Healthy Controls*, ,R, ,3.33
+24400099,PMC3882248,pone.0084560.s003.docx,-11.0,49.0,18.0,,*Alcohol Dependents > Healthy Controls*, ,L,16,3.08
+24400099,PMC3882248,pone.0084560.s003.docx,-37.0,35.0,20.0,Inferior Frontal Gyrus,*Alcohol Dependents > Healthy Controls*, ,L,103,3.49
+24400099,PMC3882248,pone.0084560.s003.docx,-20.0,19.0,-15.0,Orbitofrontal Gyrus,*Alcohol Dependents > Healthy Controls*, ,L,20,3.28
+24400099,PMC3882248,pone.0084560.s003.docx,-27.0,19.0,38.0,Middle Frontal Gyrus,*Healthy Controls > Alcohol Dependents*, ,L,35,3.14
+24400099,PMC3882248,pone.0084560.s003.docx,9.0,-9.0,20.0,Caudate Nucleus,*Alcohol Dependents > Depression / Anxiety Patients*, ,R,67,4
+24400099,PMC3882248,pone.0084560.s003.docx,-41.0,-9.0,43.0,Precentral Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,40,3.87
+24400099,PMC3882248,pone.0084560.s003.docx,-46.0,33.0,5.0,Inferior Frontal Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,151,3.81
+24400099,PMC3882248,pone.0084560.s003.docx,-32.0,33.0,-13.0,Orbitofrontal Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*,47,L, ,3.15
+24400099,PMC3882248,pone.0084560.s003.docx,32.0,33.0,-10.0,,*Alcohol Dependents > Depression / Anxiety Patients*, ,R,16,3.42
+24400099,PMC3882248,pone.0084560.s003.docx,-11.0,-20.0,43.0,Posterior Cingulate Cortex,*Alcohol Dependents > Depression / Anxiety Patients*,24,L,43,3.42
+24400099,PMC3882248,pone.0084560.s003.docx,-2.0,-18.0,45.0,,*Alcohol Dependents > Depression / Anxiety Patients*,31,L, ,3.22
+24400099,PMC3882248,pone.0084560.s003.docx,-7.0,21.0,48.0,Supplementary Motor Area,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,61,3.34
+24400099,PMC3882248,pone.0084560.s003.docx,-37.0,-82.0,-3.0,Middle Occipital Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,27,3.26
+24400099,PMC3882248,pone.0084560.s003.docx,-14.0,14.0,-15.0,Ventral Striatum,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,19,3.26
+24400099,PMC3882248,pone.0084560.s003.docx,-2.0,-11.0,3.0,Thalamus,*Alcohol Dependents > Depression / Anxiety Patients*, ,L,29,3.25
+24400099,PMC3882248,pone.0084560.s003.docx,16.0,-6.0,3.0,,*Alcohol Dependents > Depression / Anxiety Patients*, ,R,62,3.46
+24400099,PMC3882248,pone.0084560.s003.docx,23.0,-11.0,0.0,Globus Pallidus,*Alcohol Dependents > Depression / Anxiety Patients*, ,R, ,2.7
+24400099,PMC3882248,pone.0084560.s003.docx,30.0,-41.0,-18.0,Fusiform Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,R,16,3.15
+24400099,PMC3882248,pone.0084560.s003.docx,5.0,47.0,-8.0,Ventromedial Prefrontal Cortex,*Alcohol Dependents > Depression / Anxiety Patients*,10,R,46,3.12
+24400099,PMC3882248,pone.0084560.s003.docx,-2.0,51.0,-8.0,,*Alcohol Dependents > Depression / Anxiety Patients*,10,L, ,3.04
+24400099,PMC3882248,pone.0084560.s003.docx,12.0,40.0,-5.0,Anterior Cingulate Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,R, ,2.93
+24400099,PMC3882248,pone.0084560.s003.docx,12.0,10.0,40.0,,*Alcohol Dependents > Depression / Anxiety Patients*,32,R,17,2.94
+24400099,PMC3882248,pone.0084560.s003.docx,16.0,-82.0,-13.0,Lingual Gyrus,*Alcohol Dependents > Depression / Anxiety Patients*, ,R,26,2.86
+24400099,PMC3882248,pone.0084560.s003.docx,-46.0,33.0,5.0,Inferior Frontal Gyrus,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,L,199,3.81
+24400099,PMC3882248,pone.0084560.s003.docx,-25.0,28.0,-13.0,Orbitofrontal Cortex,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*,11/47,L, ,3.45
+24400099,PMC3882248,pone.0084560.s003.docx,-14.0,14.0,-15.0,Ventral Striatum,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,L, ,3.44
+24400099,PMC3882248,pone.0084560.s003.docx,-9.0,14.0,-13.0,,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,L, ,3.28
+24400099,PMC3882248,pone.0084560.s003.docx,19.0,10.0,33.0,Anterior Cingulate Cortex,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,R,101,3.52
+24400099,PMC3882248,pone.0084560.s003.docx,-25.0,-48.0,-5.0,Lingual Gyrus,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,L,37,3.5
+24400099,PMC3882248,pone.0084560.s003.docx,51.0,-64.0,-8.0,Middle Occipital Gyrus,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,R,67,3.12
+24400099,PMC3882248,pone.0084560.s003.docx,-37.0,-78.0,-3.0,,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,L,34,3.07
+24400099,PMC3882248,pone.0084560.s003.docx,5.0,47.0,-8.0,Ventromedial prefrontal cortex,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*,10,R,39,3.08
+24400099,PMC3882248,pone.0084560.s003.docx,7.0,3.0,60.0,Supplementary Motor Area,*Alcohol Dependents > (Depression / Anxiety Patients & Healthy Controls)*, ,R,18,2.99
+24400099,PMC3882248,pone.0084560.s004.docx,-20.0,35.0,50.0,Superior Frontal Gyrus,Severity, ,L,47,3.87
+24400099,PMC3882248,pone.0084560.s004.docx,16.0,37.0,45.0,,Severity, ,R,59,3.31
+24400099,PMC3882248,pone.0084560.s004.docx,-41.0,21.0,15.0,Inferior Frontal Gyrus,Severity, ,L,27,3.38
+24400099,PMC3882248,pone.0084560.s004.docx,12.0,24.0,38.0,Anterior Cingulate Cortex,Severity, ,R,18,3.24
+24400099,PMC3882248,pone.0084560.s004.docx,-14.0,-20.0,15.0,Thalamus,Severity, ,L,19,3.11
+24400099,PMC3882248,pone.0084560.s004.docx,25.0,21.0,-8.0,Anterior Putamen,Severity, ,R,63,3.79
+24400099,PMC3882248,pone.0084560.s004.docx,-9.0,33.0,-8.0,Anterior Cingulate Cortex,Severity,32,L,19,3.26
+24400099,PMC3882248,pone.0084560.s004.docx,-48.0,-45.0,3.0,Middle Temporal Gyrus,Duration, ,L,59,4.52
+24400099,PMC3882248,pone.0084560.s004.docx,16.0,21.0,43.0,Anterior Cingulate Cortex,Duration, ,R,129,4.1
+24400099,PMC3882248,pone.0084560.s004.docx,-20.0,31.0,53.0,Superior Frontal Gyrus,Duration,8,L,108,4.01
+24400099,PMC3882248,pone.0084560.s004.docx,12.0,28.0,58.0,,Duration, ,R,37,3.51
+24400099,PMC3882248,pone.0084560.s004.docx,44.0,10.0,55.0,Middle Frontal Gyrus,Duration,6,R,24,3.03
+24400099,PMC3882248,pone.0084560.s004.docx,37.0,33.0,40.0,,Duration,9,R,50,3.47
+24400099,PMC3882248,pone.0084560.s004.docx,-32.0,-29.0,13.0,Posterior Insula,Duration,13,L,39,3.93
+24400099,PMC3882248,pone.0084560.s004.docx,44.0,-57.0,33.0,Angular Gyrus,Duration, ,R,100,3.91
+24400099,PMC3882248,pone.0084560.s004.docx,-23.0,-20.0,58.0,Postcentral Gyrus,Duration, ,L,54,3.67
+24400099,PMC3882248,pone.0084560.s004.docx,-50.0,-18.0,45.0,,Duration,3,L,108,3.65
+24400099,PMC3882248,pone.0084560.s004.docx,32.0,-27.0,43.0,,Duration, ,R,21,3.42
+24400099,PMC3882248,pone.0084560.s004.docx,55.0,-20.0,45.0,,Duration,1,R,30,3.24
+24400099,PMC3882248,pone.0084560.s004.docx,-30.0,-2.0,-3.0,Posterior Putamen,Duration, ,L,67,3.64
+24400099,PMC3882248,pone.0084560.s004.docx,16.0,-4.0,43.0,Middle Cingulate Cortex,Duration, ,R,84,3.36
+24400099,PMC3882248,pone.0084560.s004.docx,-18.0,-64.0,30.0,Precuneus,Duration, ,L,39,3.32
+24400099,PMC3882248,pone.0084560.s004.docx,-4.0,-27.0,53.0,Supplementary Motor Area,Duration,6,L,42,3.22
+24400099,PMC3882248,pone.0084560.s004.docx,-41.0,-73.0,33.0,Middle Occipital Gyrus,Duration,39,L,22,3.14
+24400099,PMC3882248,pone.0084560.s004.docx,30.0,-94.0,10.0,Middle Occipital Gyrus,Duration, ,R,109,3.8
+24400099,PMC3882248,pone.0084560.s004.docx,-16.0,-98.0,8.0,,Duration, ,L,18,3.1
+24400099,PMC3882248,pone.0084560.s004.docx,-37.0,-91.0,-8.0,Inferior Occipital Gyrus,Self-reported cue-induced craving, ,L,16,3.86
+24400099,PMC3882248,pone.0084560.s004.docx,44.0,-18.0,-18.0,Parahippocampal Gyrus,Self-reported cue-induced craving, ,R,27,3.17
+24400099,PMC3882248,pone.0084560.s004.docx,32.0,8.0,40.0,Superior Frontal Gyrus,Self-reported cue-induced craving, ,R,44,4.14
+24400099,PMC3882248,pone.0084560.s004.docx,-7.0,26.0,-5.0,Anterior Cingulate Gyrus,Self-reported cue-induced craving, ,L,46,3.43
+24400099,PMC3882248,pone.0084560.s004.docx,3.0,21.0,-5.0,,Self-reported cue-induced craving,24,R, ,3.22
+24400099,PMC3882248,pone.0084560.s004.docx,28.0,-71.0,-10.0,Fusiform Gyrus,Self-reported cue-induced craving, ,R,25,3.02
+24400099,PMC3882248,pone.0084560.s004.docx,-34.0,-43.0,-13.0,,Self-reported cue-induced craving,37,L,16,2.98
+24400099,PMC3882248,pone.0084560.s004.docx,46.0,-27.0,33.0,Postcentral Gyrus,Depression symptoms (IDS), ,R,105,3.86
+24400099,PMC3882248,pone.0084560.s004.docx,58.0,-20.0,38.0,,Depression symptoms (IDS),4,R, ,3.47
+24400099,PMC3882248,pone.0084560.s004.docx,51.0,-36.0,38.0,,Depression symptoms (IDS),40,R, ,2.94
+24400099,PMC3882248,pone.0084560.s004.docx,-50.0,-13.0,25.0,,Depression symptoms (IDS), ,L,15,3.03
+24400099,PMC3882248,pone.0084560.s004.docx,-39.0,-73.0,40.0,Precuneus,Depression symptoms (IDS),19,L,46,3.87
+24400099,PMC3882248,pone.0084560.s004.docx,-48.0,-64.0,43.0,Inferior Parietal Lobule,Depression symptoms (IDS),40,L, ,2.66
+24400099,PMC3882248,pone.0084560.s004.docx,51.0,-59.0,43.0,,Depression symptoms (IDS),40,R,75,3.63
+24400099,PMC3882248,pone.0084560.s004.docx,-16.0,19.0,60.0,Supplementary Motor Area,Depression symptoms (IDS),6,L,34,3.32
+24400099,PMC3882248,pone.0084560.s004.docx,-11.0,8.0,63.0,,Depression symptoms (IDS), ,L, ,2.78
+24400099,PMC3882248,pone.0084560.s004.docx,42.0,19.0,3.0,IFG,Anxiety symptoms (BAI),45,R,34,3.66
+24400099,PMC3882248,pone.0084560.s004.docx,35.0,26.0,20.0,,Anxiety symptoms (BAI), ,R,42,3.54
+24400099,PMC3882248,pone.0084560.s004.docx,-37.0,21.0,0.0,Insula,Anxiety symptoms (BAI),47,L,50,3.28
+24400099,PMC3882248,pone.0084560.s004.docx,-9.0,-61.0,25.0,Precuneus,Anxiety symptoms (BAI),31,L,17,3.27
+24400099,PMC3882248,pone.0084560.s004.docx,44.0,-59.0,48.0,Inferior Parietal Lobule,Anxiety symptoms (BAI),40,R,26,3.2
+24400099,PMC3882248,pone.0084560.s004.docx,-32.0,-68.0,40.0,,Anxiety symptoms (BAI),19,L,42,3.1
+24400099,PMC3882248,pone.0084560.s004.docx,-62.0,-29.0,10.0,Superior Temporal Gyrus,Anxiety symptoms (BAI), ,L,37,3.06
+24400099,PMC3882248,pone.0084560.s004.docx,3.0,-2.0,50.0,Supplementary Motor Area,Anxiety symptoms (BAI), ,R,21,3.03
+24400099,PMC3882248,pone.0084560.s004.docx,-2.0,-9.0,55.0,,Anxiety symptoms (BAI),6,L, ,2.77
+24400099,PMC3882248,pone.0084560.s004.docx,3.0,-25.0,53.0,,Anxiety symptoms (BAI),6,R,18,3.01
+24400099,PMC3882248,pone.0084560.s004.docx,-39.0,10.0,-20.0,Superior Temporal Gyrus,Smoking, ,L,24,3.83
+24400099,PMC3882248,pone.0084560.s004.docx,-14.0,35.0,15.0,Anterior Cingulate / White matter,Smoking, ,L,28,3.28
+24400099,PMC3882248,pone.0084560.s004.docx,-43.0,-48.0,40.0,Inferior Parietal Lobule,Smoking,40,L,17,3.24
+24400099,PMC3882248,pone.0084560.s004.docx,25.0,-82.0,8.0,Cuneus,Smoking, ,R,69,3.66
+24400099,PMC3882248,pone.0084560.s004.docx,-34.0,-6.0,40.0,Precentral Gyrus,Smoking, ,L,24,3.36
+24400099,PMC3882248,pone.0084560.s004.docx,-25.0,-94.0,-10.0,Inferior Occipital Gyrus,Smoking, ,L,50,3.21
+24400099,PMC3882248,pone.0084560.s004.docx,-20.0,-89.0,-5.0,,Smoking, ,L, ,3.11
+24400099,PMC3882248,pone.0084560.s004.docx,51.0,-13.0,-15.0,Middle Temporal Gyrus,Smoking, ,R,35,3.14
+24400099,PMC3882248,pone.0084560.s004.docx,51.0,-13.0,-5.0,Superior Temporal Gyrus,Smoking, ,R, ,3.04

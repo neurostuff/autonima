@@ -1,0 +1,62 @@
+pmid,pmcid,source_file,x,y,z,region,group,ba,statistic
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-61.0,6.0,30.0,Comparison subjects Left superior frontal Gyrus,,6,4.19
+19538748,PMC2704184,1471-244X-9-39-S2.doc,53.0,-4.0,30.0,Right superior frontal Gyrus,,6,3.76
+19538748,PMC2704184,1471-244X-9-39-S2.doc,32.0,54.0,-8.0,Right middle frontal Gyrus,,10,5.38
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-55.0,30.0,19.0,Left middle frontal Gyrus,,46,4.78
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-53.0,35.0,-2.0,Left inferior frontal Gyrus,,47,4.22
+19538748,PMC2704184,1471-244X-9-39-S2.doc,22.0,13.0,-21.0,Right inferior frontal Gyrus,,47,3.06
+19538748,PMC2704184,1471-244X-9-39-S2.doc,6.0,2.0,-3.0,Right anterior cingulate Gyrus,,25,5.57
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-6.0,-1.0,24.0,Left anterior cingulate Gyrus,,24,5.77
+19538748,PMC2704184,1471-244X-9-39-S2.doc,4.0,-47.0,41.0,Right cingulate Gyrus,,31,4.81
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-28.0,-29.0,-4.0,Left hippocampus,,,9.00
+19538748,PMC2704184,1471-244X-9-39-S2.doc,12.0,-41.0,4.0,Right parahippocampal,,30,4.05
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-18.0,-46.0,4.0,Left parahippocampal,,30,4.73
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-44.0,14.0,1.0,Left insular cortex,,13,4.37
+19538748,PMC2704184,1471-244X-9-39-S2.doc,44.0,8.0,0.0,Right insular cortex,,13,3.56
+19538748,PMC2704184,1471-244X-9-39-S2.doc,6.0,16.0,58.0,PTSD patients Right superior frontal Gyrus,,6,1.87
+19538748,PMC2704184,1471-244X-9-39-S2.doc,30.0,50.0,25.0,Right superior frontal Gyrus,,10,2.34
+19538748,PMC2704184,1471-244X-9-39-S2.doc,38.0,12.0,47.0,Right middle frontal Gyrus,,6,2.38
+19538748,PMC2704184,1471-244X-9-39-S2.doc,53.0,23.0,36.0,Right middle frontal Gyrus,,9,2.55
+19538748,PMC2704184,1471-244X-9-39-S2.doc,48.0,27.0,32.0,Right middle frontal Gyrus,,46,2.72
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-50.0,25.0,26.0,Left middle Frontal Gyrus,,46,1.99
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-42.0,29.0,35.0,Left middle Frontal Gyrus,,9,3.04
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-28.0,-31.0,-3.0,Left hippocampus,,,2.20
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-24.0,-28.0,-12.0,Left parahippocampal,,35,2.07
+19538748,PMC2704184,1471-244X-9-39-S2.doc,24.0,-33.0,-10.0,Right parahippocampal,,36,1.88
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-40.0,10.0,3.0,Left insular cortex,,13,1.99
+19538748,PMC2704184,1471-244X-9-39-S2.doc,22.0,16.0,45.0,Comparison subjects > PTSD patients Right superior frontal Gyrus,,8,1.77
+19538748,PMC2704184,1471-244X-9-39-S2.doc,36.0,12.0,47.0,Right middle frontal Gyrus,,6,2.44
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-51.0,17.0,23.0,Left inferior frontal Gyrus,,9,1.86
+19538748,PMC2704184,1471-244X-9-39-S2.doc,53.0,37.0,0.0,Right inferior frontal Gyrus,,45,1.89
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-6.0,-1.0,24.0,Left anterior cingulate Gyrus,,24,1.77
+19538748,PMC2704184,1471-244X-9-39-S2.doc,2.0,0.0,-3.0,Right anterior cingulate Gyrus,,25,1.84
+19538748,PMC2704184,1471-244X-9-39-S2.doc,4.0,-47.0,41.0,Right Cingulate Gyrus,,31,1.81
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-20.0,-29.0,-4.0,Left hippocampus,,,2.19
+19538748,PMC2704184,1471-244X-9-39-S2.doc,12.0,-41.0,4.0,Right parahippocampal,,30,2.05
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-18.0,-46.0,4.0,Left Parahippocampal,,30,1.73
+19538748,PMC2704184,1471-244X-9-39-S2.doc,-40.0,-22.0,18.0,Left Insular,,13,2.17
+19538748,PMC2704184,1471-244X-9-39-S3.doc,26.0,63.0,13.0,Comparison subjects Right superior frontal Gyrus,,10,5.77
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-46.0,17.0,-9.0,Left superior frontal Gyrus,,9,6.47
+19538748,PMC2704184,1471-244X-9-39-S3.doc,8.0,12.0,55.0,Right superior frontal Gyrus,,6,6.34
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-14.0,-10.0,35.0,Left anterior cingulate Gyrus,,24,3.65
+19538748,PMC2704184,1471-244X-9-39-S3.doc,22.0,-42.0,22.0,Right posterior cingulate Gyrus,,31,3.43
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-40.0,-32.0,-12.0,Left parahippocampal Gyrus,,36,3.22
+19538748,PMC2704184,1471-244X-9-39-S3.doc,32.0,-18.0,-19.0,Right hippocampus,,,2.96
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-30.0,-22.0,-17.0,Left hippocampus,,,3.15
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-42.0,-34.0,18.0,Left insular cortex,,13,4.63
+19538748,PMC2704184,1471-244X-9-39-S3.doc,42.0,-32.0,15.0,Right insular cortex,,13,4.42
+19538748,PMC2704184,1471-244X-9-39-S3.doc,10.0,11.0,66.0,Patients Right superior frontal Gyrus,,6,3.17
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-12.0,42.0,18.0,Left Middle Frontal Gyrus,,9,4.81
+19538748,PMC2704184,1471-244X-9-39-S3.doc,8.0,55.0,-8.0,Right Middle Frontal Gyrus,,10,3.69
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-59.0,16.0,16.0,Left Inferior Frontal Gyrus,,44,3.28
+19538748,PMC2704184,1471-244X-9-39-S3.doc,16.0,-33.0,-6.0,Right Parahippocampal Gyrus,,30,2.98
+19538748,PMC2704184,1471-244X-9-39-S3.doc,8.0,12.0,55.0,Comparison Subjects > Patients Right Superior Frontal Gyrus,,6,3.34
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-38.0,14.0,53.0,Left Middle Frontal Gyrus,,6,3.33
+19538748,PMC2704184,1471-244X-9-39-S3.doc,24.0,63.0,6.0,Right Middle Frontal Gyrus,,10,3.29
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-14.0,-10.0,35.0,Left Anterior Cingulate Gyrus,,24,2.99
+19538748,PMC2704184,1471-244X-9-39-S3.doc,22.0,-42.0,22.0,Right Posterior Cingulate Gyrus,,31,3.43
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-40.0,-32.0,-12.0,Left Parahippocampal Gyrus,,36,3.01
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-30.0,-22.0,-17.0,Left Hippocampus,,,3.85
+19538748,PMC2704184,1471-244X-9-39-S3.doc,32.0,-18.0,-19.0,Right hippocampus,,,3.70
+19538748,PMC2704184,1471-244X-9-39-S3.doc,-42.0,-34.0,18.0,Left Insular,,13,3.51
+19538748,PMC2704184,1471-244X-9-39-S3.doc,42.0,-32.0,15.0,Right Insular,,13,3.62

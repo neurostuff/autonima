@@ -1,0 +1,34 @@
+pmid,pmcid,source_file,x,y,z,region,group,size,statistic,p_value
+32150321,PMC7267965,HBM-41-2216-s001.docx,-52.0,2.0,46.0,Primary Motor Cortex (BA6) - Left,SDI>HC group comparison,9343,4.23,6.96E-30
+32150321,PMC7267965,HBM-41-2216-s001.docx,62.0,-10.0,38.0,Primary Motor Cortex (BA6) - Right,SDI>HC group comparison,1288,4.13,4.77E-07
+32150321,PMC7267965,HBM-41-2216-s001.docx,40.0,20.0,-32.0,Temporal Pole (BA38) - Right,SDI>HC group comparison,787,4.44,0.000103
+32150321,PMC7267965,HBM-41-2216-s001.docx,46.0,-50.0,22.0,Angular gyrus (BA39) - Right,SDI>HC group comparison,761,4.06,0.000139
+32150321,PMC7267965,HBM-41-2216-s001.docx,-20.0,-8.0,-12.0,Amygdala - Left,SDI>HC group comparison,715,3.85,0.000241
+32150321,PMC7267965,HBM-41-2216-s001.docx,10.0,-54.0,8.0,PCC (BA23) - Right,SDI>HC group comparison,591,3.31,0.00113
+32150321,PMC7267965,HBM-41-2216-s001.docx,-14.0,-44.0,36.0,PCC (BA31) - Left,SDI>HC group comparison,573,3.65,0.00142
+32150321,PMC7267965,HBM-41-2216-s001.docx,30.0,-82.0,-12.0,Occipital cortex (BA19) - Right,SDI>HC group comparison,362,3.97,0.0266
+32150321,PMC7267965,HBM-41-2216-s001.docx,-10.0,34.0,-14.0,OFC/vmPFC (BA11) - Left,SDI>HC group comparison,353,3.25,0.0305
+32150321,PMC7267965,HBM-41-2216-s001.docx,32.0,38.0,-12.0,OFC (BA47) - Right,SDI>HC group comparison,353,4.02,0.0305
+32150321,PMC7267965,HBM-41-2216-s001.docx,-32.0,20.0,-22.0,OFC (BA47) - Left,SDI>HC group comparison,333,3.94,0.0412
+32150321,PMC7267965,HBM-41-2216-s001.docx,20.0,-28.0,8.0,Thalamus (BA50) - Right,SDI>HC group comparison,338,3.6,0.0382
+32150321,PMC7267965,HBM-41-2216-s001.docx,-22.0,2.0,18.0,WM between Cau and Put,SDI>HC group comparison,,3.31,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-12.0,10.0,16.0,Left Cau,SDI>HC group comparison,,3.23,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-14.0,8.0,20.0,Left Cau,SDI>HC group comparison,,3.15,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-14.0,18.0,12.0,Left anterior Cau,SDI>HC group comparison,,3.12,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-32.0,-4.0,12.0,WM between Put and Insula,SDI>HC group comparison,,2.8,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-22.0,2.0,8.0,Left putamen,SDI>HC group comparison,,2.49,0.0365
+32150321,PMC7267965,HBM-41-2216-s001.docx,-52.0,4.0,46.0,Primary Motor Cortex (BA6) - Left,SDI>SIB group comparison,23758,5.1,<0.0001
+32150321,PMC7267965,HBM-41-2216-s001.docx,-34.0,-82.0,16.0,Occipital (BA19) - Left,SDI>SIB group comparison,,4.66,<0.0001
+32150321,PMC7267965,HBM-41-2216-s001.docx,-32.0,-92.0,10.0,Occipital (BA18) - Left,SDI>SIB group comparison,,4.29,<0.0001
+32150321,PMC7267965,HBM-41-2216-s001.docx,-50.0,-6.0,-14.0,Superior temporal gyrus (BA22) - Left,SDI>SIB group comparison,,4.33,<0.0001
+32150321,PMC7267965,HBM-41-2216-s001.docx,-10.0,-20.0,12.0,Thalamus (BA50) - Left,SDI>SIB group comparison,,4.31,<0.0001
+32150321,PMC7267965,HBM-41-2216-s001.docx,56.0,-44.0,46.0,Supramarginal gyrus (BA40) - Right,SDI>SIB group comparison,1046,4.09,5.78E-06
+32150321,PMC7267965,HBM-41-2216-s001.docx,52.0,14.0,32.0,IFC (pars opercularis) (BA44) - Right,SDI>SIB group comparison,646,3.8,0.000562
+32150321,PMC7267965,HBM-41-2216-s001.docx,46.0,-14.0,40.0,Primary Motor Cortex (BA6) - Right,SDI>SIB group comparison,570,3.72,0.00148
+32150321,PMC7267965,HBM-41-2216-s001.docx,62.0,-26.0,-12.0,Temporal lobe (BA21) - Right,SDI>SIB group comparison,558,3.48,0.00173
+32150321,PMC7267965,HBM-41-2216-s001.docx,-24.0,-26.0,6.0,WM between Put and Thal,SDI>SIB group comparison,,3.94,0.00176
+32150321,PMC7267965,HBM-41-2216-s001.docx,-18.0,-6.0,6.0,Left Putamen,SDI>SIB group comparison,,3.5,0.00176
+32150321,PMC7267965,HBM-41-2216-s001.docx,-36.0,-2.0,2.0,WM between Put and Insula,SDI>SIB group comparison,,3.41,0.00176
+32150321,PMC7267965,HBM-41-2216-s001.docx,-20.0,-4.0,24.0,Left dorsal caudate,SDI>SIB group comparison,,3.01,0.00176
+32150321,PMC7267965,HBM-41-2216-s001.docx,-24.0,-4.0,14.0,Left dorsal putamen,SDI>SIB group comparison,,2.86,0.00176
+32150321,PMC7267965,HBM-41-2216-s001.docx,-32.0,-24.0,10.0,WM between Put and Insula,SDI>SIB group comparison,,2.79,0.00176

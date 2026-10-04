@@ -1,0 +1,25 @@
+pmid,pmcid,source_file,x,y,z,region,group,hemisphere,size
+PMC6785263,PMC6785263,aax2084_SM.pdf,46.0,14.0,14.0,Anterior insula /inferior frontal gyrus (IFG),,R,1137
+PMC6785263,PMC6785263,aax2084_SM.pdf,-42.0,12.0,12.0,Anterior insula /inferior frontal gyrus (IFG),,L,992
+PMC6785263,PMC6785263,aax2084_SM.pdf,2.0,18.0,46.0,"ACC/Pre-SMA/SMA (superior, middle & medial frontal gyrus, cigulate gyrus)",,"R,L",969
+PMC6785263,PMC6785263,aax2084_SM.pdf,1.0,-19.0,0.0,Thalamus (encompassing Habenula),,"R,L",748
+PMC6785263,PMC6785263,aax2084_SM.pdf,31.0,45.0,19.0,Middle & superior frontal gyrus,,R,44
+PMC6785263,PMC6785263,aax2084_SM.pdf,-36.0,-29.0,15.0,Posterior insula & superior temporal gyrus,,L,33
+PMC6785263,PMC6785263,aax2084_SM.pdf,0.0,-22.0,30.0,Posterior cingulate,,"R,L",50
+PMC6785263,PMC6785263,aax2084_SM.pdf,49.0,-45.0,21.0,"Superior & middle temporal gyrus, supramarginal gyrus",,R,642
+PMC6785263,PMC6785263,aax2084_SM.pdf,-45.0,-51.0,30.0,Superior & middle temporal gyrus,,L,46
+PMC6785263,PMC6785263,aax2084_SM.pdf,38.0,-71.0,23.0,Middle temporal gyrus & superior occipital gyrus,,R,19
+PMC6785263,PMC6785263,aax2084_SM.pdf,-45.0,-51.0,30.0,"Supramarginal gyrus , superior temporal gyrus, & inferior parietal lobule",,L,376
+PMC6785263,PMC6785263,aax2084_SM.pdf,37.0,-51.0,-16.0,Fusiform gyrus,,R,295
+PMC6785263,PMC6785263,aax2084_SM.pdf,49.0,-45.0,21.0,Fusiform gyrus,,L,217
+PMC6785263,PMC6785263,aax2084_SM.pdf,10.0,-68.0,41.0,Precuneus,,R,37
+PMC6785263,PMC6785263,aax2084_SM.pdf,-18.0,-69.0,-25.0,"Cerebellum (uvula, pyramis)",,L,35
+PMC6785263,PMC6785263,aax2084_SM.pdf,15.0,10.0,-3.0,"Ventral striatum (nucleus accumbens, caudate)",,R,55
+PMC6785263,PMC6785263,aax2084_SM.pdf,-12.0,10.0,-3.0,"Ventral striatum (nucleus accumbens, caudate)",,L,42
+PMC6785263,PMC6785263,aax2084_SM.pdf,13.0,2.0,-1.0,"Ventral striatum (lentiform nucleus, caudate)",,R,29
+PMC6785263,PMC6785263,aax2084_SM.pdf,-12.0,0.0,-3.0,Ventral striatum (lentiform nucleus),,L,21
+PMC6785263,PMC6785263,aax2084_SM.pdf,-32.0,26.0,-3.0,Anterior insula /inferior frontal gyrus (IFG),,L,18
+PMC6785263,PMC6785263,aax2084_SM.pdf,0.0,41.0,-10.0,"Ventromedial PFC (medial frontal gyrus, BA10)",,"R,L",21
+PMC6785263,PMC6785263,aax2084_SM.pdf,-16.0,1.0,16.0,Caudate (body),,L,23
+PMC6785263,PMC6785263,aax2084_SM.pdf,4.0,-3.0,10.0,Thalamus/Caudate/Insula/Lentiform nucleus,,"R,L",506
+PMC6785263,PMC6785263,aax2084_SM.pdf,1.0,13.0,42.0,Cingulate gyrus (medial & superior frontal gyrus),,"R,L",144
