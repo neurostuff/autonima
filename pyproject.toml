@@ -57,7 +57,7 @@ Documentation = "https://neurostuff.github.io/autonima/"
 Source = "https://github.com/neurostuff/autonima"
 Tracker = "https://github.com/neurostuff/autonima/issues"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21.0",
@@ -66,6 +66,8 @@ dev = [
     "mypy>=1.0",
     "pre-commit>=3.0",
 ]
+
+[project.optional-dependencies]
 llm = ["openai>=1.0"]
 readability = ["readabilipy>=0.2.0"]
 meta = ["nimare>=0.11.0"]
