@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
         resolution: ['highest']
         include:
           # The minimum the meta extra allows, on the oldest supported Python.
-          - python-version: "3.10"
+          - python-version: "3.11"
             resolution: 'lowest-direct'
 
     env:
