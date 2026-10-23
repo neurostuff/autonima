@@ -69,7 +69,7 @@ dev = [
 ]
 
 [project.optional-dependencies]
-llm = ["openai>=1.0"]
+llm = ["openai>=2.0"]
 readability = ["readabilipy>=0.2.0"]
 meta = ["nimare>=0.11.0"]
 docs = [
