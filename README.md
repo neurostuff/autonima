@@ -68,7 +68,28 @@ created in one can be run from the other. See the
 
 ## Install
 
-Autonima needs Python 3.10 or newer (tested on 3.10 through 3.13).
+The simplest way to get going is to use [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install 'git+https://github.com/neurostuff/autonima.git[llm,meta,ui]'
+```
+
+This will install autonima into `~/.local/bin`, so make sure that is in your `PATH`.
+
+### Other installation methods
+
+If you're going to be hacking on autonima, clone the repository and use `uv sync`:
+
+```bash
+git clone https://github.com/neurostuff/autonima.git
+cd autonima
+uv sync --extra llm,meta,ui
+```
+
+To run autonima from the source tree, use `uv run autonima` instead of `autonima`.
+
+If you'd prefer not to use `uv`, you can still use `pip` install.
+Autonima needs Python 3.11 or newer (tested on 3.11 through 3.15).
 
 ```bash
 git clone https://github.com/neurostuff/autonima.git
