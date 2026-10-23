@@ -161,7 +161,7 @@ If `autonima meta` fails with an import error, install:
 pip install -e ".[meta]"
 ```
 
-The error names the import that failed. NiMARE 0.21 and later are incompatible; the same command replaces them with a supported version.
+The error names the import that failed. NiMARE releases older than 0.11.0 are incompatible; the same command upgrades them to a supported version.
 
 ## Missing Readability Support
 

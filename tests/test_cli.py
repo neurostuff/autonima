@@ -297,15 +297,18 @@ def test_run_abstract_passes_abstract_stop_after_stage(tmp_path, monkeypatch):
 def test_meta_reports_an_incompatible_nimare_instead_of_calling_it_missing(
     tmp_path, monkeypatch, caplog
 ):
-    # NiMARE 0.21+ is installable but no longer exports nimare.nimads.Annotation. That used to be
-    # reported as "NiMARE is not installed", which sent users to reinstall the same broken version.
+    # An installed NiMARE that lacks an API autonima imports -- as 0.21 did when it dropped
+    # nimare.nimads.Annotation -- used to be reported as "NiMARE is not installed", which sent
+    # users to reinstall the same broken version. The stand-ins model one without Studyset.
     stand_ins = {
         "nimare": {},
         "nimare.correct": {"FDRCorrector": object, "FWECorrector": object},
         "nimare.workflows": {"CBMAWorkflow": object},
         "nimare.meta": {},
         "nimare.meta.cbma": {"MKDADensity": object, "ALE": object, "KDA": object},
-        "nimare.nimads": {"Studyset": object},
+        "nimare.nimads": {},
+        "nimare.reports": {},
+        "nimare.reports.base": {"run_reports": object},
     }
     for name, attrs in stand_ins.items():
         module = types.ModuleType(name)
@@ -317,6 +320,6 @@ def test_meta_reports_an_incompatible_nimare_instead_of_calling_it_missing(
         result = CliRunner().invoke(meta, [str(tmp_path)])
 
     assert result.exit_code == 1
-    assert "cannot import name 'Annotation'" in caplog.text
-    assert "nimare<0.21" in caplog.text
+    assert "cannot import name 'Studyset'" in caplog.text
+    assert "nimare>=0.11" in caplog.text
     assert "not installed" not in caplog.text

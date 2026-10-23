@@ -45,7 +45,7 @@ Install this to use `autonima meta`:
 pip install -e ".[meta]"
 ```
 
-This adds the NiMARE dependency stack, pinned below 0.21: later releases dropped `nimare.nimads.Annotation`, which `autonima meta` uses.
+This adds the NiMARE dependency stack. `autonima meta` needs NiMARE 0.11.0 or later.
 
 ### Enhanced HTML Cleaning (Optional)
 

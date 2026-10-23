@@ -12,17 +12,17 @@ try:
     from nimare.correct import FDRCorrector, FWECorrector
     from nimare.workflows import CBMAWorkflow
     from nimare.meta.cbma import MKDADensity, ALE, KDA
-    from nimare.nimads import Studyset, Annotation
+    from nimare.nimads import Studyset
     from nimare.reports.base import run_reports
 except ImportError as exc:
-    # Report the real failure: an installed but incompatible NiMARE (0.21+ dropped
-    # nimare.nimads.Annotation) used to be reported as "NiMARE is not installed".
+    # Report the real failure: an installed but incompatible NiMARE used to be reported
+    # as "NiMARE is not installed".
     if getattr(exc, "name", None) == "nimare":
         message = "NiMARE is not installed."
     else:
-        message = f"Could not import NiMARE: {exc}. autonima meta needs nimare<0.21."
+        message = f"Could not import NiMARE: {exc}. autonima meta needs nimare>=0.11."
     raise ImportError(
-        f'{message} Install a supported version with: pip install "nimare<0.21"'
+        f'{message} Install a supported version with: pip install "nimare>=0.11"'
     ) from exc
 
 
@@ -291,13 +291,7 @@ def run_meta_analysis_for_column(
         return None
     first_studyset = first_studyset.slice(analyses=valid_analysis_ids)
 
-    for study in first_studyset.studies:
-        study.name = study.id
-        for analysis in study.analyses:
-            analysis.name = analysis.id
-
-    first_dataset = first_studyset.to_dataset()
-    if len(first_dataset.ids) == 0:
+    if len(first_studyset.ids) == 0:
         print(f"No analyses available for column {column} after slicing. Skipping.")
         return None
 
@@ -311,7 +305,7 @@ def run_meta_analysis_for_column(
         output_dir=str(output_dir),
     )
 
-    meta_results = workflow.fit(first_dataset)
+    meta_results = workflow.fit(first_studyset)
     if generate_reports:
         run_reports(meta_results, str(output_dir))
 
@@ -368,9 +362,6 @@ def run_meta_analyses_from_files(
     print("Creating studyset...")
     studyset = Studyset(studyset_data)
 
-    print("Creating annotation...")
-    annotation = Annotation(annotation_data, studyset)
-
     selected_columns = _get_boolean_columns(annotation_data, columns=columns)
     print(f"Found {len(selected_columns)} boolean columns: {selected_columns}")
 
@@ -387,7 +378,7 @@ def run_meta_analyses_from_files(
         try:
             meta_results = run_meta_analysis_for_column(
                 studyset,
-                annotation,
+                None,
                 annotation_data,
                 column,
                 str(column_output_dir),

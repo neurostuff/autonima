@@ -75,8 +75,9 @@ setup(
             "readabilipy>=0.2.0"
         ],
         "meta": [
-            # 0.21 dropped Annotation from nimare.nimads, which autonima/meta.py imports.
-            "nimare>=0.1.0,<0.21"
+            # 0.11.0 is the first release whose Studyset has .ids, which autonima/meta.py
+            # uses; it fits that Studyset directly.
+            "nimare>=0.11.0"
         ],
         "docs": [
             "mkdocs>=1.6",
