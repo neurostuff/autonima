@@ -42,11 +42,13 @@ CLEAR_CACHE_STAGES = {
 }
 
 STAGE_ARTIFACTS: Dict[str, List[str]] = {
-    "search": ["search_results.json"],
+    "search": ["search_results.json", "neurostore_search_log.json"],
     "abstract": ["abstract_screening_results.json"],
     "retrieval": ["fulltext_retrieval_results.json", "documents_unavailable.csv"],
     "fulltext": ["fulltext_screening_results.json"],
-    "parsing": ["coordinate_parsing_results.json"],
+    # The NeuroStore snapshot is what a coordinate_source: neurostore run used; it moves and
+    # is invalidated with the stage like the parse results it stands behind.
+    "parsing": ["coordinate_parsing_results.json", "neurostore_analyses.json", "neurostore_unavailable.csv"],
     "annotation": ["annotation_results.json"],
     "output": [
         "final_results.json",

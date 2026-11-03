@@ -367,3 +367,41 @@ def test_the_parsing_stage_attaches_neurostore_analyses(tmp_path, monkeypatch):
     asyncio.run(pipeline._execute_coordinate_parsing())
     assert [t.table_id for t in found.activation_tables] == ["tbl1", "neurostore-T1"]
     assert pipeline.results.execution_stats["coordinate_parsing"]["studies_reused"] == 2
+
+
+# ---------------------------------------------------------------------------
+# cache: the snapshot travels and is invalidated with the parsing stage
+# ---------------------------------------------------------------------------
+
+def _ns_config(directory, roles=None):
+    from autonima.config import ConfigManager as Manager
+
+    config = yaml.safe_load(get_sample_config_text())
+    config["output"]["directory"] = str(directory)
+    config["parsing"] = {"parse_coordinates": True, "coordinate_source": "neurostore",
+                         **({"neurostore": {"roles": roles}} if roles else {})}
+    return Manager().load_from_dict(config)
+
+
+def _signed(path, stage, stage_hash):
+    from autonima.execution import CACHE_SCHEMA_VERSION
+
+    path.write_text(json.dumps({"studies": [], "cache_signature": {
+        "schema_version": CACHE_SCHEMA_VERSION, "stage": stage, "stage_hash": stage_hash}}))
+
+
+def test_the_snapshot_is_copied_from_a_seed_run_and_cleared_when_options_change(tmp_path):
+    from autonima.execution import prepare_execution
+
+    seed = tmp_path / "seed"
+    config = _ns_config(seed)
+    prepare_execution(config, seed)
+    _signed(seed / "outputs" / "coordinate_parsing_results.json", "parsing", stage_hashes(config)["parsing"])
+    (seed / "outputs" / SNAPSHOT_FILENAME).write_text("{}")
+
+    arm = tmp_path / "arm"
+    prepare_execution(_ns_config(arm), arm, copy_valid_cache_from=str(seed))
+    assert (arm / "outputs" / SNAPSHOT_FILENAME).exists()
+
+    prepare_execution(_ns_config(arm, roles=["result", "anchor"]), arm)
+    assert not (arm / "outputs" / SNAPSHOT_FILENAME).exists()
