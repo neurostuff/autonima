@@ -1140,7 +1140,8 @@ class AutonimaPipeline:
             record = snapshot.get(study.pmid)
             # Tables from an earlier NeuroStore attach are replaced, never accumulated.
             study.activation_tables = [
-                t for t in study.activation_tables if not t.table_id.startswith(TABLE_ID_PREFIX)
+                t for t in study.activation_tables
+                if not (t.table_id or "").startswith(TABLE_ID_PREFIX)
             ]
             if not record or record.get("unavailable"):
                 reason = record.get("unavailable") if record else "fetch_failed"

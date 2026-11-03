@@ -343,7 +343,9 @@ def test_the_parsing_stage_attaches_neurostore_analyses(tmp_path, monkeypatch):
     pipeline.results.studies = [
         Study(pmid=pmid, title="t", abstract="a", authors=[], journal="j", publication_date="2020",
               status=StudyStatus.INCLUDED_FULLTEXT,
-              activation_tables=[ActivationTable(table_id="tbl1", table_label="Table 1")])
+              activation_tables=[ActivationTable(table_id="tbl1", table_label="Table 1"),
+                                 # Older retrievals left some tables without an id.
+                                 ActivationTable(table_id=None, table_label="Table 2")])
         for pmid in ("111", "999")
     ]
     monkeypatch.setattr(
@@ -355,7 +357,7 @@ def test_the_parsing_stage_attaches_neurostore_analyses(tmp_path, monkeypatch):
     found, missing = pipeline.results.studies
     assert [a.name for a in found.analyses] == ["Patients > Controls", "Task > Rest"]
     # The article's own tables stay; NeuroStore's are added beside them.
-    assert [t.table_id for t in found.activation_tables] == ["tbl1", "neurostore-T1"]
+    assert [t.table_id for t in found.activation_tables] == ["tbl1", None, "neurostore-T1"]
     assert missing.analyses == []
     stats = pipeline.results.execution_stats["coordinate_parsing"]
     assert stats["studies_with_analyses"] == 1 and stats["unavailable"] == {"not_in_neurostore": 1}
@@ -365,7 +367,7 @@ def test_the_parsing_stage_attaches_neurostore_analyses(tmp_path, monkeypatch):
 
     # A second run reads the snapshot and does not accumulate tables.
     asyncio.run(pipeline._execute_coordinate_parsing())
-    assert [t.table_id for t in found.activation_tables] == ["tbl1", "neurostore-T1"]
+    assert [t.table_id for t in found.activation_tables] == ["tbl1", None, "neurostore-T1"]
     assert pipeline.results.execution_stats["coordinate_parsing"]["studies_reused"] == 2
 
 
