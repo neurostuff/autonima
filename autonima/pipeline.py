@@ -1,10 +1,10 @@
 """Main pipeline orchestrator for Autonima."""
 
 import logging
-import os
 import csv
 import json
 import hashlib
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Literal, cast
@@ -28,7 +28,7 @@ from .retrieval.utils import (
     _apply_analyses_to_studies,
     _map_pmids_to_text,
 )
-from .utils import log_error_with_debug
+from .utils import atomic_write_json as _atomic_write_json, log_error_with_debug
 from .annotation.processor import AnnotationProcessor
 from .documents import attach_documents, create_document_source
 from .execution import (
@@ -46,15 +46,6 @@ logger = logging.getLogger(__name__)
 
 RunStopStage = Literal["search", "abstract", "full"]
 VALID_RUN_STOP_STAGES = {"search", "abstract", "full"}
-
-
-def _atomic_write_json(file_path: Path, data: Dict[str, Any]) -> None:
-    """Write JSON atomically to avoid partially written output files."""
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = file_path.with_suffix(file_path.suffix + ".tmp")
-    with open(temp_file, 'w') as f:
-        json.dump(data, f, indent=2)
-    os.replace(temp_file, file_path)
 
 
 def _analyses_transported(study: Study) -> bool:
@@ -78,6 +69,9 @@ class AutonimaPipeline:
     4. Full-text screening
     5. Output generation with PRISMA compliance
     """
+
+    # Minimum seconds between rewrites of coordinate_parsing_results.json while studies finish.
+    coordinate_save_interval = 2.0
 
     def __init__(
         self,
@@ -1005,66 +999,86 @@ class AutonimaPipeline:
             f"from {len(studies_with_tables)}"
         )
  
-        # Process tables with or without parallelization
-        if self.num_workers <= 1 or len(table_jobs) <= 1:
-            # Serial processing
-            logger.debug("Using serial processing for coordinate parsing")
-            processed_count = 0
-            for study, table, table_index in table_jobs:
-                try:
-                    # Process a single table
-                    table_analyses = processor.process_single_table(table)
-                    
-                    # Add the analyses to the study
-                    study.analyses.extend(table_analyses)
-                    processed_count += 1
-                    
-                except Exception as e:
-                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
-                    self._coordinate_failed_tables.setdefault(study.pmid, []).append(
-                        table.table_id
-                    )
-                    continue
-        else:
-            # Parallel processing over all tables
-            logger.debug(
-                f"Using {self.num_workers} workers for parallel "
-                f"coordinate parsing of {len(table_jobs)} tables"
-            )
+        # A study is used -- and cached -- only once all of its tables are back. Its analyses
+        # are then applied in table order and the cache is rewritten, so a run killed partway
+        # keeps the studies it finished; writes are at least coordinate_save_interval apart.
+        tables_left = {study.pmid: len(study.activation_tables) for study in studies_with_tables}
+        parsed_tables: Dict[str, Dict[int, Any]] = {}
+        processed_count = 0
+        last_save = None
 
-            def process_single_table_job(job):
-                study, table, table_index = job
-                try:
-                    # Process a single table
-                    table_analyses = processor.process_single_table(table)
-                    return study, table_analyses, table_index
-                except Exception as e:
-                    logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
-                    return study, None, table_index
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                futures = [
-                    executor.submit(process_single_table_job, job)
-                    for job in table_jobs
-                ]
-                results = [
-                    future.result()
-                    for future in tqdm(futures, total=len(futures))
-                ]
-            
-            # Apply results to studies
-            processed_count = 0
-            for study, table_analyses, table_index in results:
-                if table_analyses is not None:
-                    study.analyses.extend(table_analyses)
-                    processed_count += 1
+        def finish_table(study, table_analyses, table_index):
+            nonlocal processed_count, last_save
+            parsed_tables.setdefault(study.pmid, {})[table_index] = table_analyses
+            if table_analyses is not None:
+                processed_count += 1
+            tables_left[study.pmid] -= 1
+            if tables_left[study.pmid]:
+                return
+            for index, analyses in sorted(parsed_tables.pop(study.pmid).items()):
+                if analyses is None:
+                    self._coordinate_failed_tables.setdefault(study.pmid, []).append(
+                        study.activation_tables[index].table_id
+                    )
                 else:
-                    self._coordinate_failed_tables.setdefault(study.pmid, []).append(
-                        study.activation_tables[table_index].table_id
-                    )
+                    study.analyses.extend(analyses)
+            now = time.monotonic()
+            if last_save is None or now - last_save >= self.coordinate_save_interval:
+                self._save_coordinate_parsing_results()
+                last_save = now
 
-        # Save coordinate parsing results
-        await self._save_coordinate_parsing_results()
+        try:
+            # Process tables with or without parallelization
+            if self.num_workers <= 1 or len(table_jobs) <= 1:
+                # Serial processing
+                logger.debug("Using serial processing for coordinate parsing")
+                for study, table, table_index in table_jobs:
+                    try:
+                        # Process a single table
+                        table_analyses = processor.process_single_table(table)
+                    except Exception as e:
+                        logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                        table_analyses = None
+                    finish_table(study, table_analyses, table_index)
+            else:
+                # Parallel processing over all tables
+                logger.debug(
+                    f"Using {self.num_workers} workers for parallel "
+                    f"coordinate parsing of {len(table_jobs)} tables"
+                )
+
+                def process_single_table_job(job):
+                    study, table, table_index = job
+                    try:
+                        # Process a single table
+                        table_analyses = processor.process_single_table(table)
+                        return study, table_analyses, table_index
+                    except Exception as e:
+                        logger.warning(f"Error processing table {table_index} for study {study.pmid}: {e}")
+                        return study, None, table_index
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                    futures = {
+                        executor.submit(process_single_table_job, job)
+                        for job in table_jobs
+                    }
+                    try:
+                        for future in tqdm(
+                            concurrent.futures.as_completed(futures), total=len(futures)
+                        ):
+                            futures.discard(future)
+                            finish_table(*future.result())
+                    except BaseException:
+                        # Interrupted: don't start the queued tables, but keep the ones
+                        # already being parsed, since their calls are paid for either way.
+                        executor.shutdown(cancel_futures=True)
+                        for future in futures:
+                            if not future.cancelled() and future.exception() is None:
+                                finish_table(*future.result())
+                        raise
+        finally:
+            # Save coordinate parsing results
+            self._save_coordinate_parsing_results()
 
         failed_tables = self._coordinate_failed_tables
         tables_failed = sum(len(ids) for ids in failed_tables.values())
@@ -1303,11 +1317,12 @@ class AutonimaPipeline:
         except Exception as e:
             logger.warning(f"Failed to load cached coordinate parsing results: {e}")
  
-    async def _save_coordinate_parsing_results(self):
+    def _save_coordinate_parsing_results(self):
         """Save coordinate parsing results to cache."""
         try:
             # Get studies with parsed analyses. A study with any failed table is left out: its
             # signature would match next run and its surviving tables would pass for all of them.
+            # A study still being parsed has no analyses yet, so a save mid-stage leaves it out.
             failed_pmids = set(getattr(self, "_coordinate_failed_tables", {}))
             studies_with_analyses = [
                 s for s in self.results.studies
@@ -1360,12 +1375,8 @@ class AutonimaPipeline:
             
             # Save to file
             output_dir = Path(self.config.output.directory)
-            output_dir.mkdir(parents=True, exist_ok=True)
             coordinate_cache_file = output_dir / "outputs" / "coordinate_parsing_results.json"
-            
-            import json
-            with open(coordinate_cache_file, 'w') as f:
-                json.dump(cached_data, f, indent=2)
+            _atomic_write_json(coordinate_cache_file, cached_data)
             
             logger.debug(
                 f"Saved coordinate parsing results for {len(studies_with_analyses)} studies"

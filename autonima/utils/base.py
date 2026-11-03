@@ -15,6 +15,18 @@ def set_debug_mode(debug: bool):
     DEBUG_MODE = debug
 
 
+def atomic_write_json(file_path, data):
+    """Write JSON atomically to avoid partially written output files."""
+    import json
+    import os
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = file_path.with_suffix(file_path.suffix + ".tmp")
+    with open(temp_file, 'w') as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_file, file_path)
+
+
 def log_error_with_debug(logger, message):
     """
     Log an error message and enter pdb post-mortem if debug mode is enabled.
