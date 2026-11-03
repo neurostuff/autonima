@@ -851,6 +851,9 @@ class AutonimaPipeline:
             logger.debug(
                 "Fetching PMCIDs for %s studies", len(studies_needing_pmcid)
             )
+            # Raises PMCIDLookupError, failing this stage, if a batch cannot be
+            # looked up: those studies would otherwise read as not in PMC and
+            # silently drop out of full-text screening.
             pmid_to_pmcid = await self._search_engine.fetch_pmcids(
                 [s.pmid for s in studies_needing_pmcid]
             )

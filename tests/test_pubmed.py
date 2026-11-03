@@ -41,8 +41,8 @@ def test_pubmed_search_initialization(search_config, temp_dir):
     assert search_engine.config == search_config
     expected_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
     assert search_engine.base_url == expected_url
-    assert search_engine.max_retries == 3
-    assert search_engine.retry_delay == 1.0
+    assert search_engine.max_retries == 5
+    assert search_engine.retry_delay == 2.0
 
 
 def test_pubmed_search_execute(search_config, pubmed_search):
