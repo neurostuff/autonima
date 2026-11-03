@@ -42,13 +42,11 @@ CLEAR_CACHE_STAGES = {
 }
 
 STAGE_ARTIFACTS: Dict[str, List[str]] = {
-    "search": ["search_results.json", "neurostore_search_log.json"],
+    "search": ["search_results.json"],
     "abstract": ["abstract_screening_results.json"],
     "retrieval": ["fulltext_retrieval_results.json", "documents_unavailable.csv"],
     "fulltext": ["fulltext_screening_results.json"],
-    # The NeuroStore snapshot is what a coordinate_source: neurostore run used; it moves and
-    # is invalidated with the stage like the parse results it stands behind.
-    "parsing": ["coordinate_parsing_results.json", "neurostore_analyses.json", "neurostore_unavailable.csv"],
+    "parsing": ["coordinate_parsing_results.json"],
     "annotation": ["annotation_results.json"],
     "output": [
         "final_results.json",
@@ -58,6 +56,20 @@ STAGE_ARTIFACTS: Dict[str, List[str]] = {
         "missing_fulltexts.txt",
     ],
 }
+
+# Files that belong to a stage without being its cache: they are copied from a seed run and
+# cleared with the stage, but never make a stage count as cached. The NeuroStore snapshot is
+# what a coordinate_source: neurostore run used; a run that stopped mid-stage leaves it without
+# the parse results it stands behind, and that must read as "not cached", not "unverifiable".
+STAGE_COMPANION_FILES: Dict[str, List[str]] = {
+    "search": ["neurostore_search_log.json"],
+    "parsing": ["neurostore_analyses.json", "neurostore_unavailable.csv"],
+}
+
+
+def _stage_files(stage: str) -> List[str]:
+    return STAGE_ARTIFACTS.get(stage, []) + STAGE_COMPANION_FILES.get(stage, [])
+
 
 RUN_STAGE_LIMITS: Dict[str, str] = {
     "search": "search",
@@ -715,7 +727,7 @@ def _delete_stage_artifacts(output_dir: Path, stages: Iterable[str]) -> List[Dic
     outputs_dir = output_dir / "outputs"
     removed: List[Dict[str, Any]] = []
     for stage in _expand_clear_stages(stages):
-        for filename in STAGE_ARTIFACTS.get(stage, []):
+        for filename in _stage_files(stage):
             path = outputs_dir / filename
             if path.exists():
                 path.unlink()
@@ -735,7 +747,7 @@ def _copy_stage_artifacts(
     target_outputs = target_output_dir / "outputs"
     target_outputs.mkdir(parents=True, exist_ok=True)
     for stage in _expand_clear_stages(stages):
-        for filename in STAGE_ARTIFACTS.get(stage, []):
+        for filename in _stage_files(stage):
             src = source_outputs / filename
             dst = target_outputs / filename
             if src.exists():

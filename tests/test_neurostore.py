@@ -407,3 +407,13 @@ def test_the_snapshot_is_copied_from_a_seed_run_and_cleared_when_options_change(
 
     prepare_execution(_ns_config(arm, roles=["result", "anchor"]), arm)
     assert not (arm / "outputs" / SNAPSHOT_FILENAME).exists()
+
+
+def test_a_snapshot_left_by_an_interrupted_stage_does_not_block_the_rerun(tmp_path):
+    from autonima.execution import prepare_execution
+
+    run = tmp_path / "run"
+    prepare_execution(_ns_config(run), run)
+    # The parsing stage died after fetching: a snapshot but no coordinate_parsing_results.json.
+    (run / "outputs" / SNAPSHOT_FILENAME).write_text("{}")
+    prepare_execution(_ns_config(run), run)  # must not raise UnsupportedCacheError
