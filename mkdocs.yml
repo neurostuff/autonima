@@ -39,6 +39,7 @@ nav:
       - Interpreting Outputs: guides/interpreting-outputs.md
       - Full-Text Sources: guides/full-text-sources.md
       - Records: guides/records.md
+      - NeuroStore: guides/neurostore.md
       - Meta-Analysis: guides/meta-analysis.md
   - Reference:
       - CLI Reference: reference/cli.md

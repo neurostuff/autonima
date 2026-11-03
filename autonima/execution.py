@@ -287,6 +287,24 @@ def _drop(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
     return {k: v for k, v in mapping.items() if k not in excluded}
 
 
+def _parsing_signature(parsing: Dict[str, Any]) -> Dict[str, Any]:
+    if parsing.get("coordinate_source", "tables") == "neurostore":
+        # No model and no prompt: the analyses are NeuroStore's, chosen by these options.
+        from .neurostore.analyses import DEFAULT_ROLES, DEFAULT_SOURCES
+
+        options = parsing.get("neurostore") or {}
+        return {
+            "parse_coordinates": parsing.get("parse_coordinates"),
+            "coordinate_source": "neurostore",
+            "sources": list(options.get("sources") or DEFAULT_SOURCES),
+            "roles": list(options.get("roles") or DEFAULT_ROLES),
+            "base_url": options.get("base_url"),
+        }
+    return _pick(parsing, ["parse_coordinates", "coordinate_model"]) | {
+        "prompt_version": COORDINATE_PARSING_PROMPT_VERSION
+    }
+
+
 def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     """Build per-stage semantic payloads for cache validation."""
     config = pipeline_config_to_dict(config_or_dict)
@@ -318,6 +336,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
                 "date_to",
                 "pmids_file",
                 "pmids_list",
+                "neurostore",
             ],
         ),
         "abstract": {
@@ -342,11 +361,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
             **document_prompt,
         },
-        "parsing": _pick(
-            parsing or retrieval,
-            ["parse_coordinates", "coordinate_model"],
-        )
-        | {"prompt_version": COORDINATE_PARSING_PROMPT_VERSION},
+        "parsing": _parsing_signature(parsing or retrieval),
         "annotation": _pick(
             annotation,
             [

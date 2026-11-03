@@ -20,6 +20,7 @@ from .models.types import (
     StudyStatus
 )
 from .search import PubMedSearch
+from .search.neurostore import NeuroStoreSearch
 from .screening import LLMScreener
 from .retrieval import PubGetRetriever
 from .retrieval.utils import (
@@ -311,6 +312,11 @@ class AutonimaPipeline:
         # Initialize search engine
         if self.config.search.database.lower() == "pubmed":
             self._search_engine = PubMedSearch(
+                self.config.search,
+                output_dir=self.config.output.directory
+            )
+        elif self.config.search.database.lower() == "neurostore":
+            self._search_engine = NeuroStoreSearch(
                 self.config.search,
                 output_dir=self.config.output.directory
             )
@@ -935,6 +941,10 @@ class AutonimaPipeline:
                 "tables_processed": 0,
             }
             return
+
+        if getattr(self.config.parsing, "coordinate_source", "tables") == "neurostore":
+            await self._execute_neurostore_coordinates()
+            return
     
         # Capture the exact per-study inputs before cached parsed analyses are
         # applied or fresh parsing mutates the studies.
@@ -1086,6 +1096,99 @@ class AutonimaPipeline:
             "studies_reused": self._coordinate_cache_loaded,
         }
  
+    async def _execute_neurostore_coordinates(self):
+        """Take each included study's analyses from NeuroStore instead of parsing its tables.
+
+        Every included study is looked up, whether or not its tables were retrieved: the
+        coordinates no longer depend on the article's tables. What each study used is frozen
+        in the run's NeuroStore snapshot, and a study NeuroStore has no coordinates for keeps
+        no analyses and is listed, with the reason, in ``neurostore_unavailable.csv``.
+        """
+        import asyncio
+        from collections import Counter
+
+        from .neurostore.analyses import (
+            SNAPSHOT_FILENAME,
+            TABLE_ID_PREFIX,
+            NeuroStoreOptions,
+            NeuroStoreSnapshot,
+            to_analyses,
+        )
+        from .neurostore.client import DEFAULT_BASE_URL, NeuroStoreClient
+
+        settings = dict(getattr(self.config.parsing, "neurostore", None) or {})
+        options = NeuroStoreOptions.from_config(settings)
+        base_url = settings.get("base_url") or DEFAULT_BASE_URL
+        outputs = Path(self.config.output.directory) / "outputs"
+        snapshot = NeuroStoreSnapshot(outputs / SNAPSHOT_FILENAME, options, base_url)
+
+        included = [
+            s for s in self.results.studies
+            if s.status == StudyStatus.INCLUDED_FULLTEXT and not _analyses_transported(s)
+        ]
+        counts = await asyncio.to_thread(
+            snapshot.ensure,
+            NeuroStoreClient(base_url),
+            [s.pmid for s in included],
+            max(self.num_workers, 4),
+        )
+
+        unavailable_rows = []
+        reasons: Counter = Counter()
+        sources: Counter = Counter()
+        for study in included:
+            record = snapshot.get(study.pmid)
+            # Tables from an earlier NeuroStore attach are replaced, never accumulated.
+            study.activation_tables = [
+                t for t in study.activation_tables if not t.table_id.startswith(TABLE_ID_PREFIX)
+            ]
+            if not record or record.get("unavailable"):
+                reason = record.get("unavailable") if record else "fetch_failed"
+                study.analyses = []
+                reasons[reason] += 1
+                unavailable_rows.append({
+                    "pmid": study.pmid,
+                    "reason": reason,
+                    "base_study_id": (record or {}).get("base_study_id") or "",
+                    "sources_seen": ";".join((record or {}).get("sources_seen") or []),
+                })
+                continue
+            analyses, tables = to_analyses(record)
+            study.analyses = analyses
+            study.activation_tables.extend(tables)
+            sources[record.get("source")] += 1
+
+        outputs.mkdir(parents=True, exist_ok=True)
+        with open(outputs / "neurostore_unavailable.csv", "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["pmid", "reason", "base_study_id", "sources_seen"])
+            writer.writeheader()
+            writer.writerows(unavailable_rows)
+
+        self._coordinate_failed_tables = {}
+        await self._save_coordinate_parsing_results()
+        with_analyses = len(included) - len(unavailable_rows)
+        logger.info(
+            "NeuroStore coordinates: %s of %s included studies have analyses (%s fetched, %s from "
+            "the snapshot, %s failed); unavailable: %s",
+            with_analyses,
+            len(included),
+            counts["fetched"],
+            counts["reused"],
+            counts["failed"],
+            dict(reasons) or "none",
+        )
+        self.results.execution_stats["coordinate_parsing"] = {
+            "enabled": True,
+            "coordinate_source": "neurostore",
+            "studies_included": len(included),
+            "studies_with_analyses": with_analyses,
+            "unavailable": dict(reasons),
+            "versions_by_source": dict(sources),
+            "studies_reused": counts["reused"],
+            "tables_processed": counts["fetched"],
+            "fetch_failed": counts["failed"],
+        }
+
     async def _execute_annotation_phase(self):
         """Execute annotation phase for parsed analyses."""
         # Check if annotation is enabled
