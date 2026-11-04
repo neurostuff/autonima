@@ -81,17 +81,33 @@ class NeuroStoreSearch(PubMedSearch):
         year_min, year_max = _year(self.config.date_from), _year(self.config.date_to)
         data_type = self.options.get("data_type", DEFAULT_DATA_TYPE)
         full_text = bool(self.options.get("search_full_text", False))
-        results = await asyncio.to_thread(
-            lambda: list(
+        def run(query: str, in_full_text: bool):
+            return list(
                 self.client.search_base_studies(
-                    ns_query,
-                    search_full_text=full_text,
+                    query,
+                    search_full_text=in_full_text,
                     year_min=year_min,
                     year_max=year_max,
                     data_type=data_type,
                 )
             )
-        )
+
+        excluded_ids: set = set()
+        if full_text and translation is not None and translation.exclude:
+            # PubMed's NOT clauses were field-scoped; keep them to titles and abstracts.
+            results = await asyncio.to_thread(run, translation.include, True)
+            for clause in translation.exclude:
+                excluded_ids |= {r.get("id") for r in await asyncio.to_thread(run, clause, False)}
+            matched = len(results)
+            results = [r for r in results if r.get("id") not in excluded_ids]
+            logger.info(
+                "NeuroStore search: %s of %s full-text matches removed by NOT clauses applied to "
+                "titles and abstracts only",
+                matched - len(results),
+                matched,
+            )
+        else:
+            results = await asyncio.to_thread(run, ns_query, full_text)
 
         pmids: List[str] = []
         seen = set()
@@ -115,6 +131,9 @@ class NeuroStoreSearch(PubMedSearch):
             "translation": None if translation is None else {
                 "dropped": translation.dropped,
                 "approximated": translation.approximated,
+                "include": translation.include,
+                "exclude": translation.exclude,
+                "exclude_scope": "title_abstract" if full_text and translation.exclude else None,
             },
             "search_full_text": full_text,
             "data_type": data_type,

@@ -35,7 +35,13 @@ words after stemming, with quoted phrases, `AND`, `OR`, `NOT`, `-` and parenthes
 - **publication type, language and date tags** are dropped; dates come from
   `date_from`/`date_to`;
 - **truncation** (`reactiv*`) becomes the prefix with a few common endings, which the
-  server's stemmer folds onto real words.
+  server's stemmer folds onto real words;
+- **`NOT` clauses** at the top of the query stay limited to titles and abstracts when
+  `search_full_text` is on. NeuroStore applies `NOT` to every field it searches, so sent
+  as written, `NOT "systematic review"[tiab]` would drop every paper whose text mentions a
+  systematic review. Autonima searches the rest of the query in full text and removes what a
+  title-and-abstract search of the `NOT` clauses finds. A native `neurostore.query` is sent
+  as written, so its `NOT` applies to the text too.
 
 Every dropped or approximated clause, the NeuroStore query sent, the totals and any base
 study without a PMID are written to `outputs/neurostore_search_log.json`. Studies without a

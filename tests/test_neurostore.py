@@ -417,3 +417,30 @@ def test_a_snapshot_left_by_an_interrupted_stage_does_not_block_the_rerun(tmp_pa
     # The parsing stage died after fetching: a snapshot but no coordinate_parsing_results.json.
     (run / "outputs" / SNAPSHOT_FILENAME).write_text("{}")
     prepare_execution(_ns_config(run), run)  # must not raise UnsupportedCacheError
+
+
+def test_top_level_not_clauses_are_split_out():
+    t = translate_pubmed_query('(PTSD[tiab] AND VBM[tiab]) NOT (review[pt] OR "systematic review"[tiab]) NOT case[ti]')
+    assert t.query == '((PTSD AND VBM) NOT "systematic review") NOT case'
+    assert t.include == "PTSD AND VBM"
+    assert t.exclude == ['"systematic review"', "case"]
+
+
+def test_full_text_search_applies_not_to_titles_and_abstracts_only(tmp_path):
+    config = _config(tmp_path, search={
+        "database": "neurostore", "query": 'PTSD[tiab] NOT "systematic review"[tiab]', "pmids_list": None,
+        "neurostore": {"search_full_text": True},
+    })
+    calls = []
+
+    class SearchClient(FakeClient):
+        def search_base_studies(self, search, search_full_text=False, **kwargs):
+            calls.append((search, search_full_text))
+            if search == "PTSD":
+                # B2 only mentions a systematic review in its text; B3 is one.
+                return iter([{"id": "B1", "pmid": "1"}, {"id": "B2", "pmid": "2"}, {"id": "B3", "pmid": "3"}])
+            return iter([{"id": "B3", "pmid": "3"}])
+
+    engine = NeuroStoreSearch(config.search, output_dir=config.output.directory, client=SearchClient({}))
+    assert asyncio.run(engine._execute_search(config.search.query)) == ["1", "2"]
+    assert calls == [("PTSD", True), ('"systematic review"', False)]

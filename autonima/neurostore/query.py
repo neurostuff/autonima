@@ -53,6 +53,12 @@ class Translation:
     query: str
     dropped: List[str] = field(default_factory=list)  # clauses removed, as written
     approximated: List[str] = field(default_factory=list)  # clauses rewritten lossily
+    # The query split at its top-level NOTs: `query` is `include` NOT each of `exclude`.
+    # NeuroStore applies NOT to every field it searches, so with full text on, a PubMed
+    # `NOT review[tiab]` would drop every paper whose text mentions a review. A full-text
+    # search runs `include` and subtracts a title-and-abstract search of `exclude`.
+    include: str = ""
+    exclude: List[str] = field(default_factory=list)
 
 
 class QueryTranslationError(ValueError):
@@ -297,13 +303,28 @@ def translate_pubmed_query(query: str) -> Translation:
             return left if right is None else right
         return f"({left} {node.op} {right})"
 
-    text = visit(tree, False)
-    if text is None:
+    negated: List[Node] = []
+    node = tree
+    while isinstance(node, Op) and node.op == "NOT":
+        negated.insert(0, node.right)
+        node = node.left
+    include = visit(node, False)
+    exclude = [text for text in (visit(n, False) for n in negated) if text is not None]
+    if include is None:
+        if negated:
+            result.dropped.append("a leading NOT clause")
         raise QueryTranslationError("nothing in the query can be searched in NeuroStore")
-    if text.startswith("(") and _balanced_outer(text):
-        text = text[1:-1]
-    result.query = text
+    text = include
+    for clause in exclude:
+        text = f"({text} NOT {clause})"
+    result.query = _strip_outer(text)
+    result.include = _strip_outer(include)
+    result.exclude = [_strip_outer(clause) for clause in exclude]
     return result
+
+
+def _strip_outer(text: str) -> str:
+    return text[1:-1] if text.startswith("(") and _balanced_outer(text) else text
 
 
 def _balanced_outer(text: str) -> bool:
