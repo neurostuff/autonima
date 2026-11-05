@@ -57,6 +57,20 @@ STAGE_ARTIFACTS: Dict[str, List[str]] = {
     ],
 }
 
+# Files that belong to a stage without being its cache: they are copied from a seed run and
+# cleared with the stage, but never make a stage count as cached. The NeuroStore snapshot is
+# what a coordinate_source: neurostore run used; a run that stopped mid-stage leaves it without
+# the parse results it stands behind, and that must read as "not cached", not "unverifiable".
+STAGE_COMPANION_FILES: Dict[str, List[str]] = {
+    "search": ["neurostore_search_log.json"],
+    "parsing": ["neurostore_analyses.json", "neurostore_unavailable.csv"],
+}
+
+
+def _stage_files(stage: str) -> List[str]:
+    return STAGE_ARTIFACTS.get(stage, []) + STAGE_COMPANION_FILES.get(stage, [])
+
+
 RUN_STAGE_LIMITS: Dict[str, str] = {
     "search": "search",
     "abstract": "abstract",
@@ -287,6 +301,24 @@ def _drop(mapping: Dict[str, Any], keys: Iterable[str]) -> Dict[str, Any]:
     return {k: v for k, v in mapping.items() if k not in excluded}
 
 
+def _parsing_signature(parsing: Dict[str, Any]) -> Dict[str, Any]:
+    if parsing.get("coordinate_source", "tables") == "neurostore":
+        # No model and no prompt: the analyses are NeuroStore's, chosen by these options.
+        from .neurostore.analyses import DEFAULT_ROLES, DEFAULT_SOURCES
+
+        options = parsing.get("neurostore") or {}
+        return {
+            "parse_coordinates": parsing.get("parse_coordinates"),
+            "coordinate_source": "neurostore",
+            "sources": list(options.get("sources") or DEFAULT_SOURCES),
+            "roles": list(options.get("roles") or DEFAULT_ROLES),
+            "base_url": options.get("base_url"),
+        }
+    return _pick(parsing, ["parse_coordinates", "coordinate_model"]) | {
+        "prompt_version": COORDINATE_PARSING_PROMPT_VERSION
+    }
+
+
 def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
     """Build per-stage semantic payloads for cache validation."""
     config = pipeline_config_to_dict(config_or_dict)
@@ -318,6 +350,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
                 "date_to",
                 "pmids_file",
                 "pmids_list",
+                "neurostore",
             ],
         ),
         "abstract": {
@@ -342,11 +375,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             "prompt_version": FULLTEXT_SCREENING_PROMPT_VERSION,
             **document_prompt,
         },
-        "parsing": _pick(
-            parsing or retrieval,
-            ["parse_coordinates", "coordinate_model"],
-        )
-        | {"prompt_version": COORDINATE_PARSING_PROMPT_VERSION},
+        "parsing": _parsing_signature(parsing or retrieval),
         "annotation": _pick(
             annotation,
             [
@@ -698,7 +727,7 @@ def _delete_stage_artifacts(output_dir: Path, stages: Iterable[str]) -> List[Dic
     outputs_dir = output_dir / "outputs"
     removed: List[Dict[str, Any]] = []
     for stage in _expand_clear_stages(stages):
-        for filename in STAGE_ARTIFACTS.get(stage, []):
+        for filename in _stage_files(stage):
             path = outputs_dir / filename
             if path.exists():
                 path.unlink()
@@ -718,7 +747,7 @@ def _copy_stage_artifacts(
     target_outputs = target_output_dir / "outputs"
     target_outputs.mkdir(parents=True, exist_ok=True)
     for stage in _expand_clear_stages(stages):
-        for filename in STAGE_ARTIFACTS.get(stage, []):
+        for filename in _stage_files(stage):
             src = source_outputs / filename
             dst = target_outputs / filename
             if src.exists():
