@@ -865,9 +865,15 @@ class AutonimaPipeline:
         fulltext_skip = self.config.screening.fulltext.get('skip_stage', False)
         if fulltext_skip:
             logger.info("Full-text screening skipped (skip_stage=True)")
-            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next stage
+            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next
+            # stage. With records, a study without one has no input in this run, exactly as an
+            # unretrieved article: it stays where it was and is reported unavailable, never
+            # counted as included.
+            records = self._document_source is not None
             for study in self.results.studies:
-                if study.status == StudyStatus.INCLUDED_ABSTRACT:
+                if study.status == StudyStatus.INCLUDED_ABSTRACT and (
+                    study.fulltext_available or not records
+                ):
                     study.status = StudyStatus.INCLUDED_FULLTEXT
             return
 
