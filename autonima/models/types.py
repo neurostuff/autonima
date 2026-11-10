@@ -374,11 +374,14 @@ class DocumentsConfig:
     record instead of being parsed from the article's tables.
     """
     enabled: bool = False
-    kind: str = "text"  # "text" | "analyses"
-    root: Optional[str] = None
+    kind: str = "text"  # "text" | "analyses" | "neurostore"
+    root: Optional[str] = None  # the directory of records; not for "neurostore", built per run
     # One line saying what the documents are, e.g. "a structured extraction record of the
     # article". It replaces "full text" wherever a prompt names what the model is reading.
     description: Optional[str] = None
+    # kind "neurostore" only: which NeuroStore version's analyses (``sources``, ``roles``,
+    # as ``parsing.neurostore``) and ``base_url``.
+    neurostore: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -433,6 +436,12 @@ class PipelineConfig:
                     "kind": self.documents.kind,
                     "root": self.documents.root,
                     "description": self.documents.description,
+                    # Only when set, so the folder kinds serialize as they did before it.
+                    **(
+                        {"neurostore": self.documents.neurostore}
+                        if self.documents.neurostore is not None
+                        else {}
+                    ),
                 }
             }
             if self.documents.enabled

@@ -320,16 +320,34 @@ class ConfigManager:
         if not documents.enabled:
             return
 
-        from .documents import SOURCE_KINDS
+        from .documents import BUILT_KINDS, SOURCE_KINDS
 
         if documents.kind not in SOURCE_KINDS:
             raise ConfigurationError(
                 f"retrieval.records.kind must be one of: {', '.join(sorted(SOURCE_KINDS))}"
             )
-        if not documents.root or not str(documents.root).strip():
-            raise ConfigurationError("retrieval.records.root is required when records are enabled")
-        if not Path(documents.root).expanduser().is_dir():
-            raise ConfigurationError(f"retrieval.records.root is not a directory: {documents.root}")
+        if documents.kind in BUILT_KINDS:
+            # Built from NeuroStore into the run's output directory; a root would be ignored.
+            if documents.root:
+                raise ConfigurationError(
+                    f"retrieval.records.kind '{documents.kind}' builds its records in the run's "
+                    "output directory; remove retrieval.records.root"
+                )
+            self._validate_record_neurostore_options(documents.neurostore)
+        else:
+            if documents.neurostore is not None:
+                raise ConfigurationError(
+                    "retrieval.records.neurostore is set but retrieval.records.kind is not "
+                    "'neurostore'"
+                )
+            if not documents.root or not str(documents.root).strip():
+                raise ConfigurationError(
+                    "retrieval.records.root is required when records are enabled"
+                )
+            if not Path(documents.root).expanduser().is_dir():
+                raise ConfigurationError(
+                    f"retrieval.records.root is not a directory: {documents.root}"
+                )
 
         if SOURCE_KINDS[documents.kind].provides_analyses and config.parsing.parse_coordinates:
             # Re-parsing the article would replace the analyses the documents refer to, and
@@ -350,6 +368,35 @@ class ConfigManager:
             raise ConfigurationError(
                 "retrieval.records is enabled but annotation.metadata_fields does not include "
                 "'study_fulltext', so annotation would never read them"
+            )
+
+    @staticmethod
+    def _validate_record_neurostore_options(options: Any) -> None:
+        """``retrieval.records.neurostore``: the version choice ``parsing.neurostore`` makes."""
+        from .neurostore.analyses import DEFAULT_SOURCES
+
+        if options is None:
+            return
+        if not isinstance(options, dict):
+            raise ConfigurationError("retrieval.records.neurostore must be a mapping")
+        unknown = sorted(set(options) - {"sources", "roles", "base_url"})
+        if unknown:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore key(s): {', '.join(unknown)}"
+            )
+        bad_sources = sorted(set(options.get("sources") or []) - set(DEFAULT_SOURCES))
+        if bad_sources:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore source(s): {', '.join(bad_sources)}. "
+                f"Known: {', '.join(DEFAULT_SOURCES)}"
+            )
+        bad_roles = sorted(
+            set(options.get("roles") or [])
+            - {"result", "anchor", "localization", "reference", "other"}
+        )
+        if bad_roles:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore role(s): {', '.join(bad_roles)}"
             )
 
     def get_config(self) -> PipelineConfig:

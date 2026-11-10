@@ -63,6 +63,8 @@ STAGE_ARTIFACTS: Dict[str, List[str]] = {
 # the parse results it stands behind, and that must read as "not cached", not "unverifiable".
 STAGE_COMPANION_FILES: Dict[str, List[str]] = {
     "search": ["neurostore_search_log.json"],
+    # A records.kind: neurostore run's frozen NeuroStore analyses and features.
+    "retrieval": ["neurostore_record_analyses.json", "neurostore_features.json"],
     "parsing": ["neurostore_analyses.json", "neurostore_unavailable.csv"],
 }
 
@@ -337,6 +339,18 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
         retrieval_documents = {
             "records": _pick(documents, ["kind", "root", "description"]),
         }
+        if documents.get("kind") == "neurostore":
+            # The records are built here, so how they are built is part of the stage.
+            from .documents.neurostore import RECORD_FORMAT_VERSION
+            from .neurostore.analyses import DEFAULT_ROLES, DEFAULT_SOURCES
+
+            options = documents.get("neurostore") or {}
+            retrieval_documents["records"] |= {
+                "sources": list(options.get("sources") or DEFAULT_SOURCES),
+                "roles": list(options.get("roles") or DEFAULT_ROLES),
+                "base_url": options.get("base_url"),
+                "record_format": RECORD_FORMAT_VERSION,
+            }
         document_prompt = {"document_prompt_version": DOCUMENT_PROMPT_VERSION}
 
     return {

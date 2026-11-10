@@ -8,6 +8,7 @@ from typing import Dict, Type
 
 from .attach import UNAVAILABLE_FILENAME, AttachReport, attach_documents
 from .folder import FolderDocumentSource, FolderRecordSource
+from .neurostore import NeuroStoreRecordSource
 from .source import (
     ANALYSIS_REFERENCE,
     AnalysisBundle,
@@ -26,11 +27,19 @@ from .source import (
 SOURCE_KINDS: Dict[str, Type[DocumentSource]] = {
     FolderDocumentSource.kind: FolderDocumentSource,
     FolderRecordSource.kind: FolderRecordSource,
+    NeuroStoreRecordSource.kind: NeuroStoreRecordSource,
 }
+# Kinds whose records autonima builds itself, under the run's output directory, so they
+# take no ``root``.
+BUILT_KINDS = frozenset({NeuroStoreRecordSource.kind})
 
 
-def create_document_source(config) -> DocumentSource:
+def create_document_source(config, output_dir=None) -> DocumentSource:
     """Build the source a ``DocumentsConfig`` describes."""
+    if config.kind == NeuroStoreRecordSource.kind:
+        return NeuroStoreRecordSource(
+            output_dir, options=config.neurostore, description=config.description
+        )
     return SOURCE_KINDS[config.kind](config.root, description=config.description)
 
 
@@ -38,6 +47,7 @@ __all__ = [
     "ANALYSIS_REFERENCE",
     "AnalysisBundle",
     "AttachReport",
+    "BUILT_KINDS",
     "Document",
     "DocumentError",
     "DocumentFormatError",
@@ -46,6 +56,7 @@ __all__ = [
     "FolderDocumentSource",
     "FolderRecordSource",
     "IdentityError",
+    "NeuroStoreRecordSource",
     "PairingError",
     "PrepareReport",
     "SOURCE_KINDS",

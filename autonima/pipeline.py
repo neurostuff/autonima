@@ -339,7 +339,9 @@ class AutonimaPipeline:
         self._retriever = PubGetRetriever(n_jobs=n_jobs)
 
         if self.config.documents.enabled:
-            self._document_source = create_document_source(self.config.documents)
+            self._document_source = create_document_source(
+                self.config.documents, output_dir=self.config.output.directory
+            )
 
         # Save criteria mapping early in pipeline
         from .utils.criteria import save_criteria_mapping

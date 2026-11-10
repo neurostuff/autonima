@@ -62,9 +62,11 @@ def attach_documents(
     documents_dir = output_dir / "documents"
     documents_dir.mkdir(parents=True, exist_ok=True)
 
-    pmids = {int(study.pmid) for study in studies if str(study.pmid).isdigit()}
-    report = source.prepare(pmids)
+    by_pmid = {int(study.pmid): study for study in studies if str(study.pmid).isdigit()}
+    report = source.prepare(set(by_pmid), studies=by_pmid)
     index = source.index()
+    # Why the source could not supply a study, where it said; otherwise there is no document.
+    reasons = {item.pmid: item for item in report.unavailable if item.pmid is not None}
     unavailable: List[UnavailableStudy] = []
     attached = 0
 
@@ -77,7 +79,10 @@ def attach_documents(
             continue
         ref = index.get(int(study.pmid))
         if ref is None:
-            unavailable.append(UnavailableStudy(pmid=int(study.pmid), reason="no_document"))
+            unavailable.append(
+                reasons.get(int(study.pmid))
+                or UnavailableStudy(pmid=int(study.pmid), reason="no_document")
+            )
             _mark_unavailable(study, source)
             continue
         try:
