@@ -298,6 +298,7 @@ class ConfigManager:
                     )
 
         self._validate_documents_config(config)
+        self._validate_fulltext_mode(config)
 
     def _load_documents_config(self, documents_dict: Any) -> DocumentsConfig:
         """Load ``retrieval.records``, rejecting keys it does not define."""
@@ -368,6 +369,41 @@ class ConfigManager:
             raise ConfigurationError(
                 "retrieval.records is enabled but annotation.metadata_fields does not include "
                 "'study_fulltext', so annotation would never read them"
+            )
+
+    def _validate_fulltext_mode(self, config: PipelineConfig) -> None:
+        """``screening.fulltext.mode``: ``separate`` (default) or ``combined``.
+
+        Combined screens each study and selects its analyses in one call, so the analyses must
+        exist before full-text screening: they have to come with the records.
+        """
+        mode = config.screening.fulltext.get("mode", "separate")
+        if mode in (None, "separate"):
+            return
+        if mode != "combined":
+            raise ConfigurationError("screening.fulltext.mode must be 'separate' or 'combined'")
+        from .documents import SOURCE_KINDS
+
+        documents = config.documents
+        if not (documents.enabled and SOURCE_KINDS[documents.kind].provides_analyses):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' needs records that carry their analyses: "
+                "retrieval.records with kind 'analyses' or 'neurostore'"
+            )
+        if config.screening.fulltext.get("skip_stage"):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' cannot be used with skip_stage"
+            )
+        annotation = config.annotation
+        if not (annotation.enabled and annotation.annotations):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' selects analyses for annotation.annotations; "
+                "enable annotation and define at least one annotation"
+            )
+        if annotation.prompt_type != "multi_analysis":
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' judges a study's analyses together; "
+                "annotation.prompt_type must be 'multi_analysis'"
             )
 
     @staticmethod

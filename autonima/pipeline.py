@@ -884,10 +884,27 @@ class AutonimaPipeline:
         if not self._screener:
             raise RuntimeError("Screener not initialized")
 
+        combined = None
+        if self._fulltext_mode() == "combined":
+            # One call per study decides its eligibility and selects its analyses.
+            from .screening.combined import CombinedReview
+
+            combined = CombinedReview(
+                self._annotation_config_with_mapping(),
+                self.config.screening.fulltext,
+                output_dir=self.config.output.directory,
+                num_workers=self.num_workers,
+            )
+        self._screener.combined = combined
+
         # Use LLM-based full-text screening
-        screening_results = await self._screener.screen_fulltexts(
-            screenable_studies, num_workers=self.num_workers
-        )
+        try:
+            screening_results = await self._screener.screen_fulltexts(
+                screenable_studies, num_workers=self.num_workers
+            )
+        finally:
+            if combined is not None:
+                combined.flush()
 
         # Apply screening results to studies
         for result in screening_results:
@@ -1192,6 +1209,69 @@ class AutonimaPipeline:
             "fetch_failed": counts["failed"],
         }
 
+    def _annotation_config_with_mapping(self):
+        """The annotation config with the run's criteria IDs injected, as prompts use it.
+
+        Built the same way for the annotation stage and for a combined full-text review, so
+        both sign their decisions with the same cache signature.
+        """
+        # Load criteria mapping and inject it into annotation config
+        from .utils.criteria import load_criteria_mapping
+        criteria_mapping = load_criteria_mapping(self.config.output.directory)
+        
+        # Create a copy of the annotation config with criteria mapping injected
+        from copy import deepcopy
+        annotation_config = deepcopy(self.config.annotation)
+        
+        # Inject criteria mapping into annotation config
+        if criteria_mapping and "annotation" in criteria_mapping:
+            annotation_data = criteria_mapping["annotation"]
+            
+            # Inject global criteria mapping
+            global_mapping = annotation_data.get("global", {})
+            global_inclusion = global_mapping.get("inclusion", {})
+            global_exclusion = global_mapping.get("exclusion", {})
+            if global_mapping:
+                # Update the annotation config's global criteria with mapping
+                has_inclusion = (
+                    hasattr(annotation_config, 'inclusion_criteria') and
+                    annotation_config.inclusion_criteria
+                )
+                if has_inclusion:
+                    annotation_config.inclusion_criteria = list(
+                        global_inclusion.values()
+                    )
+                    annotation_config.exclusion_criteria = list(
+                        global_exclusion.values()
+                    )
+            
+            # Inject per-annotation criteria mapping
+            if "annotations" in annotation_data:
+                annotations_mapping = annotation_data["annotations"]
+                for annotation in annotation_config.annotations:
+                    if annotation.name not in annotations_mapping:
+                        continue
+
+                    local_mapping = annotations_mapping[annotation.name]
+                    local_inclusion = local_mapping.get("inclusion", {})
+                    local_exclusion = local_mapping.get("exclusion", {})
+
+                    # Merge global + local IDs for validation while retaining
+                    # dedicated blocks for prompt rendering.
+                    annotation.criteria_mapping = {
+                        "inclusion": {**global_inclusion, **local_inclusion},
+                        "exclusion": {**global_exclusion, **local_exclusion},
+                        "global_inclusion": global_inclusion,
+                        "global_exclusion": global_exclusion,
+                        "local_inclusion": local_inclusion,
+                        "local_exclusion": local_exclusion,
+                    }
+        
+        return annotation_config
+
+    def _fulltext_mode(self) -> str:
+        return str(self.config.screening.fulltext.get("mode", "separate") or "separate")
+
     async def _execute_annotation_phase(self):
         """Execute annotation phase for parsed analyses."""
         # Check if annotation is enabled
@@ -1245,60 +1325,18 @@ class AutonimaPipeline:
             }
             return
                 
-        # Load criteria mapping and inject it into annotation config
-        from .utils.criteria import load_criteria_mapping
-        criteria_mapping = load_criteria_mapping(self.config.output.directory)
-        
-        # Create a copy of the annotation config with criteria mapping injected
-        from copy import deepcopy
-        annotation_config = deepcopy(self.config.annotation)
-        
-        # Inject criteria mapping into annotation config
-        if criteria_mapping and "annotation" in criteria_mapping:
-            annotation_data = criteria_mapping["annotation"]
-            
-            # Inject global criteria mapping
-            global_mapping = annotation_data.get("global", {})
-            global_inclusion = global_mapping.get("inclusion", {})
-            global_exclusion = global_mapping.get("exclusion", {})
-            if global_mapping:
-                # Update the annotation config's global criteria with mapping
-                has_inclusion = (
-                    hasattr(annotation_config, 'inclusion_criteria') and
-                    annotation_config.inclusion_criteria
-                )
-                if has_inclusion:
-                    annotation_config.inclusion_criteria = list(
-                        global_inclusion.values()
-                    )
-                    annotation_config.exclusion_criteria = list(
-                        global_exclusion.values()
-                    )
-            
-            # Inject per-annotation criteria mapping
-            if "annotations" in annotation_data:
-                annotations_mapping = annotation_data["annotations"]
-                for annotation in annotation_config.annotations:
-                    if annotation.name not in annotations_mapping:
-                        continue
+        annotation_config = self._annotation_config_with_mapping()
 
-                    local_mapping = annotations_mapping[annotation.name]
-                    local_inclusion = local_mapping.get("inclusion", {})
-                    local_exclusion = local_mapping.get("exclusion", {})
+        # Initialize the annotation processor with updated config and num_workers. In combined
+        # mode the decisions were made by full-text screening, and the processor only reads them.
+        combined_with = None
+        if self._fulltext_mode() == "combined":
+            from .screening.combined import combined_link
 
-                    # Merge global + local IDs for validation while retaining
-                    # dedicated blocks for prompt rendering.
-                    annotation.criteria_mapping = {
-                        "inclusion": {**global_inclusion, **local_inclusion},
-                        "exclusion": {**global_exclusion, **local_exclusion},
-                        "global_inclusion": global_inclusion,
-                        "global_exclusion": global_exclusion,
-                        "local_inclusion": local_inclusion,
-                        "local_exclusion": local_exclusion,
-                    }
-        
-        # Initialize the annotation processor with updated config and num_workers
-        processor = AnnotationProcessor(annotation_config, num_workers=self.num_workers)
+            combined_with = combined_link(annotation_config, self.config.screening.fulltext)
+        processor = AnnotationProcessor(
+            annotation_config, num_workers=self.num_workers, combined_with=combined_with
+        )
         
         # Process studies
         annotation_results = processor.process_studies(

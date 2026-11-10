@@ -151,10 +151,16 @@ Fields:
 - `enabled`
   Type: boolean, default `false`
 - `kind`
-  Type: string, `"text"` or `"analyses"`
-  `analyses` also supplies each study's analyses, and requires `parsing.parse_coordinates: false`
+  Type: string, `"text"`, `"analyses"` or `"neurostore"`
+  `analyses` also supplies each study's analyses, and requires `parsing.parse_coordinates: false`.
+  `neurostore` builds each record from NeuroStore's extracted values (each analysis with its
+  contrast, task, spatial scope, participants and design) and takes no `root`
 - `root`
-  Type: path to a directory holding one `<pmid>.md` (or `.txt`, `.json`, `.yaml`) per study
+  Type: path to a directory holding one `<pmid>.md` (or `.txt`, `.json`, `.yaml`) per study.
+  Not for `kind: neurostore`
+- `neurostore`
+  Type: mapping, `kind: neurostore` only: `sources`, `roles` and `base_url`, as
+  `parsing.neurostore`
 - `description`
   Type: string. Says what the records are; prompts show it in place of "full text"
 
@@ -197,7 +203,17 @@ Current behavior:
 - If it is enabled, it must define its own `objective` and `inclusion_criteria`.
 - If you do not want to run full-text screening, set `skip_stage: true`.
 
-Fields are the same shape as `screening.abstract`.
+Fields are the same shape as `screening.abstract`, plus:
+
+- `mode`
+  Type: `"separate"` (default) or `"combined"`.
+  `combined` makes one call per study that decides its eligibility and, when it is included,
+  selects its analyses for every annotation, in place of a full-text call and an annotation
+  call. It needs `retrieval.records` that carry their analyses (`kind: analyses` or
+  `neurostore`) and `annotation.annotations` with `prompt_type: multi_analysis`. The call uses
+  this stage's `model`; `annotation.model` is not used. The decisions are saved as full-text
+  screening results and annotation results, so PRISMA counts and the NiMADS export are
+  unchanged, and the annotation stage reads them without a call of its own.
 
 ## `parsing`
 

@@ -353,7 +353,7 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             }
         document_prompt = {"document_prompt_version": DOCUMENT_PROMPT_VERSION}
 
-    return {
+    payloads = {
         "search": _pick(
             search,
             [
@@ -410,6 +410,18 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
             ["prisma_diagram", "formats", "nimads", "export_excluded_studies"],
         ),
     }
+    if (screening.get("fulltext") or {}).get("mode") == "combined":
+        # One call makes both stages' decisions, so each stage depends on the other's settings.
+        from .screening.combined import COMBINED_PROMPT_VERSION
+
+        fulltext_payload, annotation_payload = payloads["fulltext"], payloads["annotation"]
+        payloads["fulltext"] = fulltext_payload | {
+            "combined": {"prompt_version": COMBINED_PROMPT_VERSION, "annotation": annotation_payload}
+        }
+        payloads["annotation"] = annotation_payload | {
+            "combined": {"prompt_version": COMBINED_PROMPT_VERSION, "fulltext": fulltext_payload}
+        }
+    return payloads
 
 
 def stage_hashes(config_or_dict: Any) -> Dict[str, str]:

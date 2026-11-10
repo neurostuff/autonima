@@ -3,7 +3,7 @@
 import json
 import logging
 from types import SimpleNamespace
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Dict, Any, Literal, Union, Optional, Sequence, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 from ..llm.client import GenericLLMClient, resolve_model_name, resolve_model_kwargs
 from ..llm.usage import record as record_usage
@@ -439,6 +439,170 @@ class AnnotationClient:
                 logger.debug(f"Response received: {json.dumps(result_dict, indent=2)[:1000]}")
             raise
     
+    def make_combined_decision(
+        self,
+        study_group: StudyAnalysisGroup,
+        criteria_list: List[AnnotationCriteriaConfig],
+        metadata_fields: List[str],
+        eligibility_block: str,
+        model: str,
+        model_params: Optional[Dict[str, Any]] = None,
+        inclusion_ids: Sequence[str] = (),
+        exclusion_ids: Sequence[str] = (),
+        usage_stage: str = "fulltext",
+    ) -> Tuple[Dict[str, Any], List[AnnotationDecision]]:
+        """Full-text screening and analysis selection for one study, in one call.
+
+        Returns the study's screening (``decision``, ``confidence``, ``reason``,
+        ``fulltext_incomplete`` and the full-text criteria IDs applied) and, when it is
+        included, one decision per analysis and annotation. Malformed responses are retried
+        as ``make_decision`` retries them.
+        """
+        last_exception: Optional[Exception] = None
+        for attempt in range(self.max_retries):
+            try:
+                return self._make_combined_attempt(
+                    study_group, criteria_list, metadata_fields, eligibility_block, model,
+                    model_params, set(inclusion_ids), set(exclusion_ids), usage_stage,
+                )
+            except (ValueError, KeyError, TypeError) as e:
+                last_exception = e
+                logger.warning(
+                    "Combined review attempt %s/%s for study %s failed: %s",
+                    attempt + 1, self.max_retries, study_group.study_id, e,
+                )
+        raise last_exception
+
+    def _make_combined_attempt(
+        self,
+        study_group: StudyAnalysisGroup,
+        criteria_list: List[AnnotationCriteriaConfig],
+        metadata_fields: List[str],
+        eligibility_block: str,
+        model: str,
+        model_params: Optional[Dict[str, Any]],
+        inclusion_ids: set,
+        exclusion_ids: set,
+        usage_stage: str,
+    ) -> Tuple[Dict[str, Any], List[AnnotationDecision]]:
+        from .prompts import create_combined_review_prompt
+
+        valid_analysis_ids = self._get_valid_analysis_ids(study_group)
+        allowed_names = [c.name for c in criteria_list]
+        DecisionModel, _ = build_dynamic_multi_annotation_models(criteria_list)
+
+        class AnalysisDecisions(BaseModel):
+            analysis_id: str
+            annotations: List[DecisionModel]
+
+            @model_validator(mode="after")
+            def every_annotation_once(self):
+                names = [a.annotation_name for a in self.annotations]
+                if len(set(names)) != len(names) or set(names) != set(allowed_names):
+                    raise ValueError(
+                        f"analysis {self.analysis_id} must have exactly one decision for each "
+                        f"of {allowed_names}, got {names}"
+                    )
+                return self
+
+        class StudyScreening(BaseModel):
+            decision: Literal["INCLUDED", "EXCLUDED"]
+            confidence: float
+            reason: str
+            fulltext_incomplete: bool = False
+            inclusion_criteria_applied: List[str] = []
+            exclusion_criteria_applied: List[str] = []
+
+            @model_validator(mode="after")
+            def known_criteria(self):
+                for applied, allowed, kind in (
+                    (self.inclusion_criteria_applied, inclusion_ids, "inclusion"),
+                    (self.exclusion_criteria_applied, exclusion_ids, "exclusion"),
+                ):
+                    unknown = [c for c in applied if allowed and c not in allowed]
+                    if unknown:
+                        raise ValueError(
+                            f"study_screening names unknown full-text {kind} IDs {unknown}; "
+                            f"allowed: {sorted(allowed)}"
+                        )
+                return self
+
+        class CombinedOutput(BaseModel):
+            study_id: str
+            study_screening: StudyScreening
+            decisions: List[AnalysisDecisions] = []
+
+            @model_validator(mode="after")
+            def selection_matches_eligibility(self):
+                included = (
+                    self.study_screening.decision == "INCLUDED"
+                    and not self.study_screening.fulltext_incomplete
+                )
+                returned = [str(d.analysis_id).strip() for d in self.decisions]
+                if included:
+                    missing = sorted(valid_analysis_ids - set(returned))
+                    if missing or len(set(returned)) != len(returned):
+                        raise ValueError(
+                            f"an included study needs one decision set per analysis; missing "
+                            f"{missing}, returned {returned}"
+                        )
+                return self
+
+        prompt = create_combined_review_prompt(
+            study_group, criteria_list, metadata_fields, eligibility_block
+        )
+        func_name = "review_study"
+        function_schema = self._generate_function_schema(CombinedOutput, func_name)
+        response = self._client.client.chat.completions.create(
+            model=resolve_model_name(model),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a neuroimaging meta-analysis expert. "
+                        "Respond using the review_study function."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            functions=[function_schema],
+            function_call={"name": func_name},
+            **resolve_model_kwargs(model, model_params),
+        )
+        record_usage(usage_stage, resolve_model_name(model), getattr(response, "usage", None))
+
+        message = response.choices[0].message
+        function_call = getattr(message, "function_call", None)
+        raw = getattr(function_call, "arguments", None) if function_call is not None else None
+        if not isinstance(raw, (str, bytes, bytearray)):
+            raw = getattr(message, "content", None)
+        if not isinstance(raw, (str, bytes, bytearray)):
+            raise ValueError("No parseable function_call arguments or message content returned")
+        result_dict = json.loads(raw)
+        result_dict.setdefault("study_id", study_group.study_id)
+        result_dict.setdefault("decisions", [])
+        self._validate_response_structure(result_dict, "multi_analysis", study_group)
+        self._validate_include_fields(result_dict, "multi_analysis")
+        self._validate_analysis_ids(result_dict, valid_analysis_ids, "multi_analysis")
+        output = CombinedOutput(**result_dict)
+
+        screening = output.study_screening.model_dump()
+        decisions: List[AnnotationDecision] = []
+        if screening["decision"] == "INCLUDED" and not screening["fulltext_incomplete"]:
+            for analysis_decision in output.decisions:
+                for annotation in analysis_decision.annotations:
+                    decisions.append(AnnotationDecision(
+                        annotation_name=annotation.annotation_name,
+                        analysis_id=str(analysis_decision.analysis_id).strip(),
+                        study_id=study_group.study_id,
+                        include=annotation.include,
+                        reasoning=annotation.reasoning,
+                        model_used=model,
+                        inclusion_criteria_applied=annotation.inclusion_criteria_applied,
+                        exclusion_criteria_applied=annotation.exclusion_criteria_applied,
+                    ))
+        return screening, decisions
+
     def _validate_response_structure(
         self,
         result_dict: Dict[str, Any],
