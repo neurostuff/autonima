@@ -34,6 +34,7 @@ from ..neurostore.features import (
     RECORD_DESCRIPTION,
     FeatureSnapshot,
     analysis_block,
+    analysis_lines,
     render_record,
 )
 from .folder import ANALYSES_SUFFIX, FolderRecordSource
@@ -53,7 +54,7 @@ RECORDS_DIRNAME = "neurostore_records"
 # stage, and these analyses belong to retrieval.
 RECORD_ANALYSES_FILENAME = "neurostore_record_analyses.json"
 # Bump when the record's layout or wording changes; it enters the retrieval stage signature.
-RECORD_FORMAT_VERSION = "neurostore-record-v1"
+RECORD_FORMAT_VERSION = "neurostore-record-v2"
 
 
 def _sha256_text(text: str) -> str:
@@ -166,20 +167,19 @@ class NeuroStoreRecordSource(DocumentSource):
                 )
             return UnavailableStudy(pmid=pmid, reason="no_features", study_id=base_study_id)
 
-        blocks, payload_analyses, tables = [], [], {}
+        rendered, payload_analyses, tables = [], [], {}
         for item in record["analyses"]:
             key = str(item.get("neurostore_id"))
             found = by_analysis.get(key)
             table_id = item.get("table_id")
             table_label = f"Table {item['table_label']}" if item.get("table_label") else None
-            block = analysis_block(
-                "{{analysis:%s}}" % key,
-                item.get("name") or (found or {}).get("name"),
+            name = item.get("name") or (found or {}).get("name")
+            lines = analysis_lines(
                 (found or {}).get("features") if found else None,
                 len(item.get("points") or []),
                 table_label,
             )
-            blocks.append(block)
+            rendered.append(("{{analysis:%s}}" % key, name, lines))
             if table_id:
                 tables.setdefault(table_id, {"table_id": table_id, "table_label": table_label or table_id})
             payload_analyses.append({
@@ -188,13 +188,14 @@ class NeuroStoreRecordSource(DocumentSource):
                 "description": item.get("description"),
                 "table_id": table_id,
                 "points": item.get("points") or [],
-                # The analysis's own block, for annotation's per-analysis document.
-                "document": block,
+                # The analysis's own block, every line included, for annotation's
+                # per-analysis document.
+                "document": analysis_block("{{analysis:%s}}" % key, name, lines),
             })
         text = render_record(
             getattr(study, "title", None),
             getattr(study, "abstract", None),
-            blocks,
+            rendered,
         )
         payload = {
             "document_sha256": _sha256_text(text),

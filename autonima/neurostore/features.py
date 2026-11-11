@@ -113,15 +113,42 @@ SPATIAL_SCOPES = {
     "roi": "region of interest",
     "searchlight": "searchlight",
 }
+# Caps that keep one analysis's block readable: list items shown, and characters per line.
+MAX_ITEMS = 6
+MAX_LINE = 400
 
 
-def _words(value: Any) -> Optional[str]:
-    if value is None or value == "" or value == []:
+def _text(value: Any) -> Optional[str]:
+    """A feature value as words: lists joined, enum underscores as spaces, never a dict's repr."""
+    if value is None or value == "" or value == [] or value == {}:
         return None
+    if isinstance(value, bool):
+        return "yes" if value else "no"
     if isinstance(value, (list, tuple)):
-        items = [str(v) for v in value if v not in (None, "")]
-        return ", ".join(items) if items else None
-    return str(value).replace("_", " ") if isinstance(value, str) and " " not in value else str(value)
+        items = [t for t in (_text(v) for v in value) if t]
+        if not items:
+            return None
+        shown = items[:MAX_ITEMS]
+        more = f" (+{len(items) - MAX_ITEMS} more)" if len(items) > MAX_ITEMS else ""
+        return "; ".join(dict.fromkeys(shown)) + more
+    if isinstance(value, dict):
+        # A normalized feature carries its wording as ``text`` beside ids, which say nothing
+        # to the model; anything else is shown as its labelled parts.
+        if "text" in value:
+            return _text(value["text"])
+        parts = [f"{k.replace('_', ' ')} {t}" for k, t in ((k, _text(v)) for k, v in value.items())
+                 if t and not k.endswith("ids")]
+        return "; ".join(parts) or None
+    text = str(value)
+    if isinstance(value, str) and " " not in text:
+        text = text.replace("_", " ")
+    return text
+
+
+def _clip(text: Optional[str]) -> Optional[str]:
+    if text and len(text) > MAX_LINE:
+        return text[:MAX_LINE].rstrip() + "..."
+    return text
 
 
 def _cohort(has_patients: Any, has_healthy: Any) -> Optional[str]:
@@ -131,100 +158,203 @@ def _cohort(has_patients: Any, has_healthy: Any) -> Optional[str]:
         return "patients"
     if has_healthy:
         return "healthy participants"
-    if has_patients is False and has_healthy is False:
-        return "neither patients nor healthy participants stated"
     return None
 
 
-def _side(features: Mapping[str, Any], side: str) -> Optional[str]:
+def _contrast(features: Mapping[str, Any]) -> Optional[str]:
+    """'positive > negative', with each side's cohort, then the kind of contrast."""
+    contrast = features.get("contrast")
+    if isinstance(contrast, str):  # the earlier flat layout
+        return contrast
+    if not isinstance(contrast, dict):
+        return None
+    sides = []
+    for side in ("positive", "negative"):
+        part = contrast.get(side) or {}
+        name = _text(part.get("name"))
+        cohort = _cohort(part.get("has_patients"), part.get("has_healthy"))
+        if name or cohort:
+            sides.append(f"{name or side}" + (f" ({cohort})" if cohort else ""))
+    head = " > ".join(sides)
+    kind = [_text(contrast.get("kind")), (f"{contrast['groups']}-group" if contrast.get("groups") else None)]
+    kind = ", ".join(k for k in kind if k)
+    if head and kind:
+        return f"{head} [{kind}]"
+    return head or kind or None
+
+
+def _condition(condition: Any) -> Optional[str]:
+    """The medical condition's wording, grouped by the role NeuroStore gave it where it did."""
+    if not isinstance(condition, dict):
+        return _text(condition)
+    ids, texts = condition.get("ids") or [], condition.get("text") or []
+    roles = {}
+    for entry in condition.get("role_ids") or []:
+        role, _, term = str(entry).partition("|")
+        roles.setdefault(term, role)
+    if ids and len(ids) == len(texts) and roles:
+        grouped: Dict[str, List[str]] = {}
+        for term, text in zip(ids, texts):
+            grouped.setdefault(roles.get(term, "other"), []).append(text)
+        return "; ".join(f"{role}: {_text(items)}" for role, items in grouped.items())
+    return _text(texts)
+
+
+def _participants(features: Mapping[str, Any]) -> Optional[str]:
     parts = []
-    cohort = _cohort(features.get(f"contrast_{side}_has_patients"), features.get(f"contrast_{side}_has_healthy"))
+    if isinstance(features.get("n"), int):
+        parts.append(f"n = {features['n']}")
+    cohort = _cohort(features.get("has_patients"), features.get("has_healthy"))
     if cohort:
         parts.append(cohort)
-    facets = _words(features.get(f"contrast_{side}_facets"))
-    if facets:
-        parts.append(f"facets {facets}")
-    return "; ".join(parts) if parts else None
+    groups = features.get("groups") if isinstance(features.get("groups"), dict) else {}
+    age = []
+    for key, label in (("age_mean", "mean"), ("age_standard_deviation", "sd"), ("age_minimum", "min"),
+                       ("age_maximum", "max"), ("age_range", "range")):
+        if _text(groups.get(key)):
+            age.append(f"{label} {_text(groups.get(key))}")
+    if age:
+        parts.append("age " + ", ".join(age))
+    sex = [f"{groups[k]} {k.split('_')[0]}" for k in ("female_count", "male_count") if isinstance(groups.get(k), int)]
+    if sex:
+        parts.append(", ".join(sex))
+    for key in ("diagnostic_system", "diagnostic_instrument", "clinical_characteristics"):
+        if _text(groups.get(key)):
+            parts.append(_text(groups.get(key)))
+    return "; ".join(parts) or None
+
+
+def _inference(features: Mapping[str, Any]) -> Optional[str]:
+    settings = features.get("inference_settings")
+    if not isinstance(settings, dict):
+        return None
+    parts = []
+    if _text(settings.get("multiple_comparison_method")):
+        parts.append(_text(settings["multiple_comparison_method"]))
+    if _text(settings.get("correction_scope")):
+        parts.append(f"corrected within {_text(settings['correction_scope'])}")
+    if settings.get("height_threshold_value") is not None:
+        kind = _text(settings.get("height_threshold_type")) or "threshold"
+        parts.append(f"{kind} < {settings['height_threshold_value']}")
+    if settings.get("cluster_extent_threshold") is not None:
+        parts.append(f"cluster extent {settings['cluster_extent_threshold']}")
+    if _text(settings.get("inference_level")):
+        parts.append(f"{_text(settings['inference_level'])}-level")
+    return "; ".join(parts) or None
+
+
+def _task(features: Mapping[str, Any]) -> Optional[str]:
+    tasks = features.get("tasks") if isinstance(features.get("tasks"), dict) else {}
+    parts = [_text(features.get("task"))]
+    for key, label in (("design_type", "design"), ("stimuli", "stimuli"), ("instructions", "instructions")):
+        if _text(tasks.get(key)):
+            parts.append(f"{label}: {_text(tasks.get(key))}")
+    return "; ".join(p for p in parts if p) or None
 
 
 def feature_lines(features: Mapping[str, Any]) -> List[str]:
-    """One line per feature the record states; a feature the record is silent on is left out."""
+    """One line per feature the record states; a feature the record is silent on is left out.
+
+    NeuroStore's features are nested (the contrast and its sides, groups, tasks, inference
+    settings, ...). Each is shown as words, never as a dict's repr; acquisition and
+    preprocessing details are left out as rarely deciding eligibility.
+    """
     lines: List[tuple] = []
 
     def add(label: str, value: Optional[str]) -> None:
         if value:
-            lines.append((label, value))
+            lines.append((label, _clip(value)))
 
-    add("Contrast", features.get("contrast") if isinstance(features.get("contrast"), str) else _words(features.get("contrast")))
-    effect = _words(features.get("effect_kind"))
-    groups = features.get("group_count")
-    if isinstance(groups, int) and groups:
-        effect = f"{effect or 'effect'}; {'within one group' if groups == 1 else f'across {groups} groups'}"
-    add("Effect", effect)
+    add("Contrast", _contrast(features))
+    sets = features.get("coordinate_sets") if isinstance(features.get("coordinate_sets"), dict) else {}
+    add("Result", _text(sets.get("result_kind")))
+    details = features.get("details") if isinstance(features.get("details"), dict) else {}
+    if details:
+        add("Connectivity", _text({k: v for k, v in details.items()}))
     scope = features.get("spatial_scope")
-    add("Spatial scope", SPATIAL_SCOPES.get(scope, _words(scope)))
-    add("Task", _words(features.get("task")))
-    participants = []
-    if isinstance(features.get("n"), int):
-        participants.append(f"n = {features['n']}")
-    cohort = _cohort(features.get("has_patients"), features.get("has_healthy"))
-    if cohort:
-        participants.append(cohort)
-    add("Participants", "; ".join(participants) or None)
-    add("Medical condition", _words(features.get("medical_condition")))
-    add("Positive side", _side(features, "positive"))
-    add("Negative side", _side(features, "negative"))
-    measure = _words(features.get("measure_type"))
-    family = _words(features.get("measure_family"))
+    add("Spatial scope", SPATIAL_SCOPES.get(scope, _text(scope)))
+    add("Inference", _inference(features))
+    regions = features.get("regions") if isinstance(features.get("regions"), dict) else {}
+    if regions:
+        defined = _text(regions.get("definition_method"))
+        add("Regions", (_text(regions.get("name")) or "") + (f" (defined by {defined})" if defined else ""))
+    add("Task", _task(features))
+    add("Participants", _participants(features))
+    add("Medical condition", _condition(features.get("medical_condition")))
+    species = features.get("species")
+    if species and species != ["human"]:
+        add("Species", _text(species))
+    measure, family = _text(features.get("measure_type")), _text(features.get("measure_family"))
     add("Measure", f"{measure} ({family})" if measure and family else measure or family)
-    design = [
-        _words(features.get("assignment_structure")),
-        f"allocation {_words(features['allocation'])}" if _words(features.get("allocation")) else None,
-        f"blinding {_words(features['blinding'])}" if _words(features.get("blinding")) else None,
-    ]
-    add("Design", "; ".join(d for d in design if d) or None)
-    add("Coordinate space", _words(features.get("coordinate_space")))
+    design = features.get("design") if isinstance(features.get("design"), dict) else {
+        k: features.get(k) for k in ("assignment_structure", "allocation", "blinding")}
+    design_text = _text({k: v for k, v in design.items() if k in ("assignment_structure", "allocation", "blinding")})
+    if features.get("is_meta_analysis"):
+        design_text = "this analysis is itself a meta-analysis" + (f"; {design_text}" if design_text else "")
+    add("Design", design_text)
+    model = features.get("model_estimation") if isinstance(features.get("model_estimation"), dict) else {}
+    terms = model.get("terms") if isinstance(model.get("terms"), dict) else {}
+    model_text = "; ".join(t for t in (_text(model.get("model_type")),
+                                       f"terms: {_text(terms.get('name'))}" if _text(terms.get("name")) else None) if t)
+    add("Model", model_text or None)
+    add("Coordinate space", _text(features.get("coordinate_space")))
     return [f"{label}: {value}" for label, value in lines]
 
 
-def analysis_block(
-    reference: str,
-    name: Optional[str],
+def analysis_lines(
     features: Optional[Mapping[str, Any]],
     peaks: int,
     table_label: Optional[str],
-) -> str:
-    """One analysis as the record shows it: a reference line, then its features."""
-    head = f"Analysis {reference}: {name or 'unnamed analysis'}"
+) -> List[str]:
+    """What the record says about one analysis: its features, then its peaks."""
     reported = f"Reported peaks: {peaks}" + (f" ({table_label})" if table_label else "")
     if features is None:
-        body = ["No features were extracted for this analysis.", reported]
-    else:
-        body = feature_lines(features) + [reported]
-    return "\n".join([head, *(f"  {line}" for line in body)])
+        return ["No features were extracted for this analysis.", reported]
+    return feature_lines(features) + [reported]
+
+
+def analysis_block(reference: str, name: Optional[str], lines: Sequence[str]) -> str:
+    """One analysis as the record shows it: a reference line, then its lines."""
+    head = f"Analysis {reference}: {name or 'unnamed analysis'}"
+    return "\n".join([head, *(f"  {line}" for line in lines)])
 
 
 RECORD_DESCRIPTION = (
     "NeuroStore's record of the article: its title and abstract, and each reported analysis "
     "with the features NeuroStore extracted from the paper (the contrast and its sides, task, "
-    "whole brain or region of interest, effect, participants, measure and design)"
+    "whole brain or region of interest, inference, participants, measure and design)"
 )
 
 
 def render_record(
     title: Optional[str],
     abstract: Optional[str],
-    blocks: Sequence[str],
+    analyses: Sequence[tuple],
 ) -> str:
-    """The study's record, as the model reads it in place of the full text."""
+    """The study's record, as the model reads it in place of the full text.
+
+    ``analyses`` holds ``(reference, name, lines)`` per analysis. A line every analysis has,
+    word for word, is printed once under "Shared by all analyses" instead of in each block:
+    a study's participants, condition and design are usually the same for all of them.
+    """
     parts = ["NEUROSTORE RECORD"]
     if title:
         parts.append(f"Title: {title}")
     if abstract:
         parts.append(f"Abstract: {abstract}")
+    shared: List[str] = []
+    if len(analyses) > 1:
+        first = analyses[0][2]
+        shared = [line for line in first if all(line in lines for _, _, lines in analyses[1:])
+                  and not line.startswith("Reported peaks")]
     parts.append(
-        f"Analyses ({len(blocks)}). Each lists only what NeuroStore's extraction states; a "
+        f"Analyses ({len(analyses)}). Each lists only what NeuroStore's extraction states; a "
         "feature it is silent on is left out."
     )
-    parts.extend(blocks)
+    if shared:
+        parts.append("Shared by all analyses:\n" + "\n".join(f"  {line}" for line in shared))
+    parts.extend(
+        analysis_block(reference, name, [line for line in lines if line not in shared])
+        for reference, name, lines in analyses
+    )
     return "\n\n".join(parts) + "\n"

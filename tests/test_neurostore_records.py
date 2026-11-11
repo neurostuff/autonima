@@ -262,3 +262,50 @@ def test_the_version_choice_enters_the_retrieval_signature(tmp_path):
                                              "neurostore": {"sources": ["study_schema"]}}))
     assert default["retrieval"] != narrowed["retrieval"]
     assert default["abstract"] == narrowed["abstract"]
+
+
+# The shape NeuroStore serves since its analysis-feature release (2026-11-10), trimmed.
+NESTED = {
+    "spatial_scope": "roi", "coordinate_space": "MNI", "n": 24, "has_patients": False, "has_healthy": True,
+    "species": ["human"], "measure_type": "bold_response", "measure_family": "functional_bold", "is_meta_analysis": False,
+    "contrast": {"key": {"ids": ["x|regulation:reappraise|vs:y"]}, "kind": "contrast", "groups": "within",
+                 "positive": {"name": ["Distance"], "facet": ["regulation:reappraise"]},
+                 "negative": {"name": ["Attend"], "facet": ["y"]}},
+    "task": {"ids": ["hedtsk_pavlovian_fear_conditioning"], "family_ids": ["c"], "text": ["Pavlovian Fear Conditioning Task"]},
+    "tasks": {"stimuli": ["Negative IAPS pictures"], "design_type": ["event_related"], "instructions": ["Distance or attend."]},
+    "groups": {"age_mean": [24.8], "female_count": 24, "male_count": 0},
+    "details": {"connectivity_method": "gppi", "seed_regions": ["left vlPFC"]},
+    "regions": {"name": ["midbrain ROI"], "definition_method": ["prior_literature"]},
+    "inference_settings": {"multiple_comparison_method": ["FWE small-volume correction"], "correction_scope": "roi"},
+    "coordinate_sets": {"role": ["result"], "result_kind": ["connectivity"]},
+    "medical_condition": {"ids": ["MONDO:1", "MONDO:2"], "text": ["PTSD", "depression"],
+                          "role_ids": ["primary|MONDO:1", "comorbid|MONDO:2"]},
+    "design": {"allocation": "not_applicable", "assignment_structure": "single_group"},
+    "acquisitions": {"modality": ["fmri"], "repetition_time_seconds": [2.0]},
+}
+
+
+def test_nested_features_read_as_words_never_as_dicts():
+    lines = feature_lines(NESTED)
+    text = "\n".join(lines)
+    assert "Contrast: Distance > Attend [contrast, within-group]" in lines
+    assert "Result: connectivity" in lines
+    assert "Spatial scope: region of interest" in lines
+    assert "Inference: FWE small-volume correction; corrected within roi" in lines
+    assert "Regions: midbrain ROI (defined by prior literature)" in lines
+    assert "Medical condition: primary: PTSD; comorbid: depression" in lines
+    assert "connectivity method gppi" in text and "Pavlovian Fear Conditioning Task" in text
+    assert "{" not in text and "ids" not in text
+    assert "repetition" not in text  # acquisition details are left out
+
+
+def test_lines_every_analysis_shares_are_printed_once():
+    from autonima.neurostore.features import analysis_lines, render_record
+
+    shared = analysis_lines(NESTED, 3, "Table 1")
+    other = analysis_lines({**NESTED, "spatial_scope": "whole_brain"}, 5, None)
+    text = render_record("T", "A", [("A1", "first", shared), ("A2", "second", other)])
+    assert text.count("Participants: n = 24") == 1
+    assert "Shared by all analyses:\n" in text
+    assert "Analysis A2: second\n  Spatial scope: whole brain" in text
+    assert text.count("Reported peaks") == 2  # never shared
