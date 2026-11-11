@@ -54,7 +54,7 @@ RECORDS_DIRNAME = "neurostore_records"
 # stage, and these analyses belong to retrieval.
 RECORD_ANALYSES_FILENAME = "neurostore_record_analyses.json"
 # Bump when the record's layout or wording changes; it enters the retrieval stage signature.
-RECORD_FORMAT_VERSION = "neurostore-record-v2"
+RECORD_FORMAT_VERSION = "neurostore-record-v3"
 
 
 def _sha256_text(text: str) -> str:

@@ -291,7 +291,7 @@ def test_nested_features_read_as_words_never_as_dicts():
     assert "Contrast: Distance > Attend [contrast, within-group]" in lines
     assert "Result: connectivity" in lines
     assert "Spatial scope: region of interest" in lines
-    assert "Inference: FWE small-volume correction; corrected within roi" in lines
+    assert "Thresholding: FWE small-volume correction; correction scope roi" in lines
     assert "Regions: midbrain ROI (defined by prior literature)" in lines
     assert "Medical condition: primary: PTSD; comorbid: depression" in lines
     assert "connectivity method gppi" in text and "Pavlovian Fear Conditioning Task" in text
@@ -309,3 +309,12 @@ def test_lines_every_analysis_shares_are_printed_once():
     assert "Shared by all analyses:\n" in text
     assert "Analysis A2: second\n  Spatial scope: whole brain" in text
     assert text.count("Reported peaks") == 2  # never shared
+
+
+def test_the_record_says_spatial_scope_decides_whole_brain_or_roi():
+    from autonima.neurostore.features import analysis_lines, render_record
+
+    text = render_record("T", "A", [("A1", "first", analysis_lines({**NESTED, "spatial_scope": "whole_brain"}, 3, None))])
+    assert "Spatial scope is what says whether an analysis covers the whole brain" in text
+    assert "Spatial scope: whole brain" in text and "Thresholding: FWE small-volume correction" in text
+    assert "corrected within" not in text

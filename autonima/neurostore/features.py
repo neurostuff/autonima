@@ -232,7 +232,7 @@ def _inference(features: Mapping[str, Any]) -> Optional[str]:
     if _text(settings.get("multiple_comparison_method")):
         parts.append(_text(settings["multiple_comparison_method"]))
     if _text(settings.get("correction_scope")):
-        parts.append(f"corrected within {_text(settings['correction_scope'])}")
+        parts.append(f"correction scope {_text(settings['correction_scope'])}")
     if settings.get("height_threshold_value") is not None:
         kind = _text(settings.get("height_threshold_type")) or "threshold"
         parts.append(f"{kind} < {settings['height_threshold_value']}")
@@ -273,7 +273,7 @@ def feature_lines(features: Mapping[str, Any]) -> List[str]:
         add("Connectivity", _text({k: v for k, v in details.items()}))
     scope = features.get("spatial_scope")
     add("Spatial scope", SPATIAL_SCOPES.get(scope, _text(scope)))
-    add("Inference", _inference(features))
+    add("Thresholding", _inference(features))
     regions = features.get("regions") if isinstance(features.get("regions"), dict) else {}
     if regions:
         defined = _text(regions.get("definition_method"))
@@ -349,7 +349,10 @@ def render_record(
                   and not line.startswith("Reported peaks")]
     parts.append(
         f"Analyses ({len(analyses)}). Each lists only what NeuroStore's extraction states; a "
-        "feature it is silent on is left out."
+        "feature it is silent on is left out. Spatial scope is what says whether an analysis "
+        "covers the whole brain or a region of interest. Thresholding only describes how its "
+        "results were thresholded and corrected: a small-volume or region-of-interest "
+        "correction listed there does not make a whole-brain analysis a region-of-interest one."
     )
     if shared:
         parts.append("Shared by all analyses:\n" + "\n".join(f"  {line}" for line in shared))
