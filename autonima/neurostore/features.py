@@ -231,8 +231,6 @@ def _inference(features: Mapping[str, Any]) -> Optional[str]:
     parts = []
     if _text(settings.get("multiple_comparison_method")):
         parts.append(_text(settings["multiple_comparison_method"]))
-    if _text(settings.get("correction_scope")):
-        parts.append(f"correction scope {_text(settings['correction_scope'])}")
     if settings.get("height_threshold_value") is not None:
         kind = _text(settings.get("height_threshold_type")) or "threshold"
         parts.append(f"{kind} < {settings['height_threshold_value']}")
@@ -241,6 +239,22 @@ def _inference(features: Mapping[str, Any]) -> Optional[str]:
     if _text(settings.get("inference_level")):
         parts.append(f"{_text(settings['inference_level'])}-level")
     return "; ".join(parts) or None
+
+
+def _inference_scope(features: Mapping[str, Any]) -> Optional[tuple]:
+    """Where significance was tested, as (label, words); None when the record does not say.
+
+    NeuroStore keeps this apart from where the model was fit: an analysis can be estimated over
+    the whole brain and tested only within regions of interest, as in a small-volume correction.
+    """
+    settings = features.get("inference_settings")
+    scope = settings.get("correction_scope") if isinstance(settings, dict) else None
+    if not _text(scope):
+        return None
+    words = SPATIAL_SCOPES.get(scope, _text(scope))
+    if scope == "whole_brain":
+        return "Inference over", words
+    return "Inference restricted to", words
 
 
 def _task(features: Mapping[str, Any]) -> Optional[str]:
@@ -272,7 +286,10 @@ def feature_lines(features: Mapping[str, Any]) -> List[str]:
     if details:
         add("Connectivity", _text({k: v for k, v in details.items()}))
     scope = features.get("spatial_scope")
-    add("Spatial scope", SPATIAL_SCOPES.get(scope, _text(scope)))
+    add("Model fit over", SPATIAL_SCOPES.get(scope, _text(scope)))
+    inference_scope = _inference_scope(features)
+    if inference_scope:
+        add(*inference_scope)
     add("Thresholding", _inference(features))
     regions = features.get("regions") if isinstance(features.get("regions"), dict) else {}
     if regions:
@@ -349,10 +366,10 @@ def render_record(
                   and not line.startswith("Reported peaks")]
     parts.append(
         f"Analyses ({len(analyses)}). Each lists only what NeuroStore's extraction states; a "
-        "feature it is silent on is left out. Spatial scope is what says whether an analysis "
-        "covers the whole brain or a region of interest. Thresholding only describes how its "
-        "results were thresholded and corrected: a small-volume or region-of-interest "
-        "correction listed there does not make a whole-brain analysis a region-of-interest one."
+        "feature it is silent on is left out. 'Model fit over' is where the model was "
+        "estimated (an estimate at every voxel of the whole brain, or of a region only). "
+        "'Inference over' or 'Inference restricted to' is where significance was tested, "
+        "which can be a subset of where the model was fit, as in a small-volume correction."
     )
     if shared:
         parts.append("Shared by all analyses:\n" + "\n".join(f"  {line}" for line in shared))

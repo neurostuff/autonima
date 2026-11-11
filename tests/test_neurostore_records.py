@@ -122,14 +122,14 @@ def test_a_record_lists_each_analysis_with_its_features_under_autonima_ids(tmp_p
     assert text.startswith("NEUROSTORE RECORD")
     assert "Title: Study 111" in text and "Abstract: Abstract of 111." in text
     assert "Analysis 111_analysis_0: Reappraise > Look" in text
-    assert "Spatial scope: whole brain" in text and "Spatial scope: region of interest" in text
+    assert "Model fit over: whole brain" in text and "Model fit over: region of interest" in text
     assert "Contrast: reappraise > look" in text
     assert "Participants: n = 24; healthy participants" in text
     assert "{{analysis:" not in text and "A1" not in text
     document = study.document
     assert document.kind == "neurostore" and document.provides_analyses
     assert document.analysis_keys == ["A1", "A2"]
-    assert "Spatial scope: region of interest" in document.analysis_documents[1]
+    assert "Model fit over: region of interest" in document.analysis_documents[1]
     assert study.full_text_source == "document:neurostore"
 
 
@@ -290,8 +290,9 @@ def test_nested_features_read_as_words_never_as_dicts():
     text = "\n".join(lines)
     assert "Contrast: Distance > Attend [contrast, within-group]" in lines
     assert "Result: connectivity" in lines
-    assert "Spatial scope: region of interest" in lines
-    assert "Thresholding: FWE small-volume correction; correction scope roi" in lines
+    assert "Model fit over: region of interest" in lines
+    assert "Inference restricted to: region of interest" in lines
+    assert "Thresholding: FWE small-volume correction" in lines
     assert "Regions: midbrain ROI (defined by prior literature)" in lines
     assert "Medical condition: primary: PTSD; comorbid: depression" in lines
     assert "connectivity method gppi" in text and "Pavlovian Fear Conditioning Task" in text
@@ -307,14 +308,20 @@ def test_lines_every_analysis_shares_are_printed_once():
     text = render_record("T", "A", [("A1", "first", shared), ("A2", "second", other)])
     assert text.count("Participants: n = 24") == 1
     assert "Shared by all analyses:\n" in text
-    assert "Analysis A2: second\n  Spatial scope: whole brain" in text
+    assert "Analysis A2: second\n  Model fit over: whole brain" in text
     assert text.count("Reported peaks") == 2  # never shared
 
 
-def test_the_record_says_spatial_scope_decides_whole_brain_or_roi():
+def test_model_fit_and_inference_scope_are_told_apart():
     from autonima.neurostore.features import analysis_lines, render_record
 
-    text = render_record("T", "A", [("A1", "first", analysis_lines({**NESTED, "spatial_scope": "whole_brain"}, 3, None))])
-    assert "Spatial scope is what says whether an analysis covers the whole brain" in text
-    assert "Spatial scope: whole brain" in text and "Thresholding: FWE small-volume correction" in text
-    assert "corrected within" not in text
+    # Whole-brain estimation, inference within ROIs only: a small-volume correction.
+    lines = analysis_lines({**NESTED, "spatial_scope": "whole_brain"}, 3, None)
+    text = render_record("T", "A", [("A1", "first", lines)])
+    assert "Model fit over: whole brain" in lines
+    assert "Inference restricted to: region of interest" in lines
+    assert "where significance was tested" in text
+    # Nothing tells the judge which of the two a criterion means; the criteria decide.
+    assert "does not make" not in text and "Spatial scope" not in text
+    whole = feature_lines({**NESTED, "inference_settings": {"correction_scope": "whole_brain"}})
+    assert "Inference over: whole brain" in whole
