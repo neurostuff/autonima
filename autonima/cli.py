@@ -710,12 +710,19 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
 
 
 @click.command()
-def create_sample_config():
+@click.option(
+    "--fulltext",
+    is_flag=True,
+    help="Read and parse each article instead of reviewing NeuroStore's records.",
+)
+def create_sample_config(fulltext):
     """
     Create a sample configuration file.
 
     This command generates a sample configuration file that can be
-    used as a starting point for your systematic review.
+    used as a starting point for your systematic review. The standard
+    path searches NeuroStore and reviews each study from NeuroStore's
+    record of it in one call; --fulltext reads every article instead.
 
     Example:
         autonima create-sample-config > config.yaml
@@ -723,7 +730,7 @@ def create_sample_config():
     try:
         from .config import get_sample_config_text
 
-        print(get_sample_config_text(), end="")
+        print(get_sample_config_text("fulltext" if fulltext else "neurostore"), end="")
 
     except Exception as e:
         log_error_with_debug(logger, f"Failed to create sample config: {e}")

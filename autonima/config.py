@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 _SAMPLE_CONFIG_PACKAGE = "autonima.templates"
 _SAMPLE_CONFIG_NAME = "sample_config.yml"
+# The standard path reviews NeuroStore's records; "fulltext" reads and parses each article.
+_SAMPLE_CONFIG_NAMES = {"neurostore": _SAMPLE_CONFIG_NAME, "fulltext": "sample_config_fulltext.yml"}
 
 
 class ConfigurationError(Exception):
@@ -335,7 +337,25 @@ class ConfigManager:
                     "output directory; remove retrieval.records.root"
                 )
             self._validate_record_neurostore_options(documents.neurostore)
+            from .documents.neurostore import FALLBACKS
+
+            if documents.fallback is not None and documents.fallback not in FALLBACKS:
+                raise ConfigurationError(
+                    f"retrieval.records.fallback must be one of: {', '.join(FALLBACKS)}"
+                )
+            if documents.fallback == "fulltext" and not (
+                config.retrieval.sources or config.retrieval.full_text_sources
+            ):
+                raise ConfigurationError(
+                    "retrieval.records.fallback is 'fulltext' but retrieval has no sources "
+                    "(retrieval.sources or retrieval.full_text_sources) to fetch articles from"
+                )
         else:
+            if documents.fallback is not None:
+                raise ConfigurationError(
+                    "retrieval.records.fallback is set but retrieval.records.kind is not "
+                    "'neurostore'"
+                )
             if documents.neurostore is not None:
                 raise ConfigurationError(
                     "retrieval.records.neurostore is set but retrieval.records.kind is not "
@@ -460,9 +480,9 @@ class ConfigManager:
         with open(config_path, 'w', encoding='utf-8') as f:
             yaml.dump(config_dict, f, default_flow_style=False, indent=2)
 
-    def create_sample_config(self) -> PipelineConfig:
-        """Create the canonical sample configuration as a validated object."""
-        sample_config_text = get_sample_config_text()
+    def create_sample_config(self, variant: str = "neurostore") -> PipelineConfig:
+        """Create a sample configuration (``neurostore`` or ``fulltext``) as a validated object."""
+        sample_config_text = get_sample_config_text(variant)
         config_data = yaml.safe_load(sample_config_text)
         if config_data is None:
             raise ConfigurationError("Canonical sample configuration is empty")
@@ -674,28 +694,36 @@ def load_config(config_path: Union[str, Path]) -> PipelineConfig:
     return manager.load_from_file(config_path)
 
 
-def create_sample_config_file(output_path: Union[str, Path]) -> None:
+def create_sample_config_file(output_path: Union[str, Path], variant: str = "neurostore") -> None:
     """
     Create a sample configuration file.
 
     Args:
         output_path: Path where to save the sample configuration
+        variant: ``neurostore`` (the standard path) or ``fulltext``
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(get_sample_config_text(), encoding="utf-8")
+    output_path.write_text(get_sample_config_text(variant), encoding="utf-8")
 
 
-def get_sample_config_text() -> str:
-    """Return the canonical sample configuration YAML text."""
+def get_sample_config_text(variant: str = "neurostore") -> str:
+    """Return a sample configuration's YAML text.
+
+    ``neurostore``, the standard path: NeuroStore search, NeuroStore records and a combined
+    review. ``fulltext``: PubMed search, each article read in full and its tables parsed.
+    """
+    if variant not in _SAMPLE_CONFIG_NAMES:
+        raise ValueError(f"Unknown sample config {variant!r}; known: {', '.join(_SAMPLE_CONFIG_NAMES)}")
+    name = _SAMPLE_CONFIG_NAMES[variant]
     if hasattr(resources, "files"):
         return (
             resources.files(_SAMPLE_CONFIG_PACKAGE)
-            .joinpath(_SAMPLE_CONFIG_NAME)
+            .joinpath(name)
             .read_text(encoding="utf-8")
         )
     return resources.read_text(
         _SAMPLE_CONFIG_PACKAGE,
-        _SAMPLE_CONFIG_NAME,
+        name,
         encoding="utf-8",
     )

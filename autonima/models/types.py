@@ -382,6 +382,9 @@ class DocumentsConfig:
     # kind "neurostore" only: which NeuroStore version's analyses (``sources``, ``roles``,
     # as ``parsing.neurostore``) and ``base_url``.
     neurostore: Optional[Dict[str, Any]] = None
+    # kind "neurostore" only. "fulltext": a study NeuroStore has coordinates for but no
+    # features is reviewed from its retrieved article instead of being left unavailable.
+    fallback: Optional[str] = None
 
 
 @dataclass
@@ -440,6 +443,11 @@ class PipelineConfig:
                     **(
                         {"neurostore": self.documents.neurostore}
                         if self.documents.neurostore is not None
+                        else {}
+                    ),
+                    **(
+                        {"fallback": self.documents.fallback}
+                        if self.documents.fallback is not None
                         else {}
                     ),
                 }

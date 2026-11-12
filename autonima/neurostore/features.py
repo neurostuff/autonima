@@ -378,3 +378,31 @@ def render_record(
         for reference, name, lines in analyses
     )
     return "\n\n".join(parts) + "\n"
+
+
+def render_fulltext_record(
+    title: Optional[str],
+    abstract: Optional[str],
+    analyses: Sequence[tuple],
+    full_text: str,
+) -> str:
+    """The record of a study NeuroStore has coordinates for but no features: the article itself.
+
+    ``retrieval.records.fallback: fulltext``. The analyses are still NeuroStore's, so the
+    model selects among the same analyses whose coordinates the run exports; it judges them
+    from the article instead of from extracted features.
+    """
+    parts = ["NEUROSTORE RECORD WITH THE ARTICLE'S FULL TEXT"]
+    if title:
+        parts.append(f"Title: {title}")
+    if abstract:
+        parts.append(f"Abstract: {abstract}")
+    parts.append(
+        f"Analyses ({len(analyses)}). NeuroStore has coordinates for these analyses but no "
+        "extracted features, so the article's full text follows them. Judge each analysis, and "
+        "the study, from the article; match an analysis to its contrast in the article by its "
+        "name and its table."
+    )
+    parts.extend(analysis_block(reference, name, lines) for reference, name, lines in analyses)
+    parts.append("FULL TEXT OF THE ARTICLE\n\n" + full_text.strip())
+    return "\n\n".join(parts) + "\n"

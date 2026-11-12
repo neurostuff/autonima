@@ -1,6 +1,8 @@
 # Configuration Guide
 
-Autonima uses a YAML config file for the pipeline. The canonical example lives at `examples/sample_config.yml` and is also emitted by `autonima create-sample-config`.
+Autonima uses a YAML config file for the pipeline. The canonical example lives at `examples/sample_config.yml` and is also emitted by `autonima create-sample-config`. It is the standard path: NeuroStore search, [NeuroStore records](records.md#neurostore-records) and a combined review (`screening.fulltext.mode: combined`). `autonima create-sample-config --fulltext` emits the full-text path, which reads and parses each article.
+
+The defaults of the individual settings have not changed: a config that leaves out `search.database`, `retrieval.records` or `screening.fulltext.mode` still searches PubMed and reads each article, as it always has. The standard path is what the sample config sets, not what a missing key means.
 
 ## Minimal Working Config
 

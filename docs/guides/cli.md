@@ -17,7 +17,13 @@ See the [CLI reference](../reference/cli.md) for generated argument and option d
 autonima create-sample-config > config.yaml
 ```
 
-This writes the canonical sample YAML to stdout, so shell redirection produces an editable config file directly.
+This writes the canonical sample YAML to stdout, so shell redirection produces an editable config file directly. It searches NeuroStore and reviews each study from NeuroStore's record of it in one call.
+
+```bash
+autonima create-sample-config --fulltext > config.yaml
+```
+
+writes the full-text sample instead: a PubMed search, each article read in full, and coordinates parsed from its tables.
 
 ## Validate a Config
 

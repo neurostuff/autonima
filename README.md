@@ -115,7 +115,7 @@ address in the config's `search.email`.
 ## Quickstart
 
 ```bash
-autonima create-sample-config > config.yaml   # a starting config
+autonima create-sample-config > config.yaml   # a starting config: NeuroStore records, one call per study
 autonima validate config.yaml                 # check it before spending anything
 autonima run config.yaml                      # run the pipeline
 autonima meta config/outputs                  # meta-analyse the NiMADS output

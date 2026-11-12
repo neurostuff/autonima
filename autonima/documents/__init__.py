@@ -38,7 +38,10 @@ def create_document_source(config, output_dir=None) -> DocumentSource:
     """Build the source a ``DocumentsConfig`` describes."""
     if config.kind == NeuroStoreRecordSource.kind:
         return NeuroStoreRecordSource(
-            output_dir, options=config.neurostore, description=config.description
+            output_dir,
+            options=config.neurostore,
+            description=config.description,
+            fallback=config.fallback,
         )
     return SOURCE_KINDS[config.kind](config.root, description=config.description)
 

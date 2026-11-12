@@ -251,7 +251,7 @@ def test_a_short_result_set_fails():
 # ---------------------------------------------------------------------------
 
 def _config(tmp_path, **sections):
-    config = yaml.safe_load(get_sample_config_text())
+    config = yaml.safe_load(get_sample_config_text("fulltext"))
     config["output"]["directory"] = str(tmp_path / "run")
     for section, values in sections.items():
         config.setdefault(section, {}).update(values)
@@ -378,7 +378,7 @@ def test_the_parsing_stage_attaches_neurostore_analyses(tmp_path, monkeypatch):
 def _ns_config(directory, roles=None):
     from autonima.config import ConfigManager as Manager
 
-    config = yaml.safe_load(get_sample_config_text())
+    config = yaml.safe_load(get_sample_config_text("fulltext"))
     config["output"]["directory"] = str(directory)
     config["parsing"] = {"parse_coordinates": True, "coordinate_source": "neurostore",
                          **({"neurostore": {"roles": roles}} if roles else {})}

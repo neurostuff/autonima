@@ -26,6 +26,25 @@ def test_canonical_sample_config_is_valid():
     assert config.output.directory
 
 
+def test_the_standard_sample_reviews_neurostore_records_in_one_call():
+    config = ConfigManager().create_sample_config()
+
+    assert config.search.database == "neurostore"
+    assert config.documents.enabled and config.documents.kind == "neurostore"
+    assert config.documents.fallback is None  # only studies with NeuroStore features
+    assert config.screening.fulltext.get("mode") == "combined"
+    assert config.parsing.parse_coordinates is False
+
+
+def test_the_fulltext_sample_reads_every_article():
+    config = ConfigManager().create_sample_config("fulltext")
+
+    assert config.search.database == "pubmed"
+    assert not config.documents.enabled
+    assert config.screening.fulltext.get("mode") in (None, "separate")
+    assert config.parsing.parse_coordinates is True
+
+
 def test_examples_sample_config_matches_canonical_template():
     canonical = (
         resources.files("autonima.templates")

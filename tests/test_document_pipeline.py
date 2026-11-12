@@ -38,7 +38,7 @@ def _write_record(root, pmid="111"):
 
 
 def _pipeline(tmp_path, kind, root, **overrides):
-    config = yaml.safe_load(get_sample_config_text())
+    config = yaml.safe_load(get_sample_config_text("fulltext"))
     config["search"]["pmids_list"] = ["111", "222"]
     config["output"]["directory"] = str(tmp_path / "run")
     config["parsing"]["parse_coordinates"] = kind != "analyses"

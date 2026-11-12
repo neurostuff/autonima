@@ -190,6 +190,38 @@ from anything else:
 | `features_for_other_version` | the features describe another version of the study than the one the coordinates came from |
 | `fetch_failed`, `features_fetch_failed` | a request failed; the study is fetched again next run |
 
+### Full-text fallback
+
+```yaml
+retrieval:
+  sources: [pubget]             # where articles come from, as in any full-text run
+  records:
+    enabled: true
+    kind: neurostore
+    fallback: fulltext
+```
+
+With `fallback: fulltext`, a study NeuroStore has coordinates for but no features
+(`no_features`, `features_for_other_version`) is reviewed from its article instead of being
+left unavailable. Autonima retrieves the article for just those studies, from
+`retrieval.sources` and `retrieval.full_text_sources`, and the study's record becomes its
+title, abstract and NeuroStore's list of analyses, followed by the article's full text. The
+model still selects among NeuroStore's analyses, so every study's coordinates come from
+NeuroStore whichever record it was judged from.
+
+- **Which studies:** each fallback record's analyses file says `"input": "fulltext"` under
+  `source`, with `article_source` naming where the article came from. The run's
+  `execution_stats.retrieval` counts `documents_fallback_candidates` and
+  `documents_from_full_text`.
+- **Still unavailable:** a study whose article cannot be retrieved keeps its reason, with
+  "full-text fallback: article not retrieved" in the detail. Studies NeuroStore has no
+  coordinates for are not fallback studies: there would be no analyses to select.
+- **Caching:** the fallback enters the retrieval stage's signature only when it is on, and
+  leaves every feature record byte for byte as it was. Turning it on for an existing run
+  therefore reviews only the fallback studies; every other decision is reused.
+- **Cost:** a fallback record is as long as the article, so each fallback study costs about
+  what a full-text run spends on it.
+
 ## Prompts
 
 When a study has a document, full-text screening uses a prompt that says the model is reading

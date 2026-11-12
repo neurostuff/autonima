@@ -9,7 +9,7 @@ from autonima.config import ConfigManager, ConfigurationError, get_sample_config
 from autonima.execution import stage_hashes
 
 
-# Stage hashes of the canonical sample config, recorded before documents existed. An article
+# Stage hashes of the full-text sample config, recorded before documents existed. An article
 # run must keep every one of them, or upgrading would silently invalidate its caches.
 SAMPLE_STAGE_HASHES = {
     "abstract": "9378a7188766253d2cc7bd52310f40bb8397c920b36cd3bf4c478f6974914fe7",
@@ -23,7 +23,7 @@ SAMPLE_STAGE_HASHES = {
 
 
 def _sample() -> dict:
-    return yaml.safe_load(get_sample_config_text())
+    return yaml.safe_load(get_sample_config_text("fulltext"))
 
 
 def _with_documents(tmp_path, **documents) -> dict:

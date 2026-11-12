@@ -22,7 +22,7 @@ def test_run_uses_config_stem_as_default_output_dir(tmp_path, monkeypatch):
     config_path = tmp_path / "default.yaml"
     config_path.write_text("search: {}\n", encoding="utf-8")
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -40,7 +40,7 @@ def test_validate_uses_config_stem_as_default_output_dir(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yml"
     config_path.write_text("search: {}\n", encoding="utf-8")
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -60,7 +60,7 @@ def test_validate_keeps_explicit_output_dir(tmp_path, monkeypatch):
     config_path.write_text("search: {}\n", encoding="utf-8")
     explicit_output = tmp_path / "custom-output"
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -83,7 +83,7 @@ def test_run_search_uses_config_stem_as_default_output_dir(
     config_path = tmp_path / "search_only.yaml"
     config_path.write_text("search: {}\n", encoding="utf-8")
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -103,7 +103,7 @@ def test_run_abstract_uses_config_stem_as_default_output_dir(
     config_path = tmp_path / "abstract_only.yaml"
     config_path.write_text("search: {}\n", encoding="utf-8")
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -159,13 +159,24 @@ def test_create_sample_config_outputs_canonical_template():
     )
 
 
+def test_create_sample_config_fulltext_outputs_the_article_template():
+    result = CliRunner().invoke(create_sample_config, ["--fulltext"])
+
+    assert result.exit_code == 0
+    assert result.output == (
+        resources.files("autonima.templates")
+        .joinpath("sample_config_fulltext.yml")
+        .read_text(encoding="utf-8")
+    )
+
+
 def test_run_passes_force_reextract_incomplete_fulltext_flag(
     tmp_path, monkeypatch
 ):
     config_path = tmp_path / "config.yml"
     config_path.write_text("search: {}\n", encoding="utf-8")
 
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -211,7 +222,7 @@ def test_run_passes_force_reextract_incomplete_fulltext_flag(
 def test_run_search_passes_search_stop_after_stage(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yml"
     config_path.write_text("search: {}\n", encoding="utf-8")
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)
@@ -254,7 +265,7 @@ def test_run_search_passes_search_stop_after_stage(tmp_path, monkeypatch):
 def test_run_abstract_passes_abstract_stop_after_stage(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yml"
     config_path.write_text("search: {}\n", encoding="utf-8")
-    sample_config = ConfigManager().create_sample_config()
+    sample_config = ConfigManager().create_sample_config("fulltext")
 
     def fake_load_from_file(self, path):
         assert path == str(config_path)

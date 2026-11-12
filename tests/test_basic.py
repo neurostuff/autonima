@@ -9,7 +9,7 @@ from autonima.pipeline import AutonimaPipeline
 def test_configuration_loading():
     """Test configuration loading."""
     config_manager = ConfigManager()
-    sample_config = config_manager.create_sample_config()
+    sample_config = config_manager.create_sample_config("fulltext")
     
     assert isinstance(sample_config, PipelineConfig)
     assert sample_config.search.query is not None
@@ -28,7 +28,7 @@ def test_configuration_loading():
 def test_pipeline_initialization():
     """Test pipeline initialization."""
     config_manager = ConfigManager()
-    sample_config = config_manager.create_sample_config()
+    sample_config = config_manager.create_sample_config("fulltext")
     
     # This should not raise an exception
     pipeline = AutonimaPipeline(sample_config)
@@ -41,7 +41,7 @@ def test_pipeline_initialization():
 def test_pipeline_search_functionality():
     """Test search functionality."""
     config_manager = ConfigManager()
-    sample_config = config_manager.create_sample_config()
+    sample_config = config_manager.create_sample_config("fulltext")
     
     # Limit the number of results for faster testing
     sample_config.search.max_results = 2
@@ -71,7 +71,7 @@ def test_pipeline_search_functionality():
 def test_pipeline_statistics():
     """Test pipeline statistics generation."""
     config_manager = ConfigManager()
-    sample_config = config_manager.create_sample_config()
+    sample_config = config_manager.create_sample_config("fulltext")
     
     # Limit the number of results for faster testing
     sample_config.search.max_results = 2

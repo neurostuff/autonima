@@ -128,7 +128,7 @@ class _FlakyProcessor:
 
 @pytest.mark.parametrize("num_workers", [1, 2])
 def test_study_with_a_failed_table_is_not_cached(tmp_path, monkeypatch, num_workers):
-    config = ConfigManager().create_sample_config()
+    config = ConfigManager().create_sample_config("fulltext")
     config.output.directory = str(tmp_path)
     config.parsing.parse_coordinates = True
     pipeline = AutonimaPipeline(config)

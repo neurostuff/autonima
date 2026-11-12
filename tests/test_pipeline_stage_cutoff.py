@@ -25,7 +25,7 @@ def _async_fail(phase_name: str):
 
 
 def _build_pipeline(tmp_path) -> AutonimaPipeline:
-    config = ConfigManager().create_sample_config()
+    config = ConfigManager().create_sample_config("fulltext")
     config.output.directory = str(tmp_path)
     return AutonimaPipeline(config)
 

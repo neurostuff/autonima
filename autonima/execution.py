@@ -351,6 +351,14 @@ def stage_signature_payloads(config_or_dict: Any) -> Dict[str, Any]:
                 "base_url": options.get("base_url"),
                 "record_format": RECORD_FORMAT_VERSION,
             }
+            if documents.get("fallback"):
+                # Only when on, so a run without it keeps its retrieval cache.
+                from .documents.neurostore import FALLBACK_FORMAT_VERSION
+
+                retrieval_documents["records"] |= {
+                    "fallback": documents["fallback"],
+                    "fallback_format": FALLBACK_FORMAT_VERSION,
+                }
         document_prompt = {"document_prompt_version": DOCUMENT_PROMPT_VERSION}
 
     payloads = {

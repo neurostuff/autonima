@@ -604,14 +604,37 @@ class AutonimaPipeline:
             return
 
         documents = self._document_source
+        fallback_studies: List[Study] = []
         if documents is not None and documents.provides_analyses:
             # The documents carry both the text and the analyses, so nothing retrieved from
-            # the article would survive attachment.
-            logger.info(
-                "Retrieval: '%s' documents supply text and analyses; skipping article retrieval",
-                documents.kind,
-            )
+            # the article would survive attachment -- except the article itself, for the
+            # studies a full-text fallback builds their record from.
             studies_from_user_sources = []
+            candidates = set(
+                documents.fallback_candidates(pmids_set)
+                if hasattr(documents, "fallback_candidates")
+                else []
+            )
+            fallback_studies = [
+                s for s in studies_to_process if s.pmid.isdigit() and int(s.pmid) in candidates
+            ]
+            if fallback_studies:
+                logger.info(
+                    "Retrieval: '%s' documents supply text and analyses; retrieving the article "
+                    "only for the %s studies without NeuroStore features (full-text fallback)",
+                    documents.kind,
+                    len(fallback_studies),
+                )
+                studies_from_user_sources = await self._retrieve_articles(
+                    fallback_studies,
+                    {int(s.pmid) for s in fallback_studies},
+                    load_excluded,
+                )
+            else:
+                logger.info(
+                    "Retrieval: '%s' documents supply text and analyses; skipping article retrieval",
+                    documents.kind,
+                )
         else:
             studies_from_user_sources = await self._retrieve_articles(
                 studies_to_process, pmids_set, load_excluded
@@ -697,6 +720,11 @@ class AutonimaPipeline:
                 "documents_attached": document_report.attached,
                 "documents_unavailable": len(document_report.unavailable),
             })
+            if fallback_studies:
+                self.results.execution_stats["retrieval"].update({
+                    "documents_fallback_candidates": len(fallback_studies),
+                    "documents_from_full_text": len(getattr(documents, "fulltext_records", [])),
+                })
 
     async def _retrieve_articles(
         self,

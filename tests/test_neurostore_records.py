@@ -99,8 +99,9 @@ def _study(pmid):
                  journal="J", publication_date="2020", status=StudyStatus.INCLUDED_ABSTRACT)
 
 
-def _source(tmp_path, client=None, **options):
-    return NeuroStoreRecordSource(tmp_path / "run", options=options or None, client=client or FakeNeuroStore())
+def _source(tmp_path, client=None, fallback=None, **options):
+    return NeuroStoreRecordSource(tmp_path / "run", options=options or None,
+                                  client=client or FakeNeuroStore(), fallback=fallback)
 
 
 def _unavailable(run):
@@ -325,3 +326,118 @@ def test_model_fit_and_inference_scope_are_told_apart():
     assert "does not make" not in text and "Spatial scope" not in text
     whole = feature_lines({**NESTED, "inference_settings": {"correction_scope": "whole_brain"}})
     assert "Inference over: whole brain" in whole
+
+
+# ---------------------------------------------------------------------------
+# full-text fallback (retrieval.records.fallback: fulltext)
+# ---------------------------------------------------------------------------
+
+def _with_article(study, tmp_path, text="Methods. We scanned 20 adults. Table 2 lists task > rest."):
+    """The study as article retrieval leaves it: its text on disk and marked available."""
+    path = tmp_path / "articles" / f"{study.pmid}.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    study.full_text_path, study.full_text_source = str(path), "pubget"
+    study.full_text_output_dir, study.fulltext_available = str(tmp_path / "run"), True
+    return study
+
+
+def test_the_fallback_reviews_a_study_without_features_from_its_article(tmp_path):
+    with_article = _with_article(_study("222"), tmp_path)
+    no_article = _study("333")
+    not_in_neurostore = _with_article(_study("999"), tmp_path)
+
+    report = attach_documents([with_article, no_article, not_in_neurostore],
+                              _source(tmp_path, fallback="fulltext"), output_dir=tmp_path / "run")
+
+    assert report.attached == 1
+    text = with_article.full_text
+    assert text.startswith("NEUROSTORE RECORD WITH THE ARTICLE'S FULL TEXT")
+    assert "Analysis 222_analysis_0: Task > Rest" in text and "Reported peaks: 1 (Table 2)" in text
+    assert text.rstrip().endswith("Table 2 lists task > rest.")
+    assert "No features were extracted" not in text
+    # The analyses, and so the exported coordinates, are still NeuroStore's.
+    assert [a.name for a in with_article.analyses] == ["Task > Rest"]
+    assert with_article.analyses[0].points[0].coordinates == [7, 8, 9]
+    payload = json.loads((tmp_path / "run" / RECORDS_DIRNAME / "222.analyses.json").read_text())
+    assert payload["source"]["input"] == "fulltext" and payload["source"]["article_source"] == "pubget"
+    # No article: still unavailable, saying the fallback found none. Not in NeuroStore: no
+    # analyses to select among, so the article does not help.
+    with open(tmp_path / "run" / "outputs" / "documents_unavailable.csv", newline="") as handle:
+        rows = {row["pmid"]: row for row in csv.DictReader(handle)}
+    assert rows["333"]["reason"] == "features_for_other_version"
+    assert "article not retrieved" in rows["333"]["detail"]
+    assert rows["999"]["reason"] == "not_in_neurostore"
+
+
+def test_the_fallback_leaves_feature_records_byte_for_byte(tmp_path):
+    off, on = _study("111"), _study("111")
+    attach_documents([off], _source(tmp_path / "off"), output_dir=tmp_path / "off" / "run")
+    attach_documents([on], _source(tmp_path / "on", fallback="fulltext"), output_dir=tmp_path / "on" / "run")
+    assert off.full_text == on.full_text
+    assert off.document.content_hash == on.document.content_hash
+    assert off.document.analyses_hash == on.document.analyses_hash
+
+
+def test_fallback_candidates_are_the_studies_with_coordinates_but_no_features(tmp_path):
+    pmids = [111, 222, 333, 999]
+    assert _source(tmp_path, fallback="fulltext").fallback_candidates(pmids) == [222, 333]
+    assert _source(tmp_path).fallback_candidates(pmids) == []
+
+
+@pytest.mark.parametrize("records, message", [
+    ({"enabled": True, "kind": "neurostore", "fallback": "abstract"}, "fallback must be one of"),
+    ({"enabled": True, "kind": "text", "root": "/tmp", "fallback": "fulltext"}, "kind is not 'neurostore'"),
+])
+def test_the_fallback_setting_is_checked(tmp_path, records, message):
+    with pytest.raises(ConfigurationError, match=message):
+        _load(tmp_path, records)
+
+
+def test_the_fallback_needs_somewhere_to_fetch_articles_from(tmp_path):
+    with pytest.raises(ConfigurationError, match="no sources"):
+        _load(tmp_path, {"enabled": True, "kind": "neurostore", "fallback": "fulltext"},
+              retrieval={"sources": [], "records": {"enabled": True, "kind": "neurostore", "fallback": "fulltext"}})
+
+
+def test_the_fallback_enters_the_retrieval_signature_only_when_on(tmp_path):
+    off = _load(tmp_path, {"enabled": True, "kind": "neurostore"})
+    on = _load(tmp_path, {"enabled": True, "kind": "neurostore", "fallback": "fulltext"})
+    assert "fallback" not in off.to_dict()["retrieval"]["records"]
+    assert on.to_dict()["retrieval"]["records"]["fallback"] == "fulltext"
+    off_hashes, on_hashes = stage_hashes(off), stage_hashes(on)
+    assert off_hashes["retrieval"] != on_hashes["retrieval"]
+    # Feature records are unchanged, so screening's cache stays valid for them.
+    assert off_hashes["fulltext"] == on_hashes["fulltext"]
+
+
+def test_the_pipeline_retrieves_articles_only_for_the_fallback_studies(tmp_path, monkeypatch):
+    import asyncio
+
+    from autonima.config import get_sample_config_text
+    from autonima.pipeline import AutonimaPipeline
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    raw = yaml.safe_load(get_sample_config_text())
+    raw["output"]["directory"] = str(tmp_path / "run")
+    raw["retrieval"]["records"]["fallback"] = "fulltext"
+    pipeline = AutonimaPipeline(ConfigManager().load_from_dict(raw))
+    pipeline._document_source = NeuroStoreRecordSource(
+        tmp_path / "run", client=FakeNeuroStore(), fallback="fulltext"
+    )
+    pipeline.results.studies = [_study(p) for p in ("111", "222", "333")]
+    asked = []
+
+    async def retrieve_articles(studies, pmids, load_excluded):
+        asked.extend(sorted(s.pmid for s in studies))
+        _with_article(next(s for s in studies if s.pmid == "222"), tmp_path)
+        return []
+
+    pipeline._retrieve_articles = retrieve_articles
+    asyncio.run(pipeline._execute_retrieval_phase())
+
+    assert asked == ["222", "333"]
+    available = {s.pmid: s.fulltext_available for s in pipeline.results.studies}
+    assert available == {"111": True, "222": True, "333": False}
+    stats = pipeline.results.execution_stats["retrieval"]
+    assert stats["documents_fallback_candidates"] == 2 and stats["documents_from_full_text"] == 1
