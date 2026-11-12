@@ -183,7 +183,7 @@ def test_non_numeric_pmids_are_not_sent(search, sleep):
 
 
 def _retrieval_pipeline(output_dir):
-    config = ConfigManager().create_sample_config()
+    config = ConfigManager().create_sample_config("fulltext")
     config.output.directory = str(output_dir)
     pipeline = AutonimaPipeline(config)
     pipeline._retriever = MagicMock()
