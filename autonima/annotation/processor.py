@@ -2,6 +2,8 @@
 
 import logging
 import json
+import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,7 +17,7 @@ from ..documents.source import IdentityError
 from ..models.types import Study
 from ..coordinates.schema import Analysis
 from ..coordinates.nimads_models import host_analysis_id
-from ..utils import log_error_with_debug
+from ..utils import atomic_write_json, log_error_with_debug
 from ..execution import (
     CACHE_SCHEMA_VERSION,
     stable_hash,
@@ -35,10 +37,120 @@ def _describe_error(error: Exception) -> str:
     return text
 
 
+_SYSTEM_ANNOTATIONS = {"all_analyses", "all_studies", "all_abstract"}
+
+
+class _ResultsFile:
+    """outputs/annotation_results.json, kept current while the stage runs.
+
+    The file used to be written once, after every study was done, so a run killed partway
+    lost every decision it had already paid for. Each study's decisions are now merged in as
+    the study finishes and the file is rewritten atomically, so a kill leaves the previous
+    complete file or a newer one, never a torn one. A large review's file takes a good part
+    of a second to serialise, so writes are at least ``min_interval`` seconds apart; decisions
+    that finish in between go out with the next write, and ``close`` writes whatever is left.
+    """
+
+    def __init__(self, output_dir: Optional[str], min_interval: float):
+        self.path = (
+            Path(output_dir) / "outputs" / "annotation_results.json" if output_dir else None
+        )
+        self.min_interval = min_interval
+        self._lock = threading.Lock()
+        # study_id -> (analysis_id, annotation_name) -> row as written to disk
+        self._rows: Dict[str, Dict[tuple, dict]] = {}
+        self._recorded = 0
+        self._unwritten = 0
+        self._last_write: Optional[float] = None
+        self._read()
+
+    def _read(self):
+        if self.path is None or not self.path.exists():
+            return
+        try:
+            data = json.loads(self.path.read_text())
+        except Exception as e:
+            logger.warning(f"Failed to load existing cache: {e}")
+            return
+        for item in data:
+            item.pop('timestamp', None)
+            try:
+                decision = AnnotationDecision(**item)
+            except Exception as e:
+                logger.warning(f"Failed to parse existing decision: {e}")
+                continue
+            self._rows.setdefault(decision.study_id, {})[
+                (decision.analysis_id, decision.annotation_name)
+            ] = decision.model_dump(exclude={'timestamp'})
+
+    def record(self, decisions: List[AnnotationDecision]):
+        """Merge in complete per-study blocks of decisions, writing the file if one is due.
+
+        Each study's rows for the annotations being recorded are replaced. Custom annotations
+        are replaced as a block -- recording any of them drops the study's other custom rows --
+        while its system annotations stay unless they are among those recorded.
+        """
+        by_study: Dict[str, List[AnnotationDecision]] = {}
+        for decision in decisions:
+            by_study.setdefault(decision.study_id, []).append(decision)
+        with self._lock:
+            for study_id, study_decisions in by_study.items():
+                names = {decision.annotation_name for decision in study_decisions}
+                replace_custom = any(name not in _SYSTEM_ANNOTATIONS for name in names)
+                rows = self._rows.setdefault(study_id, {})
+                for key in [
+                    key for key in rows
+                    if key[1] in names or (replace_custom and key[1] not in _SYSTEM_ANNOTATIONS)
+                ]:
+                    del rows[key]
+                for decision in study_decisions:
+                    rows[(decision.analysis_id, decision.annotation_name)] = (
+                        decision.model_dump(exclude={'timestamp'})
+                    )
+            self._recorded += len(decisions)
+            self._unwritten += len(decisions)
+            if (
+                self._last_write is None
+                or time.monotonic() - self._last_write >= self.min_interval
+            ):
+                self._write()
+
+    def close(self):
+        """Write anything not yet on disk."""
+        with self._lock:
+            if self._unwritten:
+                self._write()
+            if self._recorded and self.path is not None:
+                total = sum(len(rows) for rows in self._rows.values())
+                logger.info(
+                    f"Saved {self._recorded} new annotation results to {self.path} "
+                    f"(total: {total})"
+                )
+
+    def _write(self):
+        if self.path is None:
+            return
+        rows = [row for study_rows in self._rows.values() for row in study_rows.values()]
+        try:
+            atomic_write_json(self.path, rows)
+        except Exception as e:
+            # The rows stay pending, so the next write tries again.
+            logger.error(f"Failed to save annotation results: {e}")
+            return
+        self._unwritten = 0
+        self._last_write = time.monotonic()
+
+
 class AnnotationProcessor:
     """Processor for annotating analyses based on LLM decisions."""
     
-    def __init__(self, config: AnnotationConfig, num_workers: int = 1, max_retries: int = 3):
+    def __init__(
+        self,
+        config: AnnotationConfig,
+        num_workers: int = 1,
+        max_retries: int = 3,
+        save_interval: float = 2.0,
+    ):
         """
         Initialize the annotation processor.
         
@@ -46,11 +158,14 @@ class AnnotationProcessor:
             config: Annotation configuration
             num_workers: Number of parallel workers for processing
             max_retries: Maximum number of retries for malformed LLM responses
+            save_interval: Minimum seconds between rewrites of annotation_results.json
+                while studies finish; 0 writes after every study
         """
         self.config = config
         self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
+        self.save_interval = save_interval
         self.stage_hash = stable_hash(
             {
                 **self.config.model_dump(),
@@ -163,66 +278,72 @@ class AnnotationProcessor:
                 if not study.full_text_output_dir:
                     study.full_text_output_dir = output_dir
         
-        # Process all analysis-annotation combinations incrementally by study
+        # Process all analysis-annotation combinations incrementally by study. Each study's
+        # decisions reach the results file as soon as they exist, so an interrupted run keeps
+        # what it finished and the next run redoes only the rest.
         all_decisions = []
-
-        # Process system annotations from search/screening/full-text inclusion.
-        if self.config.create_all_included_annotations:
-            if all_studies:
-                logger.info(
-                    f"Creating 'all_studies' annotation for "
-                    f"{len(all_studies)} studies from search"
-                )
-                all_studies_decisions = (
-                    self._create_all_analyses_annotations_by_study(
-                        all_studies,
-                        annotation_name="all_studies",
-                        output_dir=output_dir,
-                        existing_results=existing_cached_results
+        results_file = _ResultsFile(output_dir, self.save_interval)
+        try:
+            # Process system annotations from search/screening/full-text inclusion.
+            if self.config.create_all_included_annotations:
+                if all_studies:
+                    logger.info(
+                        f"Creating 'all_studies' annotation for "
+                        f"{len(all_studies)} studies from search"
                     )
-                )
-                all_decisions.extend(all_studies_decisions)
-
-            if all_abstract_studies:
-                logger.info(
-                    f"Creating 'all_abstract' annotation for "
-                    f"{len(all_abstract_studies)} "
-                    "abstract-screened studies"
-                )
-                all_abstract_decisions = (
-                    self._create_all_analyses_annotations_by_study(
-                        all_abstract_studies,
-                        annotation_name="all_abstract",
-                        output_dir=output_dir,
-                        existing_results=existing_cached_results
+                    all_studies_decisions = (
+                        self._create_all_analyses_annotations_by_study(
+                            all_studies,
+                            annotation_name="all_studies",
+                            output_dir=output_dir,
+                            existing_results=existing_cached_results
+                        )
                     )
-                )
-                all_decisions.extend(all_abstract_decisions)
+                    all_decisions.extend(all_studies_decisions)
 
-            if included_studies:
-                all_analyses_decisions = (
-                    self._create_all_analyses_annotations_by_study(
-                        included_studies,
-                        annotation_name="all_analyses",
-                        output_dir=output_dir,
-                        existing_results=existing_cached_results
+                if all_abstract_studies:
+                    logger.info(
+                        f"Creating 'all_abstract' annotation for "
+                        f"{len(all_abstract_studies)} "
+                        "abstract-screened studies"
                     )
+                    all_abstract_decisions = (
+                        self._create_all_analyses_annotations_by_study(
+                            all_abstract_studies,
+                            annotation_name="all_abstract",
+                            output_dir=output_dir,
+                            existing_results=existing_cached_results
+                        )
+                    )
+                    all_decisions.extend(all_abstract_decisions)
+
+                if included_studies:
+                    all_analyses_decisions = (
+                        self._create_all_analyses_annotations_by_study(
+                            included_studies,
+                            annotation_name="all_analyses",
+                            output_dir=output_dir,
+                            existing_results=existing_cached_results
+                        )
+                    )
+                    all_decisions.extend(all_analyses_decisions)
+
+            # The system annotations need no calls, so they are all ready at once.
+            if all_decisions:
+                results_file.record(all_decisions)
+
+            # Process custom annotations on INCLUDED studies only
+            if self.config.annotations and included_studies:
+                custom_decisions = self._process_custom_annotations_by_study(
+                    included_studies,
+                    self.config.model,
+                    output_dir=output_dir,
+                    existing_results=existing_cached_results,
+                    results_file=results_file,
                 )
-                all_decisions.extend(all_analyses_decisions)
-        
-        # Process custom annotations on INCLUDED studies only
-        if self.config.annotations and included_studies:
-            custom_decisions = self._process_custom_annotations_by_study(
-                included_studies,
-                self.config.model,
-                output_dir=output_dir,
-                existing_results=existing_cached_results
-            )
-            all_decisions.extend(custom_decisions)
-        
-        # Save results to cache (only new/updated decisions)
-        if all_decisions:
-            self._save_results_by_study(all_decisions, output_dir, existing_cached_results)
+                all_decisions.extend(custom_decisions)
+        finally:
+            results_file.close()
         self.annotation_results = all_decisions
         
         # Return only results eligible for this execution. Cached decisions
@@ -376,7 +497,7 @@ class AnnotationProcessor:
         
         return decisions
     
-    def _process_custom_annotations_by_study(self, studies: List[Study], model: str, output_dir: str = None, existing_results: List[AnnotationDecision] = None) -> List[AnnotationDecision]:
+    def _process_custom_annotations_by_study(self, studies: List[Study], model: str, output_dir: str = None, existing_results: List[AnnotationDecision] = None, results_file: Optional[_ResultsFile] = None) -> List[AnnotationDecision]:
         """
         Process custom annotations using LLM decisions by study with multi-annotation prompts.
         
@@ -385,6 +506,7 @@ class AnnotationProcessor:
             model: LLM model to use for decisions
             output_dir: Output directory for caching
             existing_results: Existing cached results
+            results_file: Where each study's decisions are recorded as soon as it finishes
             
         Returns:
             List of annotation decisions
@@ -422,6 +544,15 @@ class AnnotationProcessor:
         
         # Process studies in parallel
         decisions = []
+
+        def finish(study, annotations_to_process, study_decisions, error):
+            filled = self._with_failures(
+                study, annotations_to_process, study_decisions, model, error
+            )
+            if results_file is not None:
+                results_file.record(filled)
+            decisions.extend(filled)
+
         if self.num_workers <= 1 or len(studies_to_process) <= 1:
             # Serial processing
             for study, annotations_to_process in tqdm(studies_to_process, desc="Processing studies"):
@@ -433,9 +564,7 @@ class AnnotationProcessor:
                 except Exception as e:
                     logger.error(f"Error processing annotations for study {study.pmid}: {e}")
                     study_decisions, error = [], _describe_error(e)
-                decisions.extend(self._with_failures(
-                    study, annotations_to_process, study_decisions, model, error
-                ))
+                finish(study, annotations_to_process, study_decisions, error)
         else:
             # Parallel processing
             with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
@@ -444,9 +573,10 @@ class AnnotationProcessor:
                     executor.submit(self._process_single_study_annotations, study, self.config.metadata_fields, annotations_to_process, model): (study, annotations_to_process)
                     for study, annotations_to_process in studies_to_process
                 }
-                
-                # Collect results
-                for future in tqdm(as_completed(future_to_study), total=len(studies_to_process), desc="Processing studies"):
+                uncollected = set(future_to_study)
+
+                def collect(future):
+                    uncollected.discard(future)
                     study, annotations_to_process = future_to_study[future]
                     error = None
                     try:
@@ -456,9 +586,25 @@ class AnnotationProcessor:
                             f"Error processing annotations for study {study.pmid}: {e}"
                         )
                         study_decisions, error = [], _describe_error(e)
-                    decisions.extend(self._with_failures(
-                        study, annotations_to_process, study_decisions, model, error
-                    ))
+                    finish(study, annotations_to_process, study_decisions, error)
+
+                # Collect results
+                try:
+                    for future in tqdm(as_completed(future_to_study), total=len(studies_to_process), desc="Processing studies"):
+                        collect(future)
+                except BaseException:
+                    # Interrupted. Left alone, the pool would still start every queued study
+                    # and pay for decisions that are then thrown away. Cancel those, wait out
+                    # the calls already running, and keep what they returned.
+                    executor.shutdown(cancel_futures=True)
+                    for future in list(uncollected):
+                        if future.cancelled():
+                            continue
+                        raised = future.exception()
+                        # A call that was itself interrupted has nothing to keep.
+                        if raised is None or isinstance(raised, Exception):
+                            collect(future)
+                    raise
 
         return decisions
 
@@ -931,106 +1077,3 @@ class AnnotationProcessor:
             logger.warning(f"Failed to load cached annotation results: {e}")
         
         return []
-    
-    def _save_results_by_study(self, new_decisions: List[AnnotationDecision], output_dir: str, existing_results: List[AnnotationDecision]):
-        """
-        Save annotation results to cache file, organized by study.
-        Complete results for each study overwrite any existing partial results.
-        
-        Args:
-            new_decisions: List of new annotation decisions
-            output_dir: Output directory
-            existing_results: Existing cached results
-        """
-        try:
-            output_path = Path(output_dir) / "outputs"
-            output_path.mkdir(parents=True, exist_ok=True)
-            cache_file = output_path / "annotation_results.json"
-            
-            # Load existing cache
-            existing_data = []
-            if cache_file.exists():
-                try:
-                    with open(cache_file, 'r') as f:
-                        existing_data = json.load(f)
-                except Exception as e:
-                    logger.warning(f"Failed to load existing cache: {e}")
-                    existing_data = []
-            
-            # Convert existing data to AnnotationDecision objects for easier handling
-            existing_decisions = []
-            for item in existing_data:
-                # Handle datetime parsing
-                if 'timestamp' in item:
-                    # Remove timestamp for now as it complicates deserialization
-                    item.pop('timestamp', None)
-                item.pop('timestamp', None)
-                try:
-                    decision = AnnotationDecision(**item)
-                    existing_decisions.append(decision)
-                except Exception as e:
-                    logger.warning(f"Failed to parse existing decision: {e}")
-            
-            # Group new decisions by study_id
-            new_decisions_by_study = {}
-            for decision in new_decisions:
-                if decision.study_id not in new_decisions_by_study:
-                    new_decisions_by_study[decision.study_id] = []
-                new_decisions_by_study[decision.study_id].append(decision)
-            
-            # Create a lookup for existing data by (study_id, analysis_id, annotation_name)
-            existing_lookup = {(d.study_id, d.analysis_id, d.annotation_name): d 
-                              for d in existing_decisions}
-            
-            # For each study with new decisions, replace only the annotations
-            # that were reprocessed for that study.
-            for study_id, study_decisions in new_decisions_by_study.items():
-                updated_annotation_names = {
-                    decision.annotation_name for decision in study_decisions
-                }
-                keep_system_annotations = {
-                    "all_analyses",
-                    "all_studies",
-                    "all_abstract",
-                }
-                has_custom_updates = any(
-                    name not in keep_system_annotations
-                    for name in updated_annotation_names
-                )
-                existing_lookup = {
-                    key: decision
-                    for key, decision in existing_lookup.items()
-                    if not (
-                        decision.study_id == study_id
-                        and (
-                            decision.annotation_name in updated_annotation_names
-                            or (
-                                has_custom_updates
-                                and decision.annotation_name
-                                not in keep_system_annotations
-                            )
-                        )
-                    )
-                }
-                
-                # Add all new decisions for this study
-                for decision in study_decisions:
-                    key = (decision.study_id, decision.analysis_id, decision.annotation_name)
-                    existing_lookup[key] = decision
-            
-            # Convert back to list of dictionaries for saving
-            updated_data = []
-            for decision in existing_lookup.values():
-                try:
-                    # Convert to dictionary, excluding timestamp to avoid JSON serialization issues
-                    decision_dict = decision.model_dump(exclude={'timestamp'})
-                    updated_data.append(decision_dict)
-                except Exception as e:
-                    logger.warning(f"Failed to convert decision to dict: {e}")
-            
-            with open(cache_file, 'w') as f:
-                json.dump(updated_data, f, indent=2)
-            
-            logger.info(f"Saved {len(new_decisions)} new annotation results to {cache_file} (total: {len(updated_data)})")
-        except Exception as e:
-            logger.error(f"Failed to save annotation results: {e}")
