@@ -17,7 +17,7 @@ class TestPipelineRetrieval(unittest.TestCase):
         
         # Create a config manager and sample config
         self.config_manager = ConfigManager()
-        self.sample_config = self.config_manager.create_sample_config()
+        self.sample_config = self.config_manager.create_sample_config("fulltext")
         
         # Modify config for testing
         self.sample_config.search.max_results = 2  # Limit for faster testing

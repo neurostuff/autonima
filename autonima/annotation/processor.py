@@ -38,7 +38,13 @@ def _describe_error(error: Exception) -> str:
 class AnnotationProcessor:
     """Processor for annotating analyses based on LLM decisions."""
     
-    def __init__(self, config: AnnotationConfig, num_workers: int = 1, max_retries: int = 3):
+    def __init__(
+        self,
+        config: AnnotationConfig,
+        num_workers: int = 1,
+        max_retries: int = 3,
+        combined_with: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize the annotation processor.
         
@@ -46,8 +52,13 @@ class AnnotationProcessor:
             config: Annotation configuration
             num_workers: Number of parallel workers for processing
             max_retries: Maximum number of retries for malformed LLM responses
+            combined_with: set when full-text screening decides the custom annotations in
+                the same call (``screening.fulltext.mode: combined``). It enters the stage
+                hash, so those decisions never pass for separately annotated ones, and this
+                processor then makes no model call of its own.
         """
         self.config = config
+        self.combined_with = combined_with
         self.client = AnnotationClient(max_retries=max_retries)
         self.annotation_results: List[AnnotationDecision] = []
         self.num_workers = num_workers
@@ -55,6 +66,8 @@ class AnnotationProcessor:
             {
                 **self.config.model_dump(),
                 "prompt_version": ANNOTATION_PROMPT_VERSION,
+                # Only when combined, so a separate run's signatures are unchanged.
+                **({"combined_with": combined_with} if combined_with else {}),
             }
         )
         self.cache_stats = {"reused": 0, "processed": 0}
@@ -414,6 +427,24 @@ class AnnotationProcessor:
         
         if not studies_to_process:
             return []
+
+        if self.combined_with:
+            # The combined full-text review decides these; deciding the gap here would mix two
+            # ways of deciding in one run. Recorded as failures, they are exported as null and
+            # the next combined review retries the study.
+            logger.warning(
+                "Combined review left %s included studies without complete analysis decisions; "
+                "they are recorded as failures and retried by the next full-text review",
+                len(studies_to_process),
+            )
+            return [
+                decision
+                for study, annotations in studies_to_process
+                for decision in self._with_failures(
+                    study, annotations, [], model,
+                    "the combined full-text review made no decision for this analysis",
+                )
+            ]
         
         logger.info(
             f"Processing {len(studies_to_process)} studies for custom annotations "

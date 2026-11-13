@@ -14,6 +14,7 @@ run, so any tool can supply one by writing the layout below.
 |---|---|---|
 | `text` | one document per study | the article, retrieved and parsed as usual |
 | `analyses` | one document per study, plus the analyses it refers to | the source; the article is not retrieved |
+| `neurostore` | built by autonima from NeuroStore: each analysis with the features NeuroStore extracted | NeuroStore; the article is not retrieved |
 
 Use `text` when the record is only something to read, like a summary. Use `analyses` when the
 record describes the study's analyses individually. Its analyses must then travel with it.
@@ -146,6 +147,80 @@ list is the only record of why those studies never reached screening.
 
 `final_results.json` records each study's document: its source path, content hash, kind, and
 the mapping from source keys to autonima ids. It never stores the document text.
+
+## NeuroStore records
+
+`kind: neurostore` needs no directory. Autonima builds each included study's record from
+NeuroStore, so full-text screening and annotation judge NeuroStore's extracted values instead
+of the article:
+
+```yaml
+retrieval:
+  records:
+    enabled: true
+    kind: neurostore
+    neurostore:                 # all optional
+      sources: [study_schema]   # which NeuroStore version's analyses, as parsing.neurostore
+      roles: [result]
+      base_url: https://neurostore.org/api
+parsing:
+  parse_coordinates: false      # the analyses come with the records
+```
+
+Per study, the record is the title and abstract, then one block per analysis giving what
+NeuroStore's extraction states about it: the contrast and its two sides, the task, whole brain
+or region of interest, the effect, the participants and n, the medical condition, the measure
+and the design. A feature the extraction is silent on is left out. Each block is also the
+analysis's own document, for `annotation.metadata_fields: [analysis_document]`.
+
+The analyses and coordinates are chosen as `parsing.coordinate_source: neurostore` chooses
+them. The features come from NeuroStore's analysis query. Both are frozen in the run,
+`outputs/neurostore_record_analyses.json` and `outputs/neurostore_features.json`, and later
+runs read them instead of the server; delete a study's entry, or the file, to fetch it again.
+The records themselves are written to `<output>/neurostore_records/`.
+
+A study without a usable record is listed in `documents_unavailable.csv` and is not screened
+from anything else:
+
+| reason | meaning |
+|---|---|
+| `not_in_neurostore` | no NeuroStore study has this PMID |
+| `no_coordinates`, `no_coordinates_from_configured_sources` | as for NeuroStore coordinates |
+| `no_features` | NeuroStore has coordinates for the study but no features |
+| `features_for_other_version` | the features describe another version of the study than the one the coordinates came from |
+| `fetch_failed`, `features_fetch_failed` | a request failed; the study is fetched again next run |
+
+### Full-text fallback
+
+```yaml
+retrieval:
+  sources: [pubget]             # where articles come from, as in any full-text run
+  records:
+    enabled: true
+    kind: neurostore
+    fallback: fulltext
+```
+
+With `fallback: fulltext`, a study NeuroStore has coordinates for but no features
+(`no_features`, `features_for_other_version`) is reviewed from its article instead of being
+left unavailable. Autonima retrieves the article for just those studies, from
+`retrieval.sources` and `retrieval.full_text_sources`, and the study's record becomes its
+title, abstract and NeuroStore's list of analyses, followed by the article's full text. The
+model still selects among NeuroStore's analyses, so every study's coordinates come from
+NeuroStore whichever record it was judged from.
+
+- **Which studies:** each fallback record's analyses file says `"input": "fulltext"` under
+  `source`, with `article_source` naming where the article came from. The run's
+  `execution_stats.retrieval` counts `documents_fallback_candidates` and
+  `documents_from_full_text`.
+- **Still unavailable:** a study whose article cannot be retrieved keeps its reason, with
+  "full-text fallback: article not retrieved" in the detail. Studies NeuroStore has no
+  coordinates for are not fallback studies: there would be no analyses to select.
+- **Caching:** the fallback enters the retrieval stage's signature only when it is on, and
+  leaves every feature record byte for byte as it was. Turning it on for an existing run
+  therefore reviews only the fallback studies; every other decision is reused.
+- **Cost:** a fallback record is as long as the article, so each fallback study costs about
+  what a full-text run spends on it.
 
 ## Prompts
 

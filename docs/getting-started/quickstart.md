@@ -7,6 +7,22 @@ autonima create-sample-config > config.yaml
 ```
 
 The generated file is the canonical sample config used by the docs and repository example.
+It follows the standard path:
+
+- **Search** NeuroStore's index of neuroimaging studies with your PubMed-style query.
+- **Screen abstracts** as usual.
+- **Review each remaining study from NeuroStore's record of it**: its analyses with the
+  features NeuroStore extracted (contrast, task, whole brain or region of interest,
+  participants, design). One call per study screens it and selects its analyses for your
+  annotations. No article is read and no table is parsed; the coordinates are NeuroStore's.
+
+Only studies NeuroStore has extracted features for are reviewed. The rest are listed in
+`outputs/documents_unavailable.csv` with the reason. To review those from their articles,
+add `fallback: fulltext` under `retrieval.records`; see
+[NeuroStore records](../guides/records.md#neurostore-records).
+
+To read every article in full and parse its tables instead, start from
+`autonima create-sample-config --fulltext`.
 
 ## 2. Edit the Config
 
@@ -17,6 +33,8 @@ At minimum, update:
 - `screening.abstract.inclusion_criteria`
 - `screening.fulltext.objective`
 - `screening.fulltext.inclusion_criteria`
+- `annotation.annotations`: the meta-analyses you want, each with the criteria an analysis
+  must meet to be selected for it
 
 If you want to skip a screening stage, set `skip_stage: true` for that stage instead of leaving required fields empty.
 

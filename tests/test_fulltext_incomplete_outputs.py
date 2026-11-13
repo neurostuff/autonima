@@ -36,7 +36,7 @@ def _make_study(
 
 def test_generate_basic_outputs_tracks_fulltext_incomplete(tmp_path):
     """Test PRISMA stats and consolidated missing fulltext report."""
-    config = ConfigManager().create_sample_config()
+    config = ConfigManager().create_sample_config("fulltext")
     config.output.directory = str(tmp_path)
     pipeline = AutonimaPipeline(config)
 
@@ -125,7 +125,7 @@ def test_generate_basic_outputs_tracks_fulltext_incomplete(tmp_path):
 
 def test_generate_basic_outputs_incomplete_pmcid_path_fallback(tmp_path):
     """Test incomplete rows include pubget text.csv reference for PMCID."""
-    config = ConfigManager().create_sample_config()
+    config = ConfigManager().create_sample_config("fulltext")
     config.output.directory = str(tmp_path)
     pipeline = AutonimaPipeline(config)
 

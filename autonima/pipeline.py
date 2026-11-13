@@ -339,7 +339,9 @@ class AutonimaPipeline:
         self._retriever = PubGetRetriever(n_jobs=n_jobs)
 
         if self.config.documents.enabled:
-            self._document_source = create_document_source(self.config.documents)
+            self._document_source = create_document_source(
+                self.config.documents, output_dir=self.config.output.directory
+            )
 
         # Save criteria mapping early in pipeline
         from .utils.criteria import save_criteria_mapping
@@ -602,14 +604,37 @@ class AutonimaPipeline:
             return
 
         documents = self._document_source
+        fallback_studies: List[Study] = []
         if documents is not None and documents.provides_analyses:
             # The documents carry both the text and the analyses, so nothing retrieved from
-            # the article would survive attachment.
-            logger.info(
-                "Retrieval: '%s' documents supply text and analyses; skipping article retrieval",
-                documents.kind,
-            )
+            # the article would survive attachment -- except the article itself, for the
+            # studies a full-text fallback builds their record from.
             studies_from_user_sources = []
+            candidates = set(
+                documents.fallback_candidates(pmids_set)
+                if hasattr(documents, "fallback_candidates")
+                else []
+            )
+            fallback_studies = [
+                s for s in studies_to_process if s.pmid.isdigit() and int(s.pmid) in candidates
+            ]
+            if fallback_studies:
+                logger.info(
+                    "Retrieval: '%s' documents supply text and analyses; retrieving the article "
+                    "only for the %s studies without NeuroStore features (full-text fallback)",
+                    documents.kind,
+                    len(fallback_studies),
+                )
+                studies_from_user_sources = await self._retrieve_articles(
+                    fallback_studies,
+                    {int(s.pmid) for s in fallback_studies},
+                    load_excluded,
+                )
+            else:
+                logger.info(
+                    "Retrieval: '%s' documents supply text and analyses; skipping article retrieval",
+                    documents.kind,
+                )
         else:
             studies_from_user_sources = await self._retrieve_articles(
                 studies_to_process, pmids_set, load_excluded
@@ -695,6 +720,11 @@ class AutonimaPipeline:
                 "documents_attached": document_report.attached,
                 "documents_unavailable": len(document_report.unavailable),
             })
+            if fallback_studies:
+                self.results.execution_stats["retrieval"].update({
+                    "documents_fallback_candidates": len(fallback_studies),
+                    "documents_from_full_text": len(getattr(documents, "fulltext_records", [])),
+                })
 
     async def _retrieve_articles(
         self,
@@ -821,6 +851,9 @@ class AutonimaPipeline:
             logger.debug(
                 "Fetching PMCIDs for %s studies", len(studies_needing_pmcid)
             )
+            # Raises PMCIDLookupError, failing this stage, if a batch cannot be
+            # looked up: those studies would otherwise read as not in PMC and
+            # silently drop out of full-text screening.
             pmid_to_pmcid = await self._search_engine.fetch_pmcids(
                 [s.pmid for s in studies_needing_pmcid]
             )
@@ -863,9 +896,15 @@ class AutonimaPipeline:
         fulltext_skip = self.config.screening.fulltext.get('skip_stage', False)
         if fulltext_skip:
             logger.info("Full-text screening skipped (skip_stage=True)")
-            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next stage
+            # Mark all studies with status INCLUDED_ABSTRACT as INCLUDED_FULLTEXT to pass to next
+            # stage. With records, a study without one has no input in this run, exactly as an
+            # unretrieved article: it stays where it was and is reported unavailable, never
+            # counted as included.
+            records = self._document_source is not None
             for study in self.results.studies:
-                if study.status == StudyStatus.INCLUDED_ABSTRACT:
+                if study.status == StudyStatus.INCLUDED_ABSTRACT and (
+                    study.fulltext_available or not records
+                ):
                     study.status = StudyStatus.INCLUDED_FULLTEXT
             return
 
@@ -882,10 +921,27 @@ class AutonimaPipeline:
         if not self._screener:
             raise RuntimeError("Screener not initialized")
 
+        combined = None
+        if self._fulltext_mode() == "combined":
+            # One call per study decides its eligibility and selects its analyses.
+            from .screening.combined import CombinedReview
+
+            combined = CombinedReview(
+                self._annotation_config_with_mapping(),
+                self.config.screening.fulltext,
+                output_dir=self.config.output.directory,
+                num_workers=self.num_workers,
+            )
+        self._screener.combined = combined
+
         # Use LLM-based full-text screening
-        screening_results = await self._screener.screen_fulltexts(
-            screenable_studies, num_workers=self.num_workers
-        )
+        try:
+            screening_results = await self._screener.screen_fulltexts(
+                screenable_studies, num_workers=self.num_workers
+            )
+        finally:
+            if combined is not None:
+                combined.flush()
 
         # Apply screening results to studies
         for result in screening_results:
@@ -1190,6 +1246,69 @@ class AutonimaPipeline:
             "fetch_failed": counts["failed"],
         }
 
+    def _annotation_config_with_mapping(self):
+        """The annotation config with the run's criteria IDs injected, as prompts use it.
+
+        Built the same way for the annotation stage and for a combined full-text review, so
+        both sign their decisions with the same cache signature.
+        """
+        # Load criteria mapping and inject it into annotation config
+        from .utils.criteria import load_criteria_mapping
+        criteria_mapping = load_criteria_mapping(self.config.output.directory)
+        
+        # Create a copy of the annotation config with criteria mapping injected
+        from copy import deepcopy
+        annotation_config = deepcopy(self.config.annotation)
+        
+        # Inject criteria mapping into annotation config
+        if criteria_mapping and "annotation" in criteria_mapping:
+            annotation_data = criteria_mapping["annotation"]
+            
+            # Inject global criteria mapping
+            global_mapping = annotation_data.get("global", {})
+            global_inclusion = global_mapping.get("inclusion", {})
+            global_exclusion = global_mapping.get("exclusion", {})
+            if global_mapping:
+                # Update the annotation config's global criteria with mapping
+                has_inclusion = (
+                    hasattr(annotation_config, 'inclusion_criteria') and
+                    annotation_config.inclusion_criteria
+                )
+                if has_inclusion:
+                    annotation_config.inclusion_criteria = list(
+                        global_inclusion.values()
+                    )
+                    annotation_config.exclusion_criteria = list(
+                        global_exclusion.values()
+                    )
+            
+            # Inject per-annotation criteria mapping
+            if "annotations" in annotation_data:
+                annotations_mapping = annotation_data["annotations"]
+                for annotation in annotation_config.annotations:
+                    if annotation.name not in annotations_mapping:
+                        continue
+
+                    local_mapping = annotations_mapping[annotation.name]
+                    local_inclusion = local_mapping.get("inclusion", {})
+                    local_exclusion = local_mapping.get("exclusion", {})
+
+                    # Merge global + local IDs for validation while retaining
+                    # dedicated blocks for prompt rendering.
+                    annotation.criteria_mapping = {
+                        "inclusion": {**global_inclusion, **local_inclusion},
+                        "exclusion": {**global_exclusion, **local_exclusion},
+                        "global_inclusion": global_inclusion,
+                        "global_exclusion": global_exclusion,
+                        "local_inclusion": local_inclusion,
+                        "local_exclusion": local_exclusion,
+                    }
+        
+        return annotation_config
+
+    def _fulltext_mode(self) -> str:
+        return str(self.config.screening.fulltext.get("mode", "separate") or "separate")
+
     async def _execute_annotation_phase(self):
         """Execute annotation phase for parsed analyses."""
         # Check if annotation is enabled
@@ -1243,60 +1362,18 @@ class AutonimaPipeline:
             }
             return
                 
-        # Load criteria mapping and inject it into annotation config
-        from .utils.criteria import load_criteria_mapping
-        criteria_mapping = load_criteria_mapping(self.config.output.directory)
-        
-        # Create a copy of the annotation config with criteria mapping injected
-        from copy import deepcopy
-        annotation_config = deepcopy(self.config.annotation)
-        
-        # Inject criteria mapping into annotation config
-        if criteria_mapping and "annotation" in criteria_mapping:
-            annotation_data = criteria_mapping["annotation"]
-            
-            # Inject global criteria mapping
-            global_mapping = annotation_data.get("global", {})
-            global_inclusion = global_mapping.get("inclusion", {})
-            global_exclusion = global_mapping.get("exclusion", {})
-            if global_mapping:
-                # Update the annotation config's global criteria with mapping
-                has_inclusion = (
-                    hasattr(annotation_config, 'inclusion_criteria') and
-                    annotation_config.inclusion_criteria
-                )
-                if has_inclusion:
-                    annotation_config.inclusion_criteria = list(
-                        global_inclusion.values()
-                    )
-                    annotation_config.exclusion_criteria = list(
-                        global_exclusion.values()
-                    )
-            
-            # Inject per-annotation criteria mapping
-            if "annotations" in annotation_data:
-                annotations_mapping = annotation_data["annotations"]
-                for annotation in annotation_config.annotations:
-                    if annotation.name not in annotations_mapping:
-                        continue
+        annotation_config = self._annotation_config_with_mapping()
 
-                    local_mapping = annotations_mapping[annotation.name]
-                    local_inclusion = local_mapping.get("inclusion", {})
-                    local_exclusion = local_mapping.get("exclusion", {})
+        # Initialize the annotation processor with updated config and num_workers. In combined
+        # mode the decisions were made by full-text screening, and the processor only reads them.
+        combined_with = None
+        if self._fulltext_mode() == "combined":
+            from .screening.combined import combined_link
 
-                    # Merge global + local IDs for validation while retaining
-                    # dedicated blocks for prompt rendering.
-                    annotation.criteria_mapping = {
-                        "inclusion": {**global_inclusion, **local_inclusion},
-                        "exclusion": {**global_exclusion, **local_exclusion},
-                        "global_inclusion": global_inclusion,
-                        "global_exclusion": global_exclusion,
-                        "local_inclusion": local_inclusion,
-                        "local_exclusion": local_exclusion,
-                    }
-        
-        # Initialize the annotation processor with updated config and num_workers
-        processor = AnnotationProcessor(annotation_config, num_workers=self.num_workers)
+            combined_with = combined_link(annotation_config, self.config.screening.fulltext)
+        processor = AnnotationProcessor(
+            annotation_config, num_workers=self.num_workers, combined_with=combined_with
+        )
         
         # Process studies
         annotation_results = processor.process_studies(

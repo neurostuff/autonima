@@ -11,6 +11,11 @@ extracted from them. Autonima can use it in two places, separately or together:
 Everything else is unchanged. Full-text screening and annotation still read the article,
 which NeuroStore does not share, so retrieval runs as usual.
 
+To have them read NeuroStore's extracted values instead, each analysis with its contrast,
+task, spatial scope, participants and design, use `retrieval.records.kind: neurostore`; see
+[Records](records.md#neurostore-records). It replaces both the article and
+`parsing.coordinate_source`, since the analyses come with the records.
+
 ## Search
 
 ```yaml

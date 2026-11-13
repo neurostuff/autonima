@@ -206,6 +206,9 @@ class LLMScreener(ScreeningEngine):
             force_reextract_incomplete_fulltext
         )
         self.cache_stats: Dict[str, Dict[str, int]] = {}
+        # Set by the pipeline for screening.fulltext.mode: combined (screening/combined.py):
+        # full-text screening then also decides the study's analysis annotations.
+        self.combined = None
         # Load existing results
         self._existing_abstract_results = self._load_existing_results(
             "abstract"
@@ -336,7 +339,7 @@ class LLMScreener(ScreeningEngine):
             if screening_type == "abstract"
             else FULLTEXT_SCREENING_PROMPT_VERSION
         )
-        return {
+        signature = {
             "schema_version": CACHE_SCHEMA_VERSION,
             "stage": screening_type,
             "stage_hash": stable_hash(
@@ -345,6 +348,10 @@ class LLMScreener(ScreeningEngine):
             "study_input_hash": self._study_input_hash(study, screening_type),
             "model": model,
         }
+        if screening_type == "fulltext" and self.combined is not None:
+            # The decision came from the combined call, which also read the annotations.
+            signature["combined"] = self.combined.signature_component()
+        return signature
 
     def _cached_signature_matches(
         self,
@@ -460,8 +467,20 @@ class LLMScreener(ScreeningEngine):
             # Get criteria mapping from config
             criteria_mapping = config.get('criteria_mapping')
             
+            combined = self.combined if screening_type == "fulltext" else None
+            if screening_type == "fulltext":
+                if not study.full_text_output_dir:
+                    study.full_text_output_dir = str(self.result_dir)
+                if not study.fulltext_available and (
+                    study.full_text_path or study.pmcid
+                ):
+                    study.fulltext_available = True
+                # Ensure reruns pick up latest on-disk content.
+                study._full_text = None
             # Build prompt with inclusion/exclusion criteria from config
-            if screening_type == "abstract":
+            if combined is not None:
+                prompt = None  # the combined review builds its own
+            elif screening_type == "abstract":
                 prompt = PromptLibrary.get_abstract_screening_prompt(
                     study=study,
                     inclusion_criteria=inclusion_criteria,
@@ -472,15 +491,6 @@ class LLMScreener(ScreeningEngine):
                     additional_instructions=additional_instructions
                 )
             else:
-                if not study.full_text_output_dir:
-                    study.full_text_output_dir = str(self.result_dir)
-                if not study.fulltext_available and (
-                    study.full_text_path or study.pmcid
-                ):
-                    study.fulltext_available = True
-                # Ensure reruns pick up latest on-disk content.
-                study._full_text = None
-
                 prompt = PromptLibrary.get_fulltext_screening_prompt(
                     study=study,
                     inclusion_criteria=inclusion_criteria,
@@ -511,11 +521,14 @@ class LLMScreener(ScreeningEngine):
             # Only pass the kwarg when there is something to pass. Callers and test doubles that
             # implement the older two-argument signature keep working -- exactly the guard PR #70
             # used, and tests/test_parallel_screening.py mocks that shape.
-            response = (
-                screen_method(prompt, model, model_params=model_params)
-                if model_params
-                else screen_method(prompt, model)
-            )
+            if combined is not None:
+                response = combined.review(study, model, model_params)
+            else:
+                response = (
+                    screen_method(prompt, model, model_params=model_params)
+                    if model_params
+                    else screen_method(prompt, model)
+                )
                 
             # Process response to get decision string
             decision_str, reason = self._process_screening_response(
@@ -668,6 +681,16 @@ class LLMScreener(ScreeningEngine):
                 # not changed, but reusing it would turn one rate limit into a permanent
                 # "screened, neither included nor excluded".
                 if old_decision == StudyStatus.SCREENING_FAILED.value:
+                    studies_to_screen.append(study)
+                    continue
+                # A combined inclusion is complete only with its analysis decisions; one whose
+                # decisions were lost or failed is reviewed again, both halves together.
+                if (
+                    screening_type == "fulltext"
+                    and self.combined is not None
+                    and old_decision in {"included", StudyStatus.INCLUDED_FULLTEXT.value}
+                    and not self.combined.decisions_complete(study)
+                ):
                     studies_to_screen.append(study)
                     continue
                 if old_decision in {

@@ -1,9 +1,9 @@
 """A small client for the public NeuroStore API (https://neurostore.org/api).
 
-Only the read endpoints autonima needs: base-study search and lookup by PMID, and a study
-version with its analyses and points. Every list is paged to completion and checked against
-the total the server reports, so a truncated search fails instead of passing for a complete
-one.
+Only the read endpoints autonima needs: base-study search and lookup by PMID, a study version
+with its analyses and points, and the analysis query for the features NeuroStore extracted
+for each analysis. Every list is read to completion and checked against the total the server
+reports, so a truncated listing fails instead of passing for a complete one.
 """
 
 from __future__ import annotations
@@ -40,11 +40,18 @@ class NeuroStoreClient:
         self.session = session or requests.Session()
 
     def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        return self._request("GET", path, params=params)
+
+    def post(self, path: str, body: Dict[str, Any]) -> Any:
+        """POST a JSON body to a read endpoint (the analysis query stores nothing)."""
+        return self._request("POST", path, json=body)
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
         last_error: Optional[Exception] = None
         for attempt in range(self.max_retries):
             try:
-                response = self.session.get(url, params=params, timeout=self.timeout)
+                response = self.session.request(method, url, timeout=self.timeout, **kwargs)
             except requests.RequestException as exc:
                 last_error = exc
             else:
@@ -53,14 +60,48 @@ class NeuroStoreClient:
                 if response.status_code < 500 and response.status_code != 429:
                     if not response.ok:
                         raise NeuroStoreError(
-                            f"GET {response.url} returned {response.status_code}: "
+                            f"{method} {response.url} returned {response.status_code}: "
                             f"{response.text[:300]}"
                         )
                     return response.json()
-                last_error = NeuroStoreError(f"GET {response.url} returned {response.status_code}")
+                last_error = NeuroStoreError(
+                    f"{method} {response.url} returned {response.status_code}"
+                )
             if attempt + 1 < self.max_retries:
                 time.sleep(self.retry_delay * (attempt + 1))
-        raise NeuroStoreError(f"GET {url} failed after {self.max_retries} attempts: {last_error}")
+        raise NeuroStoreError(
+            f"{method} {url} failed after {self.max_retries} attempts: {last_error}"
+        )
+
+    def analysis_features(self, base_study_ids: List[str]) -> List[Dict[str, Any]]:
+        """Every analysis with features that these papers have, from the analysis query.
+
+        An empty query restricted to ``base_study_ids`` selects all their analyses that have
+        features; ``paginate: false`` lists every selected study in one streamed response.
+        Each result is ``{study, base_study, analyses: [{id, name, features}]}``; a paper
+        without features is simply absent. The listing is checked against the count the
+        server reports, like the searches.
+        """
+        if not base_study_ids:
+            return []
+        data = self.post(
+            "analysis-queries/",
+            {
+                "query": {},
+                "base_study_ids": sorted(set(base_study_ids)),
+                "paginate": False,
+                "detail": "features",
+            },
+        )
+        if data is None:
+            raise NeuroStoreError("analysis-queries returned 404")
+        results = data.get("results") or []
+        reported = (data.get("metadata") or {}).get("total_count")
+        if reported is not None and reported != len(results):
+            raise NeuroStoreError(
+                f"analysis query listed {len(results)} studies but reported {reported}"
+            )
+        return results
 
     def search_base_studies(
         self,

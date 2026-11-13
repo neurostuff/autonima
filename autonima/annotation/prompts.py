@@ -435,3 +435,49 @@ Respond with JSON array, one object for each annotation in the same order:
 ]
 """    
     return prompt.strip()
+
+
+def create_combined_review_prompt(
+    study_group: StudyAnalysisGroup,
+    criteria_list: List[AnnotationCriteriaConfig],
+    metadata_fields: List[str],
+    eligibility_block: str,
+) -> str:
+    """One prompt for full-text screening and analysis selection together.
+
+    The study context, analyses, annotation criteria and per-analysis output are exactly the
+    multi-analysis annotation prompt's; ``eligibility_block`` (the review objective, the
+    full-text criteria and how to judge them) comes first, and the response adds the study's
+    eligibility decision as one more top-level field. Analysis decisions are asked for only
+    when the study is included, so an excluded study costs no per-analysis output.
+    """
+    selection = create_study_multi_annotation_prompt(study_group, criteria_list, metadata_fields)
+    return f"""
+This review makes two decisions about one study in a single response.
+
+STEP 1: STUDY ELIGIBILITY. Decide whether the study as a whole meets the full-text
+criteria below.
+STEP 2: ANALYSIS SELECTION. Only if the study is INCLUDED, decide for every analysis and
+every annotation whether the analysis belongs to it, as described after the criteria.
+
+{eligibility_block}
+
+{selection}
+
+COMBINED OUTPUT (this overrides the output format above where they differ):
+Return the JSON above with one more top-level field, "study_screening":
+{{
+  "decision": "INCLUDED or EXCLUDED",
+  "confidence": 0.0,
+  "reason": "Which full-text criteria IDs are met and not met, and why.",
+  "fulltext_incomplete": false,
+  "inclusion_criteria_applied": ["<full-text inclusion IDs met>"],
+  "exclusion_criteria_applied": ["<full-text exclusion IDs met>"]
+}}
+- If study_screening.decision is "EXCLUDED", return "decisions": [] and decide nothing per
+  analysis.
+- If it is "INCLUDED", return a decision for EVERY analysis listed above and, within each,
+  for EVERY annotation in the ENUM.
+- Use only the full-text criteria IDs in study_screening, and only the annotation criteria
+  IDs in the analysis decisions.
+""".strip()

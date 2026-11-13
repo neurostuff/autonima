@@ -5,14 +5,25 @@
 # - `autonima create-sample-config`
 # - the repository example config
 # - the user documentation
+#
+# The standard path: candidates come from NeuroStore's search, and each one is reviewed from
+# NeuroStore's record of it -- its analyses with the features NeuroStore extracted (contrast,
+# task, whole brain or ROI, participants, design) -- in a single call that screens the study
+# and selects its analyses (screening.fulltext.mode: combined). No article is read, and no
+# table is parsed: the coordinates are NeuroStore's.
+#
+# Only studies NeuroStore has extracted features for are reviewed; the others are listed in
+# outputs/documents_unavailable.csv with the reason. To review those from their articles
+# instead, set retrieval.records.fallback: fulltext. To read every article in full, as
+# autonima did before NeuroStore records existed, see docs/guides/records.md.
 
 # Optional global defaults applied when stage-level values are omitted.
 # defaults:
 #   model: "gpt-5-mini-2025-08-07"
 
 search:
-  database: "pubmed"
-  # Option 1: Specify a search query.
+  database: "neurostore"  # or "pubmed" to search all of PubMed
+  # Option 1: Specify a search query, in PubMed syntax; NeuroStore translates it.
   query: "schizophrenia AND working memory AND fMRI"
   # Option 2: Provide a list of PMIDs directly.
   # pmids_list:
@@ -25,12 +36,21 @@ search:
   # Optional date filtering, formatted as YYYY/MM/DD.
   # date_from: "2020/01/01"
   # date_to: "2024/12/31"
-  email: "your.email@example.com"  # Recommended for NCBI API access.
+  email: "your.email@example.com"  # Study metadata is fetched from PubMed.
+  # neurostore:  # Optional; see docs/guides/neurostore.md.
+  #   search_full_text: false  # Also match the paper's text, not only title and abstract.
 
 retrieval:
   load_excluded: false  # Load full texts for abstract-excluded studies too.
+  # Where articles come from when one is read: with the fallback below, or without records.
   sources:
     - pubget
+  records:
+    # Review each study from NeuroStore's record of it instead of its article.
+    enabled: true
+    kind: "neurostore"
+    # fallback: "fulltext"  # Review studies NeuroStore has coordinates but no features for
+    #                       # from their articles (retrieved from the sources above).
   # full_text_sources:
   #   # Example: HTML files where the filename is the PMID.
   #   - root_path: "/path/to/your/html/files"
@@ -62,15 +82,8 @@ retrieval:
   #     # coordinates_path_templates:
   #     #   - "coordinates.json"
   #     processed_data_path: "/path/to/processed/pubget_like_data"
-  # records:
-  #   # Optional: read a record another tool produced from each article (an extraction
-  #   # record, a summary) in place of its full text, for full-text screening and annotation.
-  #   # See docs/guides/records.md for the directory layout.
-  #   enabled: true
-  #   kind: "text"  # "text": records only. "analyses": records plus their analyses,
-  #                 # which requires parsing.parse_coordinates: false.
-  #   root: "/path/to/records"  # One file per study, named <pmid>.md (or .txt/.json/.yaml).
-  #   description: "a structured extraction record of the article"  # Shown to the model.
+  # Records can also come from another tool (kind "text" or "analyses", with a root
+  # folder); see docs/guides/records.md.
 
 screening:
   abstract:
@@ -94,8 +107,9 @@ screening:
 
   fulltext:
     model: "gpt-5-mini-2025-08-07"
-    # Full-text screening must currently define its own objective and
-    # inclusion criteria (or set skip_stage: true).
+    # One call per study screens it against these criteria and selects its analyses for
+    # the annotations below. "separate" screens first and annotates in a second call.
+    mode: "combined"
     objective: "Identify fMRI studies of working memory in schizophrenia"
     inclusion_criteria:
       - Human participants
@@ -114,10 +128,9 @@ screening:
     #   reasoning_effort: "none"  # Required by gpt-5.6-* when function tools are used.
 
 parsing:
-  parse_coordinates: true
-  coordinate_model: "gpt-4o-mini"
-  # coordinate_model_params:  # Optional, same idea as screening's model_params.
-  #   reasoning_effort: "none"
+  # The records bring each study's analyses and coordinates, so no tables are parsed.
+  # Without records, set true to parse them from the articles with coordinate_model.
+  parse_coordinates: false
 
 output:
   # Keep this non-empty. The CLI can override it with an explicit output folder
@@ -129,30 +142,30 @@ output:
 
 annotation:
   enabled: true
-  model: "gpt-4o-mini"
+  model: "gpt-5-mini-2025-08-07"
   # model_params:  # Optional, same idea as screening's model_params.
   #   reasoning_effort: "none"
   # Options: "single_analysis" or "multi_analysis".
   prompt_type: "multi_analysis"
   create_all_included_annotations: true
-  # metadata_fields:
-  #   - "analysis_name"
-  #   - "analysis_description"
-  #   - "table_caption"
-  #   - "study_title"
-  #   - "study_abstract"
-  #   - "study_fulltext"
-  # inclusion_criteria:
-  #   - "Studies must be in English"
-  # exclusion_criteria:
-  #   - "Exclude animal studies"
-  # annotations:
-  #   - name: "working_memory"
-  #     description: "Working memory task-based analyses"
-  #     inclusion_criteria:
-  #       - "Analysis involves working memory tasks"
-  #       - "Task-based fMRI with cognitive load manipulation"
-  #     exclusion_criteria:
-  #       - "Resting-state or passive viewing"
-  #       - "Non-cognitive motor-only tasks"
+  metadata_fields:
+    - "analysis_name"
+    - "analysis_description"
+    - "table_caption"
+    - "study_title"
+    - "study_fulltext"  # The record (or article): how annotation reads each study.
+  # Criteria every selected analysis must meet, on top of each annotation's own.
+  inclusion_criteria:
+    - "Whole-brain analysis"
+  exclusion_criteria:
+    - "Region-of-interest analyses"
+  annotations:
+    - name: "working_memory"
+      description: "Working memory task-based analyses"
+      inclusion_criteria:
+        - "Analysis involves working memory tasks"
+        - "Task-based fMRI with cognitive load manipulation"
+      exclusion_criteria:
+        - "Resting-state or passive viewing"
+        - "Non-cognitive motor-only tasks"
 

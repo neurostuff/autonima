@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 _SAMPLE_CONFIG_PACKAGE = "autonima.templates"
 _SAMPLE_CONFIG_NAME = "sample_config.yml"
+# The standard path reviews NeuroStore's records; "fulltext" reads and parses each article.
+_SAMPLE_CONFIG_NAMES = {"neurostore": _SAMPLE_CONFIG_NAME, "fulltext": "sample_config_fulltext.yml"}
 
 
 class ConfigurationError(Exception):
@@ -298,6 +300,7 @@ class ConfigManager:
                     )
 
         self._validate_documents_config(config)
+        self._validate_fulltext_mode(config)
 
     def _load_documents_config(self, documents_dict: Any) -> DocumentsConfig:
         """Load ``retrieval.records``, rejecting keys it does not define."""
@@ -320,16 +323,52 @@ class ConfigManager:
         if not documents.enabled:
             return
 
-        from .documents import SOURCE_KINDS
+        from .documents import BUILT_KINDS, SOURCE_KINDS
 
         if documents.kind not in SOURCE_KINDS:
             raise ConfigurationError(
                 f"retrieval.records.kind must be one of: {', '.join(sorted(SOURCE_KINDS))}"
             )
-        if not documents.root or not str(documents.root).strip():
-            raise ConfigurationError("retrieval.records.root is required when records are enabled")
-        if not Path(documents.root).expanduser().is_dir():
-            raise ConfigurationError(f"retrieval.records.root is not a directory: {documents.root}")
+        if documents.kind in BUILT_KINDS:
+            # Built from NeuroStore into the run's output directory; a root would be ignored.
+            if documents.root:
+                raise ConfigurationError(
+                    f"retrieval.records.kind '{documents.kind}' builds its records in the run's "
+                    "output directory; remove retrieval.records.root"
+                )
+            self._validate_record_neurostore_options(documents.neurostore)
+            from .documents.neurostore import FALLBACKS
+
+            if documents.fallback is not None and documents.fallback not in FALLBACKS:
+                raise ConfigurationError(
+                    f"retrieval.records.fallback must be one of: {', '.join(FALLBACKS)}"
+                )
+            if documents.fallback == "fulltext" and not (
+                config.retrieval.sources or config.retrieval.full_text_sources
+            ):
+                raise ConfigurationError(
+                    "retrieval.records.fallback is 'fulltext' but retrieval has no sources "
+                    "(retrieval.sources or retrieval.full_text_sources) to fetch articles from"
+                )
+        else:
+            if documents.fallback is not None:
+                raise ConfigurationError(
+                    "retrieval.records.fallback is set but retrieval.records.kind is not "
+                    "'neurostore'"
+                )
+            if documents.neurostore is not None:
+                raise ConfigurationError(
+                    "retrieval.records.neurostore is set but retrieval.records.kind is not "
+                    "'neurostore'"
+                )
+            if not documents.root or not str(documents.root).strip():
+                raise ConfigurationError(
+                    "retrieval.records.root is required when records are enabled"
+                )
+            if not Path(documents.root).expanduser().is_dir():
+                raise ConfigurationError(
+                    f"retrieval.records.root is not a directory: {documents.root}"
+                )
 
         if SOURCE_KINDS[documents.kind].provides_analyses and config.parsing.parse_coordinates:
             # Re-parsing the article would replace the analyses the documents refer to, and
@@ -350,6 +389,70 @@ class ConfigManager:
             raise ConfigurationError(
                 "retrieval.records is enabled but annotation.metadata_fields does not include "
                 "'study_fulltext', so annotation would never read them"
+            )
+
+    def _validate_fulltext_mode(self, config: PipelineConfig) -> None:
+        """``screening.fulltext.mode``: ``separate`` (default) or ``combined``.
+
+        Combined screens each study and selects its analyses in one call, so the analyses must
+        exist before full-text screening: they have to come with the records.
+        """
+        mode = config.screening.fulltext.get("mode", "separate")
+        if mode in (None, "separate"):
+            return
+        if mode != "combined":
+            raise ConfigurationError("screening.fulltext.mode must be 'separate' or 'combined'")
+        from .documents import SOURCE_KINDS
+
+        documents = config.documents
+        if not (documents.enabled and SOURCE_KINDS[documents.kind].provides_analyses):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' needs records that carry their analyses: "
+                "retrieval.records with kind 'analyses' or 'neurostore'"
+            )
+        if config.screening.fulltext.get("skip_stage"):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' cannot be used with skip_stage"
+            )
+        annotation = config.annotation
+        if not (annotation.enabled and annotation.annotations):
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' selects analyses for annotation.annotations; "
+                "enable annotation and define at least one annotation"
+            )
+        if annotation.prompt_type != "multi_analysis":
+            raise ConfigurationError(
+                "screening.fulltext.mode 'combined' judges a study's analyses together; "
+                "annotation.prompt_type must be 'multi_analysis'"
+            )
+
+    @staticmethod
+    def _validate_record_neurostore_options(options: Any) -> None:
+        """``retrieval.records.neurostore``: the version choice ``parsing.neurostore`` makes."""
+        from .neurostore.analyses import DEFAULT_SOURCES
+
+        if options is None:
+            return
+        if not isinstance(options, dict):
+            raise ConfigurationError("retrieval.records.neurostore must be a mapping")
+        unknown = sorted(set(options) - {"sources", "roles", "base_url"})
+        if unknown:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore key(s): {', '.join(unknown)}"
+            )
+        bad_sources = sorted(set(options.get("sources") or []) - set(DEFAULT_SOURCES))
+        if bad_sources:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore source(s): {', '.join(bad_sources)}. "
+                f"Known: {', '.join(DEFAULT_SOURCES)}"
+            )
+        bad_roles = sorted(
+            set(options.get("roles") or [])
+            - {"result", "anchor", "localization", "reference", "other"}
+        )
+        if bad_roles:
+            raise ConfigurationError(
+                f"Unknown retrieval.records.neurostore role(s): {', '.join(bad_roles)}"
             )
 
     def get_config(self) -> PipelineConfig:
@@ -377,9 +480,9 @@ class ConfigManager:
         with open(config_path, 'w', encoding='utf-8') as f:
             yaml.dump(config_dict, f, default_flow_style=False, indent=2)
 
-    def create_sample_config(self) -> PipelineConfig:
-        """Create the canonical sample configuration as a validated object."""
-        sample_config_text = get_sample_config_text()
+    def create_sample_config(self, variant: str = "neurostore") -> PipelineConfig:
+        """Create a sample configuration (``neurostore`` or ``fulltext``) as a validated object."""
+        sample_config_text = get_sample_config_text(variant)
         config_data = yaml.safe_load(sample_config_text)
         if config_data is None:
             raise ConfigurationError("Canonical sample configuration is empty")
@@ -591,28 +694,36 @@ def load_config(config_path: Union[str, Path]) -> PipelineConfig:
     return manager.load_from_file(config_path)
 
 
-def create_sample_config_file(output_path: Union[str, Path]) -> None:
+def create_sample_config_file(output_path: Union[str, Path], variant: str = "neurostore") -> None:
     """
     Create a sample configuration file.
 
     Args:
         output_path: Path where to save the sample configuration
+        variant: ``neurostore`` (the standard path) or ``fulltext``
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(get_sample_config_text(), encoding="utf-8")
+    output_path.write_text(get_sample_config_text(variant), encoding="utf-8")
 
 
-def get_sample_config_text() -> str:
-    """Return the canonical sample configuration YAML text."""
+def get_sample_config_text(variant: str = "neurostore") -> str:
+    """Return a sample configuration's YAML text.
+
+    ``neurostore``, the standard path: NeuroStore search, NeuroStore records and a combined
+    review. ``fulltext``: PubMed search, each article read in full and its tables parsed.
+    """
+    if variant not in _SAMPLE_CONFIG_NAMES:
+        raise ValueError(f"Unknown sample config {variant!r}; known: {', '.join(_SAMPLE_CONFIG_NAMES)}")
+    name = _SAMPLE_CONFIG_NAMES[variant]
     if hasattr(resources, "files"):
         return (
             resources.files(_SAMPLE_CONFIG_PACKAGE)
-            .joinpath(_SAMPLE_CONFIG_NAME)
+            .joinpath(name)
             .read_text(encoding="utf-8")
         )
     return resources.read_text(
         _SAMPLE_CONFIG_PACKAGE,
-        _SAMPLE_CONFIG_NAME,
+        name,
         encoding="utf-8",
     )

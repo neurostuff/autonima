@@ -172,8 +172,15 @@ class DocumentSource:
                 f"open_analyses is {'missing' if cls.provides_analyses else 'defined'}"
             )
 
-    def prepare(self, pmids: Iterable[int]) -> PrepareReport:
-        """Make the documents for ``pmids`` available. May be expensive; idempotent."""
+    def prepare(
+        self, pmids: Iterable[int], studies: Optional[Mapping[int, Any]] = None
+    ) -> PrepareReport:
+        """Make the documents for ``pmids`` available. May be expensive; idempotent.
+
+        ``studies`` maps each PMID to its Study, for a source that writes the study's own
+        metadata (title, abstract) into the document; a source that reads documents as they
+        are ignores it. ``unavailable`` names each PMID the source cannot supply and why.
+        """
         raise NotImplementedError
 
     def index(self) -> Mapping[int, DocumentRef]:

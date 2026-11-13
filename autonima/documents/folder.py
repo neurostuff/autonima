@@ -61,7 +61,9 @@ class FolderDocumentSource(DocumentSource):
         self.description = description or DEFAULT_DESCRIPTION
         self._index: Optional[Dict[int, DocumentRef]] = None
 
-    def prepare(self, pmids: Iterable[int]) -> PrepareReport:
+    def prepare(
+        self, pmids: Iterable[int], studies: Optional[Mapping[int, Any]] = None
+    ) -> PrepareReport:
         if not self.root.is_dir():
             raise DocumentFormatError(f"Document root {self.root} is not a directory")
         index: Dict[int, DocumentRef] = {}

@@ -38,7 +38,7 @@ def _write_record(root, pmid="111"):
 
 
 def _pipeline(tmp_path, kind, root, **overrides):
-    config = yaml.safe_load(get_sample_config_text())
+    config = yaml.safe_load(get_sample_config_text("fulltext"))
     config["search"]["pmids_list"] = ["111", "222"]
     config["output"]["directory"] = str(tmp_path / "run")
     config["parsing"]["parse_coordinates"] = kind != "analyses"
@@ -209,3 +209,20 @@ def test_skipped_abstract_screening_still_counts_missing_documents(tmp_path, kin
     assert [(r["pmid"], r["type"]) for r in missing] == [("222", "unavailable")]
     reasons = _csv_rows(outputs / "documents_unavailable.csv")
     assert [(r["pmid"], r["reason"]) for r in reasons] == [("222", "no_document")]
+
+
+def test_skipped_fulltext_screening_passes_on_only_studies_with_records(tmp_path):
+    root = tmp_path / "records"
+    _write_record(root)
+    pipeline = _pipeline(
+        tmp_path, "analyses", root,
+        screening={"fulltext": {"skip_stage": True}},
+    )
+    asyncio.run(pipeline._execute_retrieval_phase())
+    asyncio.run(pipeline._execute_fulltext_screening())
+
+    # 111 has a record and passes on; 222 has none and is unavailable, not included.
+    assert [s.status for s in pipeline.results.studies] == [
+        StudyStatus.INCLUDED_FULLTEXT,
+        StudyStatus.INCLUDED_ABSTRACT,
+    ]
