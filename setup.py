@@ -76,7 +76,7 @@ setup(
             "readabilipy>=0.2.0"
         ],
         "meta": [
-            "nimare>=0.1.0"
+            "nimare>=0.11.0"
         ],
         "docs": [
             "mkdocs>=1.6",

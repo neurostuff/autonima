@@ -12,17 +12,18 @@ try:
     from nimare.correct import FDRCorrector, FWECorrector
     from nimare.workflows import CBMAWorkflow
     from nimare.meta.cbma import MKDADensity, ALE, KDA
-    from nimare.nimads import Studyset, Annotation
+    from nimare.nimads import Studyset
     from nimare.reports.base import run_reports
-
-    NIMARE_AVAILABLE = True
-except ImportError:
-    NIMARE_AVAILABLE = False
-
-if not NIMARE_AVAILABLE:
+except ImportError as exc:
+    # Report the real failure: an installed but incompatible NiMARE used to be reported
+    # as "NiMARE is not installed".
+    if getattr(exc, "name", None) == "nimare":
+        message = "NiMARE is not installed."
+    else:
+        message = f"Could not import NiMARE: {exc}. autonima meta needs nimare>=0.11."
     raise ImportError(
-        "NiMARE is not installed. Please install with: pip install autonima[meta]"
-    )
+        f'{message} Install a supported version with: pip install "nimare>=0.11"'
+    ) from exc
 
 
 def create_estimator(estimator_name, estimator_args):
@@ -64,6 +65,19 @@ def find_nimads_files(output_folder):
         raise FileNotFoundError(f"Annotation file not found: {annotation_file}")
 
     return str(studyset_file), str(annotation_file)
+
+
+def resolve_nimads_folder(output_folder) -> Path:
+    """Return the folder that holds the NiMADS files, given a run folder or its outputs/.
+
+    The README, the CLI help and the guides all pass ``<run>/outputs``, while the web UI
+    passes the run folder itself. This used to append ``outputs/`` unconditionally, so
+    following the docs looked for ``<run>/outputs/outputs/`` and failed.
+    """
+    folder = Path(output_folder)
+    if (folder / "nimads_studyset.json").exists():
+        return folder
+    return folder / "outputs"
 
 
 def load_include_ids(include_ids_file: Optional[os.PathLike]) -> Optional[Set[str]]:
@@ -157,21 +171,96 @@ def _analysis_ids_for_column(annotation_data, column):
     ]
 
 
-def _analysis_has_valid_coordinates(analysis) -> bool:
-    """Return True when an analysis has at least one finite (x, y, z) point."""
-    points = getattr(analysis, "points", None) or []
-    if not points:
-        return False
+def _unknown_analysis_count(annotation_data, column):
+    """Count analyses whose decision for a column is null: annotation failed, not excluded."""
+    return sum(
+        1
+        for note in annotation_data.get("notes", [])
+        if isinstance(note, dict)
+        and isinstance(note.get("note"), dict)
+        and column in note["note"]
+        and note["note"][column] is None
+    )
 
-    for point in points:
-        coords = (getattr(point, "x", None), getattr(point, "y", None), getattr(point, "z", None))
-        if all(
+
+def _analysis_has_valid_coordinates(analysis) -> bool:
+    """Return True when an analysis has at least one finite (x, y, z) point.
+
+    Accepts a NiMADS analysis dict (points carry ``coordinates``) or a NiMARE analysis
+    object (points carry ``x``, ``y``, ``z``).
+    """
+    if isinstance(analysis, dict):
+        points = analysis.get("points") or []
+        triples = [tuple(p.get("coordinates") or ())[:3] for p in points if isinstance(p, dict)]
+    else:
+        points = getattr(analysis, "points", None) or []
+        triples = [
+            (getattr(p, "x", None), getattr(p, "y", None), getattr(p, "z", None))
+            for p in points
+        ]
+    for coords in triples:
+        if len(coords) == 3 and all(
             isinstance(value, (int, float)) and math.isfinite(float(value))
             for value in coords
         ):
             return True
-
     return False
+
+
+def _select_studyset_data(studyset_data, analysis_ids, include_ids=None):
+    """The studyset dict holding exactly the selected analyses, and what was dropped.
+
+    Selection is done on the NiMADS dict rather than with ``Studyset.slice``, whose meaning
+    depends on the NiMARE version: on 0.21.x it keeps every analysis of each named study
+    (asking for one of a study's five analyses returns all five) and raises on an id that is
+    not in the studyset. Filtering the dict behaves the same on every supported release.
+
+    - ids not present in the studyset are ignored;
+    - ``include_ids`` (study ids) restricts the result to those studies;
+    - analyses without a finite (x, y, z) point are dropped and counted;
+    - a repeated study or analysis record is kept once (an export can repeat a study);
+    - a point with no recorded space is labelled MNI, which is how NiMARE treated it before
+      0.21 (no transform applied); 0.21 refuses a dataset without a space. Counted.
+    """
+    wanted = {str(i) for i in analysis_ids}
+    counts = {"no_coordinates": 0, "unknown_space": 0, "duplicates": 0}
+    studies, seen_studies, seen_analyses = [], set(), set()
+    for study in studyset_data.get("studies", []) or []:
+        study_id = str(study.get("id"))
+        if study_id in seen_studies:
+            counts["duplicates"] += sum(
+                1 for a in study.get("analyses") or [] if str(a.get("id")) in wanted
+            )
+            continue
+        seen_studies.add(study_id)
+        if include_ids is not None and study_id not in include_ids:
+            continue
+        kept = []
+        for analysis in study.get("analyses") or []:
+            analysis_id = str(analysis.get("id"))
+            if analysis_id not in wanted:
+                continue
+            if analysis_id in seen_analyses:
+                counts["duplicates"] += 1
+                continue
+            seen_analyses.add(analysis_id)
+            if not _analysis_has_valid_coordinates(analysis):
+                counts["no_coordinates"] += 1
+                continue
+            points = []
+            unknown = False
+            for point in analysis.get("points") or []:
+                if isinstance(point, dict) and not point.get("space"):
+                    point = dict(point, space="MNI")
+                    unknown = True
+                points.append(point)
+            counts["unknown_space"] += int(unknown)
+            kept.append(dict(analysis, name=analysis_id, points=points))
+        if kept:
+            studies.append(dict(study, name=study_id, analyses=kept))
+    subset = dict(studyset_data)
+    subset["studies"] = studies
+    return subset, counts
 
 
 def _post_mortem_debugger():
@@ -214,57 +303,54 @@ def run_meta_analysis_for_column(
         return None
 
     analysis_ids = _analysis_ids_for_column(annotation_data, column)
+    unknown = _unknown_analysis_count(annotation_data, column)
+    if unknown:
+        # Left out because they were never decided, not because they were excluded. Say so,
+        # or the map silently loses them the way the old False default did.
+        print(
+            f"Warning: {unknown} analyses have no decision for column {column} "
+            "(annotation failed) and are left out of this meta-analysis. "
+            "Re-run the pipeline to retry them."
+        )
     if not analysis_ids:
         print(f"No studies found for column {column}. Skipping.")
         return None
 
-    first_studyset = studyset.slice(analyses=analysis_ids)
-
+    if not isinstance(studyset, dict):
+        # Older call sites pass a NiMARE Studyset; select on its dict form all the same.
+        studyset = studyset.to_dict()
     include_ids_set = _normalize_include_ids(include_ids)
-    if include_ids_set is not None:
-        filtered_analysis_ids = [
-            analysis.id
-            for study in first_studyset.studies
-            if study.id in include_ids_set
-            for analysis in study.analyses
-        ]
-        if not filtered_analysis_ids:
-            print(f"No analyses remain after include-ids filtering for column {column}. Skipping.")
-            return None
-        first_studyset = first_studyset.slice(analyses=filtered_analysis_ids)
+    subset, counts = _select_studyset_data(studyset, analysis_ids, include_ids_set)
+    n_selected = sum(len(study["analyses"]) for study in subset["studies"])
 
-    valid_analysis_ids = [
-        analysis.id
-        for study in first_studyset.studies
-        for analysis in study.analyses
-        if _analysis_has_valid_coordinates(analysis)
-    ]
-    valid_analysis_id_set = set(valid_analysis_ids)
-    skipped_without_valid_coords = sum(
-        1
-        for study in first_studyset.studies
-        for analysis in study.analyses
-        if analysis.id not in valid_analysis_id_set
-    )
-    if skipped_without_valid_coords:
+    if counts["duplicates"]:
         print(
-            f"Skipping {skipped_without_valid_coords} analyses without valid coordinates "
+            f"Ignoring {counts['duplicates']} repeated analysis records for column {column} "
+            "(the studyset repeats a study); each analysis is fitted once."
+        )
+    if counts["no_coordinates"]:
+        print(
+            f"Skipping {counts['no_coordinates']} analyses without valid coordinates "
             f"for column {column}."
         )
-    if not valid_analysis_ids:
-        print(f"No analyses with valid coordinates remain for column {column}. Skipping.")
+    if counts["unknown_space"]:
+        print(
+            f"{counts['unknown_space']} analyses for column {column} have points with no "
+            "recorded coordinate space; those points are fitted as MNI."
+        )
+    if n_selected == 0:
+        if include_ids_set is not None:
+            print(f"No analyses remain after include-ids filtering for column {column}. Skipping.")
+        else:
+            print(f"No analyses with valid coordinates remain for column {column}. Skipping.")
         return None
-    first_studyset = first_studyset.slice(analyses=valid_analysis_ids)
 
-    for study in first_studyset.studies:
-        study.name = study.id
-        for analysis in study.analyses:
-            analysis.name = analysis.id
-
-    first_dataset = first_studyset.to_dataset()
-    if len(first_dataset.ids) == 0:
-        print(f"No analyses available for column {column} after slicing. Skipping.")
-        return None
+    dataset = Studyset(subset).to_dataset()
+    if len(dataset.ids) != n_selected:
+        raise RuntimeError(
+            f"NiMARE built a dataset of {len(dataset.ids)} analyses for column {column}, "
+            f"but {n_selected} were selected."
+        )
 
     estimator = create_estimator(estimator_name, estimator_args or {})
     corrector = create_corrector(corrector_name, corrector_args or {})
@@ -276,7 +362,7 @@ def run_meta_analysis_for_column(
         output_dir=str(output_dir),
     )
 
-    meta_results = workflow.fit(first_dataset)
+    meta_results = workflow.fit(dataset)
     if generate_reports:
         run_reports(meta_results, str(output_dir))
 
@@ -330,11 +416,6 @@ def run_meta_analyses_from_files(
 
     studyset_data, annotation_data = _load_and_sanitize_data(studyset_file, annotation_file)
 
-    print("Creating studyset...")
-    studyset = Studyset(studyset_data)
-
-    print("Creating annotation...")
-    annotation = Annotation(annotation_data, studyset)
 
     selected_columns = _get_boolean_columns(annotation_data, columns=columns)
     print(f"Found {len(selected_columns)} boolean columns: {selected_columns}")
@@ -351,8 +432,8 @@ def run_meta_analyses_from_files(
 
         try:
             meta_results = run_meta_analysis_for_column(
-                studyset,
-                annotation,
+                studyset_data,
+                None,
                 annotation_data,
                 column,
                 str(column_output_dir),
@@ -391,8 +472,12 @@ def run_meta_analyses(
     debug=False,
     generate_reports=False,
 ):
-    """Run meta-analyses on all boolean annotation columns in the NiMADS files."""
-    output_folder = Path(output_folder) / "outputs"
+    """Run meta-analyses on all boolean annotation columns in the NiMADS files.
+
+    ``output_folder`` may be the run folder or its ``outputs/`` folder. Results are written
+    to ``meta_analysis_results/`` beside the NiMADS files either way.
+    """
+    output_folder = resolve_nimads_folder(output_folder)
     studyset_file, annotation_file = find_nimads_files(output_folder)
 
     output_dir = Path(output_folder) / "meta_analysis_results"
@@ -420,7 +505,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run meta-analyses on autonima output")
     parser.add_argument(
         "output_folder",
-        help="Path to the autonima output folder containing NiMADS files",
+        help="Run output folder, or its outputs/ folder holding the NiMADS files",
     )
 
     parser.add_argument(

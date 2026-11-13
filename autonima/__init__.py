@@ -7,7 +7,7 @@ loaded only when their symbols are requested.
 
 from importlib import import_module
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Autonima Development Team"
 __description__ = "LLM-powered automated systematic review and meta-analysis"
 

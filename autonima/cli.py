@@ -644,7 +644,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
     from an Autonima systematic review pipeline.
 
     Arguments:
-        OUTPUT_FOLDER   Output folder containing NiMADS files
+        OUTPUT_FOLDER   Run output folder, or its outputs/ folder holding the NiMADS files
 
     Options:
         --estimator              CBMA estimator to use (ale, mkdadensity, kda)
@@ -669,10 +669,7 @@ def meta(output_folder: str, estimator: str, estimator_args: str,
         try:
             from .meta import run_meta_analyses
         except ImportError as e:
-            log_error_with_debug(
-                logger,
-                "NiMARE is not installed. Please install with: pip install autonima[meta]"
-            )
+            log_error_with_debug(logger, str(e))
             if debug:
                 import pdb
                 pdb.post_mortem()
