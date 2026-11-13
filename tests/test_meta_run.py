@@ -135,3 +135,49 @@ def test_meta_analysis_keeps_only_include_ids_studies(tmp_path):
         "101-101_analysis_1",
         "103-103_analysis_0",
     ]
+
+
+EXPECTED_TARGET_IDS = [
+    "101-101_analysis_0",
+    "101-101_analysis_1",
+    "102-102_analysis_0",
+    "102-102_analysis_1",
+    "103-103_analysis_0",
+    "104-104_analysis_0",
+    "105-105_analysis_0",
+    "106-106_analysis_0",
+]
+
+
+def _edit_studyset(folder, edit):
+    path = folder / "nimads_studyset.json"
+    data = json.loads(path.read_text())
+    edit(data)
+    path.write_text(json.dumps(data))
+
+
+def test_meta_analysis_fits_a_repeated_study_record_once(tmp_path):
+    # An export can repeat a study verbatim; its analyses must not be counted twice.
+    outputs = _write_outputs(tmp_path / "outputs")
+    _edit_studyset(outputs, lambda d: d["studies"].append(json.loads(json.dumps(d["studies"][0]))))
+
+    results = meta.run_meta_analyses(outputs, fail_fast=True)
+
+    assert _fitted_ids(results["target"]) == EXPECTED_TARGET_IDS
+
+
+def test_meta_analysis_fits_points_without_a_recorded_space(tmp_path):
+    # Coordinates whose space the parser could not determine are exported with space null.
+    outputs = _write_outputs(tmp_path / "outputs")
+
+    def drop_spaces(data):
+        for study in data["studies"]:
+            for analysis in study["analyses"]:
+                for point in analysis.get("points") or []:
+                    point["space"] = None
+
+    _edit_studyset(outputs, drop_spaces)
+
+    results = meta.run_meta_analyses(outputs, fail_fast=True)
+
+    assert _fitted_ids(results["target"]) == EXPECTED_TARGET_IDS
