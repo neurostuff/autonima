@@ -303,6 +303,9 @@ class SearchConfig:
     email: Optional[str] = None  # Required for NCBI API
     pmids_file: Optional[str] = None  # Path to file with PMIDs (one per line)
     pmids_list: Optional[List[str]] = None  # Direct list of PMIDs
+    # database: neurostore only. {query, search_full_text, data_type, base_url}; see
+    # autonima/search/neurostore.py. None keeps a PubMed config's signature unchanged.
+    neurostore: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -354,6 +357,11 @@ class ParsingConfig:
     # Not in the parsing cache signature, which allowlists parse_coordinates and coordinate_model
     # only, so setting it does not invalidate parsed coordinates.
     coordinate_model_params: Optional[Dict[str, Any]] = None
+    # Where analyses come from: "tables" parses the retrieved tables with coordinate_model;
+    # "neurostore" takes them from NeuroStore (autonima/neurostore/analyses.py).
+    coordinate_source: str = "tables"
+    # coordinate_source: neurostore only. {sources, roles, base_url}.
+    neurostore: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -441,6 +449,8 @@ class PipelineConfig:
                 "email": self.search.email,
                 "pmids_file": self.search.pmids_file,
                 "pmids_list": self.search.pmids_list,
+                # Present only when set, so a config without it hashes as it always has.
+                **({"neurostore": self.search.neurostore} if self.search.neurostore else {}),
             },
             "screening": {
                 "abstract": serialize_screening_dict(self.screening.abstract),
@@ -461,6 +471,12 @@ class PipelineConfig:
             "parsing": {
                 "parse_coordinates": self.parsing.parse_coordinates,
                 "coordinate_model": self.parsing.coordinate_model,
+                **(
+                    {"coordinate_source": self.parsing.coordinate_source}
+                    if self.parsing.coordinate_source != "tables"
+                    else {}
+                ),
+                **({"neurostore": self.parsing.neurostore} if self.parsing.neurostore else {}),
             },
             "annotation": {
                 "model": self.annotation.model,

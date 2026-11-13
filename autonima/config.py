@@ -237,14 +237,16 @@ class ConfigManager:
         # Validate search configuration
         if not (config.search.pmids_file or config.search.pmids_list):
             # Query-based search
-            if not config.search.query.strip():
+            native_query = (config.search.neurostore or {}).get("query") if config.search.database == "neurostore" else None
+            if not config.search.query.strip() and not native_query:
                 raise ConfigurationError("Search query cannot be empty when not using PMIDs list/file")
 
         if config.search.max_results is not None and config.search.max_results <= 0:
             raise ConfigurationError("max_results must be positive")
 
-        if config.search.database not in ['pubmed', 'pmc']:
-            raise ConfigurationError("database must be 'pubmed' or 'pmc'")
+        if config.search.database not in ['pubmed', 'pmc', 'neurostore']:
+            raise ConfigurationError("database must be 'pubmed', 'pmc' or 'neurostore'")
+        self._validate_neurostore_config(config)
 
         # Validate screening configuration
         self._validate_screening_config(config)
@@ -382,6 +384,53 @@ class ConfigManager:
         if config_data is None:
             raise ConfigurationError("Canonical sample configuration is empty")
         return self.load_from_dict(config_data)
+
+    def _validate_neurostore_config(self, config: PipelineConfig) -> None:
+        """NeuroStore options: known keys only, and only where NeuroStore is in use."""
+        from .neurostore.analyses import DEFAULT_SOURCES
+
+        search_options = config.search.neurostore
+        if search_options is not None:
+            if config.search.database != "neurostore":
+                raise ConfigurationError("search.neurostore is set but search.database is not 'neurostore'")
+            if not isinstance(search_options, dict):
+                raise ConfigurationError("search.neurostore must be a mapping")
+            unknown = sorted(set(search_options) - {"query", "search_full_text", "data_type", "base_url"})
+            if unknown:
+                raise ConfigurationError(f"Unknown search.neurostore key(s): {', '.join(unknown)}")
+            if search_options.get("data_type") not in (None, "coordinate", "image", "both"):
+                raise ConfigurationError("search.neurostore.data_type must be coordinate, image, both or null")
+
+        source = config.parsing.coordinate_source
+        if source not in ("tables", "neurostore"):
+            raise ConfigurationError("parsing.coordinate_source must be 'tables' or 'neurostore'")
+        parsing_options = config.parsing.neurostore
+        if parsing_options is not None:
+            if source != "neurostore":
+                raise ConfigurationError(
+                    "parsing.neurostore is set but parsing.coordinate_source is not 'neurostore'"
+                )
+            if not isinstance(parsing_options, dict):
+                raise ConfigurationError("parsing.neurostore must be a mapping")
+            unknown = sorted(set(parsing_options) - {"sources", "roles", "base_url"})
+            if unknown:
+                raise ConfigurationError(f"Unknown parsing.neurostore key(s): {', '.join(unknown)}")
+            bad_sources = sorted(set(parsing_options.get("sources") or []) - set(DEFAULT_SOURCES))
+            if bad_sources:
+                raise ConfigurationError(
+                    f"Unknown parsing.neurostore source(s): {', '.join(bad_sources)}. "
+                    f"Known: {', '.join(DEFAULT_SOURCES)}"
+                )
+            bad_roles = sorted(
+                set(parsing_options.get("roles") or [])
+                - {"result", "anchor", "localization", "reference", "other"}
+            )
+            if bad_roles:
+                raise ConfigurationError(f"Unknown parsing.neurostore role(s): {', '.join(bad_roles)}")
+        if source == "neurostore" and not config.parsing.parse_coordinates:
+            raise ConfigurationError(
+                "parsing.coordinate_source is 'neurostore' but parsing.parse_coordinates is false"
+            )
 
     def _validate_screening_config(self, config: PipelineConfig) -> None:
         """
